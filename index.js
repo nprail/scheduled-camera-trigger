@@ -6,17 +6,17 @@ import { log, readJson } from './utils.js'
 
 const cam = new Camera()
 
-const attempts = await readJson('./schedule.json')
+const config = await readJson('./config.json')
 
-const jobs = attempts.map((attempt) => {
-  const launchTime = new Date(attempt.date)
+const jobs = config.attempts.map((attempt) => {
+  const launchTime = new Date(attempt.time)
 
-  // start recording 20 seconds before ignition
-  const recordTime = new Date(launchTime.getTime() - ms('20s'))
-  // wake up the camera 5 seconds before recording
-  const wakeUpTime = new Date(recordTime.getTime() - ms('5s'))
-  // stop recording 30 seconds after ignition
-  const stopTime = new Date(launchTime.getTime() + ms('30s'))
+  // start recording x seconds before ignition
+  const recordTime = new Date(launchTime.getTime() - ms(config.startBefore))
+  // wake up the camera x seconds before recording
+  const wakeUpTime = new Date(recordTime.getTime() - ms(config.wakeUpTimeout))
+  // stop recording x seconds after ignition
+  const stopTime = new Date(launchTime.getTime() + ms(config.endAfter))
 
   // wake up the camera
   schedule.scheduleJob(wakeUpTime, () => {

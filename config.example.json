@@ -1,0 +1,15 @@
+{
+  "wakeUpTimeout": "5s",
+  "startBefore": "20s",
+  "endAfter": "30s",
+  "attempts": [
+    {
+      "name": "First attempt",
+      "time": "2022-02-19T17:39:00.000Z"
+    },
+    {
+      "name": "Second attempt",
+      "time": "2022-02-20T17:39:00.000Z"
+    }
+  ]
+}
