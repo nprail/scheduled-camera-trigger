@@ -1,21 +1,19 @@
+import { log } from './utils.js'
+
 export class Camera {
   constructor() {
     this.recording = false
   }
 
-  log(message, ...optionalParams) {
-    console.log(`${new Date().toISOString()} ${message}`, ...optionalParams)
-  }
-
   async wake() {
-    this.log('Waking up camera.')
+    log('Wake')
   }
 
   async trigger() {
     if (!this.recording) {
-      this.log('Starting recording.')
+      log('Record')
     } else {
-      this.log('Ending recording.')
+      log('Stop')
     }
 
     this.recording = !this.recording

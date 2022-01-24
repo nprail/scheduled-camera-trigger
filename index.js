@@ -2,7 +2,7 @@ import schedule from 'node-schedule'
 import ms from 'ms'
 
 import { Camera } from './camera.js'
-import { log, readJson, sleep } from './utils.js'
+import { log, readJson } from './utils.js'
 
 const cam = new Camera()
 
@@ -11,32 +11,36 @@ const attempts = await readJson('./schedule.json')
 const jobs = attempts.map((attempt) => {
   const launchTime = new Date(attempt.date)
 
-  // start the job 31 seconds before ignition to allow for 30 seconds of recording before
-  const jobTime = new Date(launchTime - ms('31s'))
+  // start recording 20 seconds before ignition
+  const recordTime = new Date(launchTime.getTime() - ms('20s'))
+  // wake up the camera 5 seconds before recording
+  const wakeUpTime = new Date(recordTime.getTime() - ms('5s'))
+  // stop recording 30 seconds after ignition
+  const stopTime = new Date(launchTime.getTime() + ms('30s'))
 
-  schedule.scheduleJob(jobTime, async () => {
+  // wake up the camera
+  schedule.scheduleJob(wakeUpTime, () => {
     console.log('')
-    log(`Starting '${attempt.name}'`)
+    log(`Start '${attempt.name}'`)
 
-    // wake up the camera
     cam.wake()
+  })
 
-    await sleep('1s')
-
-    // press the trigger to start recording
+  // press the trigger to start recording
+  schedule.scheduleJob(recordTime, () => {
     cam.trigger()
+  })
 
-    // wait 1 minute
-    await sleep('30s')
-
+  // just log some stuff
+  schedule.scheduleJob(launchTime, () => {
     log(`Ignition ${launchTime.toISOString()}`)
+  })
 
-    await sleep('30s')
-
-    // press the trigger again to stop recording
+  // press the trigger again to stop recording
+  schedule.scheduleJob(stopTime, () => {
     cam.trigger()
 
-    log(`'${attempt.name}' completed.`)
+    log(`Complete '${attempt.name}'`)
   })
 })
 
