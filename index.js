@@ -1,5 +1,6 @@
 import schedule from 'node-schedule'
 import ms from 'ms'
+import { v4 as uuid } from 'uuid'
 
 import { Camera } from './camera.js'
 import { log, readJson } from './utils.js'
@@ -19,7 +20,7 @@ const jobs = config.attempts.map((attempt) => {
   const stopTime = new Date(launchTime.getTime() + ms(config.endAfter))
 
   // wake up the camera
-  schedule.scheduleJob(wakeUpTime, () => {
+  const wakeUpJob = schedule.scheduleJob(wakeUpTime, () => {
     console.log('')
     log(`Start '${attempt.name}'`)
 
@@ -27,21 +28,23 @@ const jobs = config.attempts.map((attempt) => {
   })
 
   // press the trigger to start recording
-  schedule.scheduleJob(recordTime, () => {
+  const triggerJob = schedule.scheduleJob(recordTime, () => {
     cam.trigger()
   })
 
-  // just log some stuff
-  schedule.scheduleJob(launchTime, () => {
-    log(`Ignition ${launchTime.toISOString()}`)
-  })
-
   // press the trigger again to stop recording
-  schedule.scheduleJob(stopTime, () => {
+  const stopJob = schedule.scheduleJob(stopTime, () => {
     cam.trigger()
 
     log(`Complete '${attempt.name}'`)
   })
+
+  return {
+    id: uuid(),
+    jobs: [wakeUpJob, triggerJob, stopJob],
+  }
 })
 
-console.log(`${jobs.length} attempts scheduled...`)
+console.log(jobs)
+
+console.log(`${config.attempts.length} attempts scheduled...`)
