@@ -1,7 +1,22 @@
-import { readFile } from 'fs/promises'
+import { readFile, appendFile } from 'fs/promises'
+import { resolve } from 'path'
 
-export const log = (message, ...optionalParams) =>
-  console.log(`${new Date().toISOString()} ${message}`, ...optionalParams)
+export class Logger {
+  constructor(logFile) {
+    this.logFile = logFile
+  }
+
+  log(message, ...optionalParams) {
+    const log = {
+      timestamp: new Date().toISOString(),
+      message,
+      optionalParams,
+    }
+    console.log(`${log.timestamp} ${log.message}`, ...log.optionalParams)
+
+    appendFile(resolve(this.logFile), `\n${JSON.stringify(log)}`)
+  }
+}
 
 export const readJson = async (path) => {
   const data = await readFile(path, 'utf-8')

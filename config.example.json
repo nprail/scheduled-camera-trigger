@@ -2,6 +2,7 @@
   "wakeUpTimeout": "5s",
   "startBefore": "20s",
   "endAfter": "30s",
+  "logFile": "log.txt",
   "attempts": [
     {
       "name": "First attempt",
