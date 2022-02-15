@@ -2,6 +2,7 @@ import { Gpio } from 'onoff'
 
 export class Camera {
   constructor({ logger }) {
+    this.logger = logger
     this.release = new Gpio(17, 'out')
     this.focus = new Gpio(18, 'out')
 
@@ -9,16 +10,16 @@ export class Camera {
   }
 
   async wake() {
-    logger.log('Wake')
+    this.logger.log('Wake')
     await this.focus.write(1)
     await this.focus.write(0)
   }
 
   async trigger() {
     if (!this.recording) {
-      logger.log('Record')
+      this.logger.log('Record')
     } else {
-      logger.log('Stop')
+      this.logger.log('Stop')
     }
 
     await this.release.write(1)
