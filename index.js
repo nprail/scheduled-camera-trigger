@@ -6,7 +6,8 @@ import { Camera } from './camera.js'
 import { Logger, readJson } from './utils.js'
 import { initServer } from './server.js'
 
-const config = await readJson('./config.json')
+const configFile = process.argv[2]
+const config = await readJson(configFile ?? './config.json')
 
 const logger = new Logger(config.logFile)
 const cam = new Camera({ logger })
