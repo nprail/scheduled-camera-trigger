@@ -44,7 +44,12 @@ const jobs = config.attempts.map((attempt) => {
 
   return {
     id: uuid(),
-    jobs: [wakeUpJob, triggerJob, stopJob],
+    config: {
+      launchTime,
+      wakeUpTime,
+      recordTime,
+      stopTime,
+    },
   }
 })
 

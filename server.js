@@ -10,7 +10,7 @@ export const initServer = (config, jobs, cam, logger) => {
     res.write(
       JSON.stringify({
         status: 'OK',
-        jobs: jobs.length,
+        jobs,
         recording: cam.recording,
         attempts: config.attempts,
       })
