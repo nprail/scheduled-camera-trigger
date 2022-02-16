@@ -2,8 +2,9 @@ import { Gpio } from 'onoff'
 
 export class Camera {
   constructor({ logger }) {
+    this.logger = logger
+
     try {
-      this.logger = logger
       this.release = new Gpio(17, 'out')
       this.focus = new Gpio(18, 'out')
 
