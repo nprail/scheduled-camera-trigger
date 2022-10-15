@@ -3,11 +3,15 @@ import ms from 'ms'
 import { v4 as uuid } from 'uuid'
 
 import { Camera } from './camera.js'
-import { log, readJson } from './utils.js'
+import { Logger, readJson } from './utils.js'
+import { initServer } from './server.js'
 
-const config = await readJson('./config.json')
+const configFile = process.argv[2]
+const config = await readJson(configFile ?? './config.json')
 
+const logger = new Logger(config.logFile)
 const cam = new Camera({
+  logger,
   releaseGpioPort: config.releaseGpioPort,
   focusGpioPort: config.focusGpioPort,
 })
@@ -25,7 +29,7 @@ const jobs = config.attempts.map((attempt) => {
   // wake up the camera
   const wakeUpJob = schedule.scheduleJob(wakeUpTime, () => {
     console.log('')
-    log(`Start '${attempt.name}'`)
+    logger.log(`Start '${attempt.name}'`)
 
     cam.wake()
   })
@@ -39,15 +43,20 @@ const jobs = config.attempts.map((attempt) => {
   const stopJob = schedule.scheduleJob(stopTime, () => {
     cam.trigger()
 
-    log(`Complete '${attempt.name}'`)
+    logger.log(`Complete '${attempt.name}'`)
   })
 
   return {
     id: uuid(),
-    jobs: [wakeUpJob, triggerJob, stopJob],
+    config: {
+      wakeUpTime,
+      launchTime,
+      recordTime,
+      stopTime,
+    },
   }
 })
 
-console.log(jobs)
+logger.log(`${config.attempts.length} attempts scheduled...`)
 
-console.log(`${config.attempts.length} attempts scheduled...`)
+initServer(config, jobs, cam, logger)
