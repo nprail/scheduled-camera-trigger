@@ -5,9 +5,12 @@ import { v4 as uuid } from 'uuid'
 import { Camera } from './camera.js'
 import { log, readJson } from './utils.js'
 
-const cam = new Camera()
-
 const config = await readJson('./config.json')
+
+const cam = new Camera({
+  releaseGpioPort: config.releaseGpioPort,
+  focusGpioPort: config.focusGpioPort,
+})
 
 const jobs = config.attempts.map((attempt) => {
   const launchTime = new Date(attempt.time)

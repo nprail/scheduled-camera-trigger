@@ -2,9 +2,15 @@ import { log } from './utils.js'
 import { Gpio } from 'onoff'
 
 export class Camera {
-  constructor() {
-    this.release = new Gpio(17, 'out')
-    this.focus = new Gpio(18, 'out')
+  constructor(opts) {
+    this.release = new Gpio(opts.releaseGpioPort, 'out')
+
+    if (opts.focusGpioPort) {
+      this.focus = new Gpio(opts.focusGpioPort, 'out')
+    } else {
+      this.focus = this.release
+    }
+
 
     this.recording = false
   }
