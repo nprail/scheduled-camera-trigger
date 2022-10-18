@@ -15,15 +15,15 @@ export class Logger {
     }
     console.log(`${log.timestamp} ${log.message}`, ...log.optionalParams)
 
-    const message = `\n${JSON.stringify(log)}`
+    const messageString = `\n${JSON.stringify(log)}`
 
-    this.serialPort.write(message, (err) => {
+    this.serialPort.write(messageString, (err) => {
       if (err) {
         return console.log('Error on write: ', err.message)
       }
     })
 
-    appendFile(resolve(this.logFile), message).catch(console.error)
+    appendFile(resolve(this.logFile), messageString).catch(console.error)
   }
 }
 

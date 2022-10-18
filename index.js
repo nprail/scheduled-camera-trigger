@@ -11,7 +11,7 @@ const configFile = process.argv[2]
 const config = await readJson(configFile ?? './config.json')
 
 const serialPort = new SerialPort({
-  path: '/dev/ttyAMA0',
+  path: '/dev/ttyGS0',
   baudRate: 9600,
 })
 
