@@ -4,10 +4,10 @@ import { v4 as uuid } from 'uuid'
 
 import { Camera } from './camera.js'
 import { Logger, readJson } from './utils.js'
+import { initServer } from './server.js'
 
 const configFile = process.argv[2]
 const config = await readJson(configFile ?? './config.json')
-
 
 const logger = new Logger({ logFile: config.logFile })
 const cam = new Camera({
@@ -58,3 +58,5 @@ const jobs = config.attempts.map((attempt) => {
 })
 
 logger.log(`${config.attempts.length} attempts scheduled...`)
+
+initServer(config, jobs, cam, logger)
