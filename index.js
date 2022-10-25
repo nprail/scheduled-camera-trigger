@@ -1,25 +1,15 @@
 import schedule from 'node-schedule'
 import ms from 'ms'
 import { v4 as uuid } from 'uuid'
-import { SerialPort } from 'serialport'
 
 import { Camera } from './camera.js'
 import { Logger, readJson } from './utils.js'
-import { initServer } from './server.js'
 
 const configFile = process.argv[2]
 const config = await readJson(configFile ?? './config.json')
 
-const serialPort = new SerialPort({
-  path: '/dev/ttyGS0',
-  baudRate: 9600,
-})
 
-serialPort.on('open', () => {
-  console.log('Serial port opened')
-})
-
-const logger = new Logger({ logFile: config.logFile, serialPort })
+const logger = new Logger({ logFile: config.logFile })
 const cam = new Camera({
   logger,
   releaseGpioPort: config.releaseGpioPort,
@@ -68,5 +58,3 @@ const jobs = config.attempts.map((attempt) => {
 })
 
 logger.log(`${config.attempts.length} attempts scheduled...`)
-
-initServer(config, jobs, cam, logger)

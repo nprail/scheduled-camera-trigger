@@ -2,8 +2,7 @@ import { readFile, appendFile } from 'fs/promises'
 import { resolve } from 'path'
 
 export class Logger {
-  constructor({ logFile, serialPort }) {
-    this.serialPort = serialPort
+  constructor({ logFile }) {
     this.logFile = logFile
   }
 
@@ -16,12 +15,6 @@ export class Logger {
     console.log(`${log.timestamp} ${log.message}`, ...log.optionalParams)
 
     const messageString = `\n${JSON.stringify(log)}`
-
-    this.serialPort.write(messageString, (err) => {
-      if (err) {
-        return console.log('Error on write: ', err.message)
-      }
-    })
 
     appendFile(resolve(this.logFile), messageString).catch(console.error)
   }
