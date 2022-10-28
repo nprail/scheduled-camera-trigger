@@ -54,11 +54,6 @@ const jobs = config.attempts.map((attempt) => {
       recordTime,
       stopTime,
     },
-    jobs: {
-      wakeUpJob,
-      triggerJob,
-      stopJob,
-    },
   }
 })
 
