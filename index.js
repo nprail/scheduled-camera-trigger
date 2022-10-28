@@ -54,9 +54,19 @@ const jobs = config.attempts.map((attempt) => {
       recordTime,
       stopTime,
     },
+    jobs: {
+      wakeUpJob,
+      triggerJob,
+      stopJob,
+    },
   }
 })
 
-logger.log(`${config.attempts.length} attempts scheduled...`)
+logger.log(
+  `${
+    config.attempts.length
+  } attempts scheduled at ${new Date().toISOString()}...`,
+  jobs
+)
 
 initServer(config, jobs, cam, logger)
