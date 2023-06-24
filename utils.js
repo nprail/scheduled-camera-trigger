@@ -14,7 +14,7 @@ export class Logger {
     }
     console.log(`${log.timestamp} ${log.message}`, ...log.optionalParams)
 
-    const messageString = `\n${JSON.stringify(log)}`
+    const messageString = `\n${log.timestamp} ${log.message} ${JSON.stringify(log.optionalParams)}`
 
     appendFile(resolve(this.logFile), messageString).catch(console.error)
   }
