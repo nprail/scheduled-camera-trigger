@@ -2,18 +2,26 @@ import schedule from 'node-schedule'
 import ms from 'ms'
 import { v4 as uuid } from 'uuid'
 
-import { Camera } from './camera.js'
+import { R5 } from './cameras/r5.js'
+import { ZCam } from './cameras/zcam.js'
+
 import { Logger, readJson } from './utils.js'
 import { initServer } from './server.js'
 
-const configFile = process.argv[2]
+const configFile = process.env.CAMERA_CONFIG_FILE
 const config = await readJson(configFile ?? './config.json')
 
+const cameras = {
+  r5: R5,
+  zcam: ZCam,
+}
+
 const logger = new Logger({ logFile: config.logFile })
+
+const Camera = cameras[config.camera]
 const cam = new Camera({
   logger,
-  releaseGpioPort: config.releaseGpioPort,
-  focusGpioPort: config.focusGpioPort,
+  config,
 })
 
 const jobs = config.attempts.map((attempt) => {
@@ -36,18 +44,21 @@ const jobs = config.attempts.map((attempt) => {
 
   // press the trigger to start recording
   const triggerJob = schedule.scheduleJob(recordTime, () => {
-    cam.trigger()
+    cam.start()
   })
 
   // press the trigger again to stop recording
-  const stopJob = schedule.scheduleJob(stopTime, () => {
-    cam.trigger()
+  const stopJob = schedule.scheduleJob(stopTime, async () => {
+    await cam.stop()
 
     logger.log(`Complete '${attempt.name}'`)
+
+    await cam.sleep()
   })
 
   return {
     id: uuid(),
+    camera: config.camera,
     config: {
       wakeUpTime,
       launchTime,
