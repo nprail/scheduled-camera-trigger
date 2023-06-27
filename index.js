@@ -58,6 +58,7 @@ const jobs = config.attempts.map((attempt) => {
 
   return {
     id: uuid(),
+    name: attempt.name,
     camera: config.camera,
     config: {
       wakeUpTime,
