@@ -1,72 +1,84 @@
-import http from 'http'
 import shell from 'shelljs'
+import express from 'express'
+import bodyParser from 'body-parser'
+import cors from 'cors'
 
-const sendJsonResponse = (res, code, json) => {
-  res.statusCode = code
-  res.setHeader('Content-Type', 'application/json')
+import { saveJson } from './utils.js'
 
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Headers', '*')
+export const initServer = ({ config, configFile, scheduler, logger }) => {
+  const app = express()
 
-  res.write(JSON.stringify(json))
-  res.end()
-}
+  app.use(bodyParser.json())
+  app.use(cors())
 
-export const initServer = (config, jobs, cam, logger) => {
-  const hostname = '0.0.0.0'
-  const port = process.env.NODE_PORT || 3000
-
-  const server = http.createServer((req, res) => {
-    if (req.url !== '/logs') logger.log('server', `${req.method} ${req.url}`)
-
-    if (req.url === '/logs' && req.method === 'GET') {
-      return sendJsonResponse(res, 200, {
-        timestamp: new Date(),
-        logs: logger.logMessages,
-      })
-    }
-
-    if (req.url === '/kill-wifi' && req.method === 'POST') {
-      return shell.exec('rfkill block wifi', (code, stdout, stderr) => {
-        const resp = {
-          timestamp: new Date(),
-          code,
-          stderr,
-          stdout,
-        }
-        logger.log('server', `rfkill block wifi: ${stdout || stderr}`, resp)
-
-        return sendJsonResponse(res, code == 0 ? 200 : 500, resp)
-      })
-    }
-
-    if (req.url === '/test' && req.method === 'POST') {
-      cam
-        .test()
-        .then(() => {
-          sendJsonResponse(res, 200, {
-            success: true,
-          })
-        })
-        .catch((err) => {
-          sendJsonResponse(res, 500, {
-            success: false,
-            error: err?.message ?? err,
-          })
-        })
-      return
-    }
-
-    return sendJsonResponse(res, 200, {
+  app.get('/', (req, res) => {
+    return res.status(200).json({
       timestamp: new Date(),
       status: 'OK',
-      jobs,
-      recording: cam.recording,
+      jobs: scheduler.jobs,
+      recording: scheduler.cam.recording,
       config,
     })
   })
 
-  server.listen(port, hostname, () => {
+  app.get('/logs', (req, res) => {
+    return res.status(200).json({
+      timestamp: new Date(),
+      logs: logger.logMessages,
+    })
+  })
+
+  app.post('/kill-wifi', (req, res) => {
+    return shell.exec('rfkill block wifi', (code, stdout, stderr) => {
+      const resp = {
+        timestamp: new Date(),
+        code,
+        stderr,
+        stdout,
+      }
+      logger.log('server', `rfkill block wifi: ${stdout || stderr}`, resp)
+
+      return res.status(code == 0 ? 200 : 500).json(resp)
+    })
+  })
+
+  app.post('/test', (req, res) => {
+    cam
+      .test()
+      .then(() => {
+        res.status(200).json({
+          success: true,
+        })
+      })
+      .catch((err) => {
+        res.status(500).json({
+          success: false,
+          error: err?.message ?? err,
+        })
+      })
+  })
+
+  app.post('/save', async (req, res, next) => {
+    try {
+      await saveJson(configFile, req.body)
+
+      scheduler.teardown()
+      scheduler.initialize(config)
+
+      return res.status(200).json({
+        timestamp: new Date(),
+        status: 'OK',
+        jobs: scheduler.jobs,
+        recording: scheduler.cam.recording,
+        config,
+      })
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  const port = process.env.NODE_PORT || 3000
+  app.listen(port, () => {
     logger.log('server', 'started')
   })
 }

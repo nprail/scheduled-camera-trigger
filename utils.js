@@ -1,4 +1,4 @@
-import { readFile, appendFile } from 'fs/promises'
+import { readFile, writeFile, appendFile } from 'fs/promises'
 import { resolve } from 'path'
 
 export class Logger {
@@ -30,4 +30,9 @@ export const readJson = async (path) => {
   const json = JSON.parse(data)
 
   return json
+}
+
+export const saveJson = async (path, string) => {
+  const json = JSON.stringify(string, null, 2)
+  await writeFile(path, json, 'utf-8')
 }
