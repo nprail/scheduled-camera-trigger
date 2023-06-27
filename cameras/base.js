@@ -2,6 +2,7 @@ export class BaseCamera {
   constructor({ logger, config }) {
     this.logger = logger
     this.config = config
+    this.recording = false
   }
 
   /**

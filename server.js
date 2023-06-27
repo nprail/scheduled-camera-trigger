@@ -1,4 +1,5 @@
 import http from 'http'
+import shell from 'shelljs'
 
 const sendJsonResponse = (res, code, json) => {
   res.statusCode = code
@@ -16,6 +17,19 @@ export const initServer = (config, jobs, cam, logger) => {
 
     if (req.url === '/logs' && req.method === 'GET') {
       return sendJsonResponse(res, 200, logger.logMessages)
+    }
+
+    if (req.url === '/kill-wifi' && req.method === 'POST') {
+      return shell.exec('rfkill block wifi', (code, stdout, stderr) => {
+        const resp = {
+          code,
+          stderr,
+          stdout,
+        }
+        logger.log('server', `rfkill block wifi: ${stdout || stderr}`, resp)
+
+        return sendJsonResponse(res, code == 0 ? 200 : 500, resp)
+      })
     }
 
     return sendJsonResponse(res, 200, {

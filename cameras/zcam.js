@@ -53,6 +53,7 @@ export class ZCam extends BaseCamera {
       )
 
       await this.zcam.recordStart()
+      this.recording = true
     } catch (err) {
       this.logError(err)
     }
@@ -62,6 +63,7 @@ export class ZCam extends BaseCamera {
     try {
       this.logger.log('ZCam', 'Stop Recording')
       await this.zcam.recordStop()
+      this.recording = false
 
       const time = await this.zcam.recordRemain()
 
