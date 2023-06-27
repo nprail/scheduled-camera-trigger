@@ -20,12 +20,16 @@ export const initServer = (config, jobs, cam, logger) => {
     if (req.url !== '/logs') logger.log('server', `${req.method} ${req.url}`)
 
     if (req.url === '/logs' && req.method === 'GET') {
-      return sendJsonResponse(res, 200, logger.logMessages)
+      return sendJsonResponse(res, 200, {
+        timestamp: new Date(),
+        logs: logger.logMessages,
+      })
     }
 
     if (req.url === '/kill-wifi' && req.method === 'POST') {
       return shell.exec('rfkill block wifi', (code, stdout, stderr) => {
         const resp = {
+          timestamp: new Date(),
           code,
           stderr,
           stdout,
@@ -37,6 +41,7 @@ export const initServer = (config, jobs, cam, logger) => {
     }
 
     return sendJsonResponse(res, 200, {
+      timestamp: new Date(),
       status: 'OK',
       jobs,
       recording: cam.recording,
