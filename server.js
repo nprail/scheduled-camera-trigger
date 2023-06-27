@@ -5,7 +5,7 @@ import cors from 'cors'
 
 import { saveJson } from './utils.js'
 
-export const initServer = ({ config, configFile, scheduler, logger }) => {
+export const initServer = ({ configFile, scheduler, logger }) => {
   const app = express()
 
   app.use(bodyParser.json())
@@ -17,7 +17,7 @@ export const initServer = ({ config, configFile, scheduler, logger }) => {
       status: 'OK',
       jobs: scheduler.jobs,
       recording: scheduler.cam.recording,
-      config,
+      config: scheduler.config,
     })
   })
 
@@ -58,8 +58,12 @@ export const initServer = ({ config, configFile, scheduler, logger }) => {
       })
   })
 
-  app.post('/save', async (req, res, next) => {
+  app.post('/save', async (req, res) => {
     try {
+      if (!req.body.logFile || !req.body.camera) {
+        return res.status(400).json({ success: false })
+      }
+
       await saveJson(configFile, req.body)
 
       scheduler.teardown()
@@ -70,10 +74,12 @@ export const initServer = ({ config, configFile, scheduler, logger }) => {
         status: 'OK',
         jobs: scheduler.jobs,
         recording: scheduler.cam.recording,
-        config: req.body,
+        config: scheduler.config,
       })
     } catch (err) {
-      next(err)
+      return res
+        .status(500)
+        .json({ success: false, error: err?.message ?? err })
     }
   })
 

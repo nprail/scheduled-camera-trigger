@@ -35,24 +35,27 @@ class Scheduler {
   }
 
   initialize(config) {
+    this.config = config
     logger.log('index', 'INITIALIZE')
-    const Camera = cameras[config.camera]
+    const Camera = cameras[this.config.camera]
     this.cam = new Camera({
       logger,
-      config,
+      config: this.config,
     })
 
-    this.jobs = config.attempts.map((attempt) => {
+    this.jobs = this.config.attempts.map((attempt) => {
       const launchTime = new Date(attempt.time)
 
       // start recording x seconds before ignition
-      const recordTime = new Date(launchTime.getTime() - ms(config.startBefore))
+      const recordTime = new Date(
+        launchTime.getTime() - ms(this.config.startBefore)
+      )
       // wake up the camera x seconds before recording
       const wakeUpTime = new Date(
-        recordTime.getTime() - ms(config.wakeUpTimeout)
+        recordTime.getTime() - ms(this.config.wakeUpTimeout)
       )
       // stop recording x seconds after ignition
-      const stopTime = new Date(launchTime.getTime() + ms(config.endAfter))
+      const stopTime = new Date(launchTime.getTime() + ms(this.config.endAfter))
 
       // wake up the camera
       const wakeUpJob = schedule.scheduleJob(wakeUpTime, () => {
@@ -81,7 +84,7 @@ class Scheduler {
       return {
         id: uuid(),
         name: attempt.name,
-        camera: config.camera,
+        camera: this.config.camera,
         config: {
           wakeUpTime,
           launchTime,
@@ -93,7 +96,7 @@ class Scheduler {
 
     logger.log(
       'index',
-      `${config.attempts.length} attempts scheduled`,
+      `${this.config.attempts.length} attempts scheduled`,
       this.jobs
     )
   }
@@ -103,4 +106,4 @@ const scheduler = new Scheduler()
 
 scheduler.initialize(configJson)
 
-initServer({ config: configJson, configFile, scheduler, logger })
+initServer({ configFile, scheduler, logger })
