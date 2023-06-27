@@ -44,13 +44,9 @@ export class ZCam extends BaseCamera {
 
   async start() {
     try {
-      this.logger.log('ZCam', 'Start Recording')
       const time = await this.zcam.recordRemain()
 
-      this.logger.log(
-        'ZCam',
-        `${time?.minutes} minutes of recording space remaining`
-      )
+      this.logger.log('ZCam', 'Start Recording', time)
 
       await this.zcam.recordStart()
       this.recording = true
@@ -61,16 +57,12 @@ export class ZCam extends BaseCamera {
 
   async stop() {
     try {
-      this.logger.log('ZCam', 'Stop Recording')
       await this.zcam.recordStop()
       this.recording = false
 
       const time = await this.zcam.recordRemain()
 
-      this.logger.log(
-        'ZCam',
-        `${time?.minutes} minutes of recording space remaining`
-      )
+      this.logger.log('ZCam', 'Stop Recording', time)
     } catch (err) {
       this.logError(err)
     }
