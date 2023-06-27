@@ -4,6 +4,10 @@ import shell from 'shelljs'
 const sendJsonResponse = (res, code, json) => {
   res.statusCode = code
   res.setHeader('Content-Type', 'application/json')
+
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Headers', '*')
+
   res.write(JSON.stringify(json))
   res.end()
 }
