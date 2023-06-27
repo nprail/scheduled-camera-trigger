@@ -76,7 +76,7 @@ export class ZCam extends BaseCamera {
     }
   }
 
-  sleep(time) {
+  pause(time) {
     return new Promise((resolve) => {
       setTimeout(() => resolve(), time)
     })
@@ -85,7 +85,7 @@ export class ZCam extends BaseCamera {
   async test() {
     await this.wake()
     await this.start()
-    await this.sleep(2000)
+    await this.pause(2000)
     await this.stop()
     await this.sleep()
   }
