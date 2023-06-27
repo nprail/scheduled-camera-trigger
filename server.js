@@ -43,7 +43,7 @@ export const initServer = ({ config, configFile, scheduler, logger }) => {
   })
 
   app.post('/test', (req, res) => {
-    cam
+    scheduler.cam
       .test()
       .then(() => {
         res.status(200).json({
