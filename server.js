@@ -63,14 +63,14 @@ export const initServer = ({ config, configFile, scheduler, logger }) => {
       await saveJson(configFile, req.body)
 
       scheduler.teardown()
-      scheduler.initialize(config)
+      scheduler.initialize(req.body)
 
       return res.status(200).json({
         timestamp: new Date(),
         status: 'OK',
         jobs: scheduler.jobs,
         recording: scheduler.cam.recording,
-        config,
+        config: req.body,
       })
     } catch (err) {
       next(err)
