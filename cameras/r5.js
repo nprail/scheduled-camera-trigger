@@ -68,4 +68,8 @@ export class R5 extends BaseCamera {
       this.logError(err)
     }
   }
+
+  async test() {
+    return await this.trigger()
+  }
 }

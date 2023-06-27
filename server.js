@@ -40,6 +40,23 @@ export const initServer = (config, jobs, cam, logger) => {
       })
     }
 
+    if (req.url === '/test' && req.method === 'POST') {
+      cam
+        .test()
+        .then(() => {
+          sendJsonResponse(res, 200, {
+            success: true,
+          })
+        })
+        .catch((err) => {
+          sendJsonResponse(res, 500, {
+            success: false,
+            error: err?.message ?? err,
+          })
+        })
+      return
+    }
+
     return sendJsonResponse(res, 200, {
       timestamp: new Date(),
       status: 'OK',
