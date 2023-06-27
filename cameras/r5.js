@@ -18,42 +18,54 @@ export class R5 extends BaseCamera {
 
       this.recording = false
     } catch (err) {
-      this.logger.log(err)
+      this.logger.log('R5', err?.message ?? err, err)
     }
+  }
+
+  logError(err) {
+    this.logger.log('R5', err?.message ?? err, err)
   }
 
   async wake() {
     try {
-      this.logger.log('Wake')
+      this.logger.log('R5', 'Wake')
       await this.focus.write(1)
       await this.focus.write(0)
     } catch (err) {
-      this.logger.log(err)
+      this.logError(err)
     }
   }
 
   async start() {
-    if (this.recording) return
+    try {
+      if (this.recording) return
 
-    return await this.trigger()
+      return await this.trigger()
+    } catch (err) {
+      this.logError(err)
+    }
   }
 
   async stop() {
-    if (!this.recording) return
+    try {
+      if (!this.recording) return
 
-    return await this.trigger()
+      return await this.trigger()
+    } catch (err) {
+      this.logError(err)
+    }
   }
 
   async trigger() {
     try {
-      this.logger.log(this.recording ? 'Stop' : 'Record')
+      this.logger.log('R5', this.recording ? 'Stop' : 'Record')
 
       await this.release.write(1)
       await this.release.write(0)
 
       this.recording = !this.recording
     } catch (err) {
-      this.logger.log(err)
+      this.logError(err)
     }
   }
 }

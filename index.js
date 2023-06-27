@@ -37,7 +37,7 @@ const jobs = config.attempts.map((attempt) => {
   // wake up the camera
   const wakeUpJob = schedule.scheduleJob(wakeUpTime, () => {
     console.log('')
-    logger.log(`Start '${attempt.name}'`)
+    logger.log('index', `Start '${attempt.name}'`)
 
     cam.wake()
   })
@@ -51,7 +51,7 @@ const jobs = config.attempts.map((attempt) => {
   const stopJob = schedule.scheduleJob(stopTime, async () => {
     await cam.stop()
 
-    logger.log(`Complete '${attempt.name}'`)
+    logger.log('index', `Complete '${attempt.name}'`)
 
     await cam.sleep()
   })
@@ -68,11 +68,6 @@ const jobs = config.attempts.map((attempt) => {
   }
 })
 
-logger.log(
-  `${
-    config.attempts.length
-  } attempts scheduled at ${new Date().toISOString()}...`,
-  jobs
-)
+logger.log('index', `${config.attempts.length} attempts scheduled`, jobs)
 
 initServer(config, jobs, cam, logger)

@@ -8,43 +8,69 @@ export class ZCam extends BaseCamera {
     this.zcam = new ZCamApi(`http://${this.config.zcam.cameraIp}`)
   }
 
-  async setup() {
-    const res = await this.zcam.acquireSession()
+  logError(err) {
+    this.logger.log('ZCam', err?.message ?? err, err)
+  }
 
-    if (res?.code !== 0) {
-      throw new Error('ZCam failed to connect')
+  async setup() {
+    try {
+      const res = await this.zcam.acquireSession()
+
+      if (res?.code !== 0) {
+        throw new Error('ZCam', 'failed to connect')
+      }
+    } catch (err) {
+      this.logError(err)
     }
   }
 
   async wake() {
-    await this.setup()
-    this.logger.log('ZCam Wake')
+    try {
+      await this.setup()
+      this.logger.log('ZCam', 'Wake')
+    } catch (err) {
+      this.logError(err)
+    }
   }
 
   async sleep() {
-    this.logger.log('ZCam Sleep')
-    await this.zcam.mode('to_standby')
+    try {
+      this.logger.log('ZCam', 'Sleep')
+      await this.zcam.mode('to_standby')
+    } catch (err) {
+      this.logError(err)
+    }
   }
 
   async start() {
-    this.logger.log('ZCam Start Recording')
-    const time = await this.zcam.recordRemain()
+    try {
+      this.logger.log('ZCam', 'Start Recording')
+      const time = await this.zcam.recordRemain()
 
-    this.logger.log(
-      `ZCam ${time?.minutes} minutes of recording space remaining`
-    )
+      this.logger.log(
+        'ZCam',
+        `${time?.minutes} minutes of recording space remaining`
+      )
 
-    await this.zcam.recordStart()
+      await this.zcam.recordStart()
+    } catch (err) {
+      this.logError(err)
+    }
   }
 
   async stop() {
-    this.logger.log('ZCam Stop Recording')
-    await this.zcam.recordStop()
+    try {
+      this.logger.log('ZCam', 'Stop Recording')
+      await this.zcam.recordStop()
 
-    const time = await this.zcam.recordRemain()
+      const time = await this.zcam.recordRemain()
 
-    this.logger.log(
-      `ZCam ${time?.minutes} minutes of recording space remaining`
-    )
+      this.logger.log(
+        'ZCam',
+        `${time?.minutes} minutes of recording space remaining`
+      )
+    } catch (err) {
+      this.logError(err)
+    }
   }
 }
