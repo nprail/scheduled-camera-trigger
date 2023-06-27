@@ -42,6 +42,7 @@ export class BaseCamera {
    */
   async test() {
     await this.wake()
+    await this.pause(1000)
     await this.start()
     await this.pause(2000)
     await this.stop()
