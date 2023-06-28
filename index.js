@@ -8,6 +8,7 @@ import { ZCam } from './cameras/zcam.js'
 
 import { Logger, readJson } from './lib/utils.js'
 import { initServer } from './lib/server.js'
+import { initButton } from './lib/button.js'
 
 const configFile = resolve(process.env.CAMERA_CONFIG_FILE ?? './config.json')
 const configJson = await readJson(configFile)
@@ -107,3 +108,4 @@ const scheduler = new Scheduler()
 scheduler.initialize(configJson)
 
 initServer({ configFile, scheduler, logger })
+initButton({ config: configJson, logger })
