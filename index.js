@@ -6,8 +6,8 @@ import { resolve } from 'path'
 import { R5 } from './cameras/r5.js'
 import { ZCam } from './cameras/zcam.js'
 
-import { Logger, readJson } from './utils.js'
-import { initServer } from './server.js'
+import { Logger, readJson } from './lib/utils.js'
+import { initServer } from './lib/server.js'
 
 const configFile = resolve(process.env.CAMERA_CONFIG_FILE ?? './config.json')
 const configJson = await readJson(configFile)
