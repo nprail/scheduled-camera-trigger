@@ -1,0 +1,141 @@
+<div class="modal-header">
+  <h4 class="modal-title">Edit Schedule Config</h4>
+  <button
+    type="button"
+    class="btn-close"
+    aria-label="Close"
+    (click)="activeModal.dismiss('Cross click')"
+  ></button>
+</div>
+
+<div class="modal-body">
+  <div class="mb-3">
+    <label for="camera" class="form-label">Camera</label>
+    <select
+      class="form-select"
+      aria-label="Default select example"
+      [(ngModel)]="config.camera"
+      id="camera"
+    >
+      <option value="r5">R5</option>
+      <option value="zcam">ZCam</option>
+    </select>
+  </div>
+
+  <div *ngIf="config.camera === 'zcam' && config.zcam">
+    <div class="mb-3">
+      <label for="ipAddress" class="form-label">ZCam IP Address</label>
+      <input
+        type="text"
+        class="form-control"
+        id="ipAddress"
+        [(ngModel)]="config.zcam.cameraIp"
+      />
+    </div>
+  </div>
+
+  <div *ngIf="config.camera === 'r5'">
+    <div class="mb-3">
+      <label for="focusGpioPort" class="form-label">Focus GPIO Pin</label>
+      <input
+        type="number"
+        class="form-control"
+        id="focusGpioPort"
+        [(ngModel)]="config.focusGpioPort"
+      />
+    </div>
+
+    <div class="mb-3">
+      <label for="releaseGpioPort" class="form-label">Release GPIO Pin</label>
+      <input
+        type="number"
+        class="form-control"
+        id="releaseGpioPort"
+        [(ngModel)]="config.releaseGpioPort"
+      />
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <label for="wakeUpTimeout" class="form-label">Wake Up Timeout</label>
+    <input
+      type="text"
+      class="form-control"
+      id="wakeUpTimeout"
+      [(ngModel)]="config.wakeUpTimeout"
+    />
+  </div>
+
+  <div class="mb-3">
+    <label for="startBefore" class="form-label">Record Pre-Buffer Time</label>
+    <input
+      type="text"
+      class="form-control"
+      id="startBefore"
+      [(ngModel)]="config.startBefore"
+    />
+  </div>
+
+  <div class="mb-3">
+    <label for="endAfter" class="form-label">Record Post-Buffer Time</label>
+    <input
+      type="text"
+      class="form-control"
+      id="endAfter"
+      [(ngModel)]="config.endAfter"
+    />
+  </div>
+
+  <button type="button" class="btn btn-success" (click)="addAttempt()">
+    Add Attempt
+  </button>
+
+  <div class="mt-3" ngbAccordion>
+    <div *ngFor="let attempt of config.attempts" ngbAccordionItem>
+      <h2 ngbAccordionHeader>
+        <button ngbAccordionButton>{{ attempt.name }}</button>
+      </h2>
+      <div ngbAccordionCollapse>
+        <div ngbAccordionBody>
+          <ng-template>
+            <div class="mb-3">
+              <label for="name" class="form-label">Name</label>
+              <input
+                type="text"
+                class="form-control"
+                id="name"
+                [(ngModel)]="attempt.name"
+              />
+            </div>
+
+            <div class="mb-3">
+              <label for="time" class="form-label">Attempt Time</label>
+              <input
+                type="text"
+                class="form-control"
+                id="time"
+                [(ngModel)]="attempt.time"
+                aria-describedby="timeHelp"
+              />
+              <div id="timeHelp" class="form-text">
+                {{ attempt.time | date : 'medium' }}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              class="btn btn-danger"
+              (click)="removeAttempt(attempt.name)"
+            >
+              Remove
+            </button>
+          </ng-template>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-success" (click)="save()">Save</button>
+</div>

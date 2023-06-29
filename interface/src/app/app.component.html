@@ -1,0 +1,177 @@
+<div class="container mt-5">
+  <div class="row">
+    <div class="col">
+      <div class="text-center">
+        <h1>Camera Scheduler</h1>
+
+        <div class="mb-3">
+          <label for="ipAddress" class="form-label"> IP Address </label>
+          <input
+            type="text"
+            class="form-control"
+            id="ipAddress"
+            [(ngModel)]="ipAddress"
+          />
+        </div>
+
+        <button type="button" class="btn btn-primary mx-1" (click)="connect()">
+          Connect
+        </button>
+
+        <button
+          *ngIf="cameraConnected"
+          type="button"
+          class="btn btn-danger mx-1"
+          (click)="disconnect()"
+        >
+          Disconnect
+        </button>
+
+        <button
+          *ngIf="cameraConnected"
+          type="button"
+          class="btn btn-success mx-1"
+          (click)="test()"
+        >
+          <ng-container *ngIf="!loadingTest"> Test </ng-container>
+
+          <ng-container *ngIf="loadingTest">
+            <span
+              class="spinner-border spinner-border-sm"
+              role="status"
+              aria-hidden="true"
+            ></span>
+            Testing...
+          </ng-container>
+        </button>
+        <button
+          *ngIf="cameraConnected"
+          type="button"
+          class="btn btn-success mx-1"
+          (click)="edit()"
+        >
+          Edit
+        </button>
+
+        <p *ngIf="connectionFailed" class="text-danger mt-3">
+          Failed to connect to camera scheduler.
+        </p>
+      </div>
+
+      <div *ngIf="info" class="my-5">
+        <div class="text-center">
+          <h2
+            [ngClass]="{
+              'text-success': cameraConnected,
+              'text-danger': !cameraConnected,
+              'text-warning': cameraConnected && requestFailCount > 0
+            }"
+          >
+            {{ info.config.camera | uppercase }}
+            {{ cameraConnected ? 'Connected' : 'Disconnected' }}
+          </h2>
+          <h4>{{ timestamp | date : 'mediumTime' }}</h4>
+        </div>
+
+        <ul class="list-group mt-3">
+          <li *ngFor="let job of info.jobs" class="list-group-item">
+            <h4 class="">
+              {{ job.name }}
+            </h4>
+            <p>
+              <span class="text-success">{{
+                job.config.launchTime | date : 'medium'
+              }}</span>
+              <br />
+              {{ job.config.launchTime }}
+            </p>
+
+            <h6>Wake Up</h6>
+            <p>
+              {{ job.config.wakeUpTime | date : 'medium' }}
+            </p>
+
+            <h6>Record</h6>
+            <p>
+              {{ job.config.recordTime | date : 'medium' }}
+            </p>
+
+            <h6>Stop</h6>
+            <p>
+              {{ job.config.stopTime | date : 'medium' }}
+            </p>
+          </li>
+        </ul>
+
+        <div class="mt-3" ngbAccordion>
+          <div ngbAccordionItem>
+            <h2 ngbAccordionHeader>
+              <button ngbAccordionButton>Config</button>
+            </h2>
+            <div ngbAccordionCollapse>
+              <div ngbAccordionBody>
+                <ng-template>
+                  <pre><code>{{ info.config | json }}</code></pre>
+                </ng-template>
+              </div>
+            </div>
+          </div>
+          <div ngbAccordionItem>
+            <h2 ngbAccordionHeader>
+              <button ngbAccordionButton>Logs</button>
+            </h2>
+            <div ngbAccordionCollapse>
+              <div ngbAccordionBody>
+                <ng-template>
+                  <div *ngFor="let log of logs">
+                    <div>
+                      {{ log.timestamp | date : 'medium' }}
+                      <span class="">[{{ log.namespace }}]</span>
+                      {{ log.message }}
+                      <pre><code>{{ log.data | json }}</code></pre>
+                    </div>
+                  </div>
+                </ng-template>
+              </div>
+            </div>
+          </div>
+
+          <div ngbAccordionItem>
+            <h2 ngbAccordionHeader>
+              <button ngbAccordionButton>Danger Area</button>
+            </h2>
+            <div ngbAccordionCollapse>
+              <div ngbAccordionBody>
+                <ng-template>
+                  <button
+                    type="button"
+                    class="btn btn-danger"
+                    [disabled]="loadingKillWifi"
+                    (click)="killWifi()"
+                  >
+                    <ng-container *ngIf="!loadingKillWifi">
+                      {{ killWifiConfirmed ? 'Are you sure?' : 'Kill WiFi' }}
+                    </ng-container>
+
+                    <ng-container *ngIf="loadingKillWifi">
+                      <span
+                        class="spinner-border spinner-border-sm"
+                        role="status"
+                        aria-hidden="true"
+                      ></span>
+                      Killing...
+                    </ng-container>
+                  </button>
+
+                  <p *ngIf="killWifiResponse" class="mt-4">
+                    {{ killWifiResponse }}
+                  </p>
+                </ng-template>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

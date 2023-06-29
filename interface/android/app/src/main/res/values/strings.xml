@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Camera Scheduler</string>
+    <string name="title_activity_main">Camera Scheduler</string>
+    <string name="package_name">com.noahprail.camscheduler</string>
+    <string name="custom_url_scheme">com.noahprail.camscheduler</string>
+</resources>
