@@ -1,5 +1,6 @@
 import { readFile, writeFile } from 'fs/promises'
 import { customAlphabet } from 'nanoid'
+import _ from 'lodash'
 
 const nanoid = customAlphabet('1234567890abcdef', 6)
 
@@ -19,8 +20,9 @@ export const readJson = async (path) => {
 }
 
 export const saveJson = async (path, json) => {
-  delete json.deviceName
+  const clonedJson = _.cloneDeep(json)
+  delete clonedJson.deviceName
 
-  const string = JSON.stringify(json, null, 2)
+  const string = JSON.stringify(clonedJson, null, 2)
   await writeFile(path, string, 'utf-8')
 }
