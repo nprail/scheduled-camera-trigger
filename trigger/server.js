@@ -2,11 +2,16 @@ import shell from 'shelljs'
 import express from 'express'
 import bodyParser from 'body-parser'
 import cors from 'cors'
+import { Bonjour } from 'bonjour-service'
 
 import { saveJson } from './lib/utils.js'
 
 export const initServer = ({ configFile, scheduler, logger }) => {
   const app = express()
+
+  const bonjour = new Bonjour({}, (err) => {
+    logger.log('server', 'Bonjour failed to init', err)
+  })
 
   app.use(bodyParser.json())
   app.use(cors())
@@ -85,6 +90,15 @@ export const initServer = ({ configFile, scheduler, logger }) => {
 
   const port = process.env.NODE_PORT || 3000
   app.listen(port, () => {
-    logger.log('server', 'started')
+    const service = bonjour.publish({
+      name: `SCT_${scheduler.config.name}`,
+      type: 'http',
+      protocol: 'tcp',
+      port,
+    })
+
+    service.start()
+
+    logger.log('server', 'started', { port })
   })
 }
