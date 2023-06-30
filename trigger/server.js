@@ -89,11 +89,16 @@ export const initServer = ({ configFile, scheduler, logger }) => {
   })
 
   const port = process.env.NODE_PORT || 3000
-  app.listen(port, () => {
+  const server = app.listen(port, () => {
     const service = bonjour.publish({
-      name: `SCT_${scheduler.config.name}`,
+      name: scheduler.config.deviceName,
       type: 'http',
       protocol: 'tcp',
+      txt: {
+        _scheduled_camera_trigger: 'com.noahprail.camscheduler',
+        _scheduled_camera_trigger_id: scheduler.config.deviceId,
+        _scheduled_camera_trigger_type: scheduler.config.camera,
+      },
       port,
     })
 
@@ -101,4 +106,6 @@ export const initServer = ({ configFile, scheduler, logger }) => {
 
     logger.log('server', 'started', { port })
   })
+
+  return { server, bonjour }
 }

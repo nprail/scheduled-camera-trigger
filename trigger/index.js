@@ -16,5 +16,18 @@ const scheduler = new Scheduler({ logger })
 
 scheduler.initialize(configJson)
 
-initServer({ configFile, scheduler, logger })
-initButton({ config: configJson, logger })
+const { server, bonjour } = initServer({ configFile, scheduler, logger })
+const button = initButton({ config: configJson, logger })
+
+const shutdown = () => {
+  bonjour.unpublishAll()
+
+  if (button) button.unexport()
+
+  server.close(() => {
+    bonjour.destroy()
+  })
+}
+
+process.on('SIGINT', shutdown)
+process.on('SIGTERM', shutdown)

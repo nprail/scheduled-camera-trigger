@@ -24,7 +24,5 @@ export const initButton = ({ config, logger }) => {
     })
   })
 
-  process.on('SIGINT', (_) => {
-    button.unexport()
-  })
+  return button
 }
