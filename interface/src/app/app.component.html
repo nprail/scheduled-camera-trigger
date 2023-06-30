@@ -4,54 +4,73 @@
       <div class="text-center">
         <h1>Camera Scheduler</h1>
 
-        <div class="mb-3">
-          <label for="ipAddress" class="form-label"> IP Address </label>
-          <input
-            type="text"
-            class="form-control"
-            id="ipAddress"
-            [(ngModel)]="ipAddress"
-          />
+        <div *ngIf="!cameraConnected">
+          <div class="mb-3">
+            <label for="ipAddress" class="form-label"> IP Address </label>
+            <input
+              type="text"
+              class="form-control"
+              id="ipAddress"
+              [(ngModel)]="ipAddress"
+            />
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-primary mb-3"
+            (click)="connect()"
+          >
+            Connect
+          </button>
+
+          <div class="list-group mb-3">
+            <a
+              *ngFor="let service of services"
+              class="list-group-item list-group-item-action"
+              href="javascript:void(0)"
+              (click)="select(service)"
+            >
+              {{ service.name }}
+              <br />
+              <small>{{ service.ipv4Addresses.join(' / ') }}</small>
+              <br />
+              <small
+                *ngIf="service.txtRecord['_scheduled_camera_trigger_type']"
+              >
+                {{
+                  service.txtRecord[
+                    '_scheduled_camera_trigger_type'
+                  ].toUpperCase()
+                }}
+              </small>
+            </a>
+          </div>
         </div>
 
-        <button type="button" class="btn btn-primary mx-1" (click)="connect()">
-          Connect
-        </button>
+        <div *ngIf="cameraConnected">
+          <button
+            type="button"
+            class="btn btn-danger mx-1"
+            (click)="disconnect()"
+          >
+            Disconnect
+          </button>
+          <button type="button" class="btn btn-success mx-1" (click)="test()">
+            <ng-container *ngIf="!loadingTest"> Test </ng-container>
 
-        <button
-          *ngIf="cameraConnected"
-          type="button"
-          class="btn btn-danger mx-1"
-          (click)="disconnect()"
-        >
-          Disconnect
-        </button>
-
-        <button
-          *ngIf="cameraConnected"
-          type="button"
-          class="btn btn-success mx-1"
-          (click)="test()"
-        >
-          <ng-container *ngIf="!loadingTest"> Test </ng-container>
-
-          <ng-container *ngIf="loadingTest">
-            <span
-              class="spinner-border spinner-border-sm"
-              role="status"
-              aria-hidden="true"
-            ></span>
-            Testing...
-          </ng-container>
-        </button>
-        <button
-          *ngIf="cameraConnected"
-          type="button"
-          class="btn btn-success mx-1"
-          (click)="edit()"
-        >
-          Edit
-        </button>
+            <ng-container *ngIf="loadingTest">
+              <span
+                class="spinner-border spinner-border-sm"
+                role="status"
+                aria-hidden="true"
+              ></span>
+              Testing...
+            </ng-container>
+          </button>
+          <button type="button" class="btn btn-success mx-1" (click)="edit()">
+            Edit
+          </button>
+        </div>
 
         <p *ngIf="connectionFailed" class="text-danger mt-3">
           Failed to connect to camera scheduler.
@@ -67,10 +86,11 @@
               'text-warning': cameraConnected && requestFailCount > 0
             }"
           >
-            {{ info.config.camera | uppercase }}
+            {{ info.config.deviceName }}
             {{ cameraConnected ? 'Connected' : 'Disconnected' }}
           </h2>
           <h4>{{ timestamp | date : 'mediumTime' }}</h4>
+          <h5>Type: {{ info.config.camera.toUpperCase() }}</h5>
         </div>
 
         <ul class="list-group mt-3">

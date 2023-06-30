@@ -1,9 +1,11 @@
-import { Component } from '@angular/core'
+import { Component, OnInit } from '@angular/core'
 import { CapacitorHttp } from '@capacitor/core'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import { cloneDeep } from 'lodash'
+import { ZeroConfService } from 'capacitor-zeroconf'
 
 import { ConfigModalComponent } from './config-modal/config-modal.component'
+import { BonjourService } from './utils/bonjour.service'
 
 const LOCAL_STORAGE_KEY = '_camera_scheduler_ip_address'
 
@@ -12,7 +14,7 @@ const LOCAL_STORAGE_KEY = '_camera_scheduler_ip_address'
   templateUrl: 'app.component.html',
   styleUrls: ['app.component.scss'],
 })
-export class AppComponent {
+export class AppComponent implements OnInit {
   public info: any
   public logs: any[] = []
   public timestamp = ''
@@ -34,11 +36,29 @@ export class AppComponent {
     return `http://${this.ipAddress}:3000`
   }
 
-  constructor(private modalService: NgbModal) {}
+  public services: ZeroConfService[] = []
+
+  constructor(private modalService: NgbModal, public bonjour: BonjourService) {}
+
+  public select(service: any) {
+Ï    this.ipAddress = service.ipv4Addresses[0]
+    this.connect()
+  }
+
+  ngOnInit() {
+    this.bonjour.start()
+
+    this.bonjour.services$.subscribe((services) => {
+      this.services = services
+    })
+  }
 
   public async getInfo() {
     try {
-      if (this.logFetchInterval) clearInterval(this.logFetchInterval)
+      if (this.logFetchInterval) {
+        clearInterval(this.logFetchInterval)
+        this.logFetchInterval = undefined
+      }
 
       const response = await CapacitorHttp.get({
         url: this.baseUrl,
@@ -81,7 +101,8 @@ export class AppComponent {
       this.requestFailCount++
 
       if (this.requestFailCount >= 5) {
-        clearTimeout(this.logFetchInterval)
+        clearInterval(this.logFetchInterval)
+        this.logFetchInterval = undefined
         this.cameraConnected = false
       }
     }
