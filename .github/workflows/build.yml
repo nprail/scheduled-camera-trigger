@@ -22,7 +22,7 @@ jobs:
 
       - name: Install app dependencies
         working-directory: ./interface/
-        run: npm install
+        run: npm install --force
 
       - name: Build Angular App
         working-directory: ./interface/
