@@ -41,7 +41,7 @@ export class AppComponent implements OnInit {
   constructor(private modalService: NgbModal, public bonjour: BonjourService) {}
 
   public select(service: any) {
-Ï    this.ipAddress = service.ipv4Addresses[0]
+    this.ipAddress = service.ipv4Addresses[0]
     this.connect()
   }
 
