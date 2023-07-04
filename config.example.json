@@ -1,5 +1,6 @@
 {
   "buttonGpioPort": 4,
+  "releaseGpioPort": 25,
   "focusGpioPort": 23,
   "wakeUpTimeout": "5s",
   "startBefore": "20s",
