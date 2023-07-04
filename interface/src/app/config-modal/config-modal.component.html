@@ -14,7 +14,7 @@
     <select
       class="form-select"
       aria-label="Default select example"
-      [(ngModel)]="config.camera"
+      [(ngModel)]="config.cameraType"
       id="camera"
     >
       <option value="generic">Generic</option>
@@ -22,7 +22,7 @@
     </select>
   </div>
 
-  <div *ngIf="config.camera === 'zcam' && config.zcam">
+  <div *ngIf="config.cameraType === 'zcam' && config.zcam">
     <div class="mb-3">
       <label for="ipAddress" class="form-label">ZCam IP Address</label>
       <input
@@ -34,24 +34,26 @@
     </div>
   </div>
 
-  <div *ngIf="config.camera === 'generic'">
-    <div class="mb-3">
-      <label for="focusGpioPort" class="form-label">Focus GPIO Pin</label>
-      <input
-        type="number"
-        class="form-control"
-        id="focusGpioPort"
-        [(ngModel)]="config.focusGpioPort"
-      />
-    </div>
-
+  <div *ngIf="config.cameraType === 'generic' && config.generic">
     <div class="mb-3">
       <label for="releaseGpioPort" class="form-label">Release GPIO Pin</label>
       <input
         type="number"
         class="form-control"
         id="releaseGpioPort"
-        [(ngModel)]="config.releaseGpioPort"
+        [(ngModel)]="config.generic.releaseGpioPort"
+      />
+    </div>
+
+    <div class="mb-3">
+      <label for="focusGpioPort" class="form-label">
+        Focus GPIO Pin (optional)
+      </label>
+      <input
+        type="number"
+        class="form-control"
+        id="focusGpioPort"
+        [(ngModel)]="config.generic.focusGpioPort"
       />
     </div>
   </div>

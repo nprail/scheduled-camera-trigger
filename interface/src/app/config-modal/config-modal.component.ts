@@ -17,6 +17,9 @@ export class ConfigModalComponent {
     if (!this.config.zcam) {
       this.config.zcam = {}
     }
+    if (!this.config.generic) {
+      this.config.generic = {}
+    }
   }
 
   public async save() {

@@ -90,7 +90,7 @@
             {{ cameraConnected ? 'Connected' : 'Disconnected' }}
           </h2>
           <h4>{{ timestamp | date : 'mediumTime' }}</h4>
-          <h5>Type: {{ info.config.camera.toUpperCase() }}</h5>
+          <h5>Type: {{ info.config.cameraType.toUpperCase() }}</h5>
         </div>
 
         <ul class="list-group mt-3">

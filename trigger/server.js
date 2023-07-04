@@ -65,7 +65,7 @@ export const initServer = ({ configFile, scheduler, logger }) => {
 
   app.post('/save', async (req, res) => {
     try {
-      if (!req.body.logFile || !req.body.camera) {
+      if (!req.body.logFile || !req.body.cameraType) {
         return res.status(400).json({ success: false })
       }
 
@@ -97,7 +97,7 @@ export const initServer = ({ configFile, scheduler, logger }) => {
       txt: {
         _scheduled_camera_trigger: 'com.noahprail.camscheduler',
         _scheduled_camera_trigger_id: scheduler.config.deviceId,
-        _scheduled_camera_trigger_type: scheduler.config.camera,
+        _scheduled_camera_trigger_type: scheduler.config.cameraType,
       },
       port,
     })

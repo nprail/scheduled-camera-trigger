@@ -29,7 +29,7 @@ export class Scheduler {
   initialize(config) {
     this.config = config
     this.logger.log('index', 'INITIALIZE')
-    const Camera = cameras[this.config.camera]
+    const Camera = cameras[this.config.cameraType]
     this.cam = new Camera({
       logger: this.logger,
       config: this.config,
@@ -76,7 +76,7 @@ export class Scheduler {
       return {
         id: uuid(),
         name: attempt.name,
-        camera: this.config.camera,
+        camera: this.config.cameraType,
         config: {
           wakeUpTime,
           launchTime,
