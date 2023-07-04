@@ -1,7 +1,7 @@
 import { Gpio } from 'onoff'
 import { BaseCamera } from './base.js'
 
-export class R5 extends BaseCamera {
+export class Generic extends BaseCamera {
   constructor(opts) {
     super(opts)
     this.logger = opts.logger
@@ -18,17 +18,17 @@ export class R5 extends BaseCamera {
 
       this.recording = false
     } catch (err) {
-      this.logger.log('R5', err?.message ?? err, err)
+      this.logger.log('Generic', err?.message ?? err, err)
     }
   }
 
   logError(err) {
-    this.logger.log('R5', err?.message ?? err, err)
+    this.logger.log('Generic', err?.message ?? err, err)
   }
 
   async wake() {
     try {
-      this.logger.log('R5', 'Wake')
+      this.logger.log('Generic', 'Wake')
       await this.focus.write(1)
       await this.focus.write(0)
     } catch (err) {
@@ -58,7 +58,7 @@ export class R5 extends BaseCamera {
 
   async trigger() {
     try {
-      this.logger.log('R5', this.recording ? 'Stop' : 'Record')
+      this.logger.log('Generic', this.recording ? 'Stop' : 'Record')
 
       await this.release.write(1)
       await this.release.write(0)

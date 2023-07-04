@@ -14,7 +14,7 @@ First, create a `config.json` file with the following contents.
   "wakeUpTimeout": "5s",
   "startBefore": "20s",
   "endAfter": "30s",
-  "camera": "r5",
+  "camera": "generic",
   "logFile": "log.txt",
   "attempts": [
     {
@@ -29,16 +29,16 @@ First, create a `config.json` file with the following contents.
 }
 ```
 
-| Option            | Description                                                                                                                 |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `camera`          | Type of camera being triggered. Can be either `r5` or `zcam`                                                                |
-| `logFile`         | File path to store logs at                                                                                                  |
-| `buttonGpioPort`  | GPIO port on the Raspberry Pi that is connected to a button which when pressed will re-enable WiFi on the Pi (optional)     |
-| `releaseGpioPort` | GPIO port on the Raspberry Pi that is connected to the camera's shutter release pin (required when the `camera` is `r5`)    |
-| `focusGpioPort`   | GPIO port on the Raspberry Pi that is connected to the camera focus pin (optional)                                          |
-| `wakeUpTimeout`   | The amount of time before the recording is started to wake up the camera. Parsed by [ms](https://www.npmjs.com/package/ms). |
-| `startBefore`     | The amount of time before ignition time to start the recording. Parsed by [ms](https://www.npmjs.com/package/ms).           |
-| `endAfter`        | The amount of time after ignition time to end the recording. Parsed by [ms](https://www.npmjs.com/package/ms).              |
-| `attempts`        | Array of launch attempts                                                                                                    |
-| `attempts.name`   | Friendly name for the launch attempt                                                                                        |
-| `attempts.time`   | Exact T-0 of the launch attempt in UTC                                                                                      |
+| Option            | Description                                                                                                                   |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `camera`          | Type of camera being triggered. Can be either `generic` or `zcam`                                                             |
+| `logFile`         | File path to store logs at                                                                                                    |
+| `buttonGpioPort`  | GPIO port on the Raspberry Pi that is connected to a button which when pressed will re-enable WiFi on the Pi (optional)       |
+| `releaseGpioPort` | GPIO port on the Raspberry Pi that is connected to the camera's shutter release pin (required when the `camera` is `generic`) |
+| `focusGpioPort`   | GPIO port on the Raspberry Pi that is connected to the camera focus pin (optional)                                            |
+| `wakeUpTimeout`   | The amount of time before the recording is started to wake up the camera. Parsed by [ms](https://www.npmjs.com/package/ms).   |
+| `startBefore`     | The amount of time before ignition time to start the recording. Parsed by [ms](https://www.npmjs.com/package/ms).             |
+| `endAfter`        | The amount of time after ignition time to end the recording. Parsed by [ms](https://www.npmjs.com/package/ms).                |
+| `attempts`        | Array of launch attempts                                                                                                      |
+| `attempts.name`   | Friendly name for the launch attempt                                                                                          |
+| `attempts.time`   | Exact T-0 of the launch attempt in UTC                                                                                        |

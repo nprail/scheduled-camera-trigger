@@ -17,7 +17,7 @@
       [(ngModel)]="config.camera"
       id="camera"
     >
-      <option value="r5">R5</option>
+      <option value="generic">Generic</option>
       <option value="zcam">ZCam</option>
     </select>
   </div>
@@ -34,7 +34,7 @@
     </div>
   </div>
 
-  <div *ngIf="config.camera === 'r5'">
+  <div *ngIf="config.camera === 'generic'">
     <div class="mb-3">
       <label for="focusGpioPort" class="form-label">Focus GPIO Pin</label>
       <input

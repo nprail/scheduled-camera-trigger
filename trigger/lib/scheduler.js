@@ -2,11 +2,11 @@ import schedule from 'node-schedule'
 import ms from 'ms'
 import { v4 as uuid } from 'uuid'
 
-import { R5 } from '../cameras/r5.js'
+import { Generic } from '../cameras/generic.js'
 import { ZCam } from '../cameras/zcam.js'
 
 const cameras = {
-  r5: R5,
+  generic: Generic,
   zcam: ZCam,
 }
 

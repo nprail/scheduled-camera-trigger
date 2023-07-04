@@ -5,7 +5,7 @@
   "wakeUpTimeout": "5s",
   "startBefore": "20s",
   "endAfter": "30s",
-  "camera": "r5",
+  "camera": "generic",
   "logFile": "log.txt",
   "attempts": [
     {
