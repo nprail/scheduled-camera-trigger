@@ -3,6 +3,7 @@ import { CapacitorHttp } from '@capacitor/core'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import { cloneDeep } from 'lodash'
 import { ZeroConfService } from 'capacitor-zeroconf'
+import { DateTime } from 'luxon'
 
 import { ConfigModalComponent } from './config-modal/config-modal.component'
 import { BonjourService } from './utils/bonjour.service'
@@ -18,6 +19,8 @@ export class AppComponent implements OnInit {
   public info: any
   public logs: any[] = []
   public timestamp = ''
+  public nowTimestamp = ''
+  public timeDiff: number | undefined = 0
 
   public killWifiConfirmed = false
   public loadingKillWifi = false
@@ -53,6 +56,20 @@ export class AppComponent implements OnInit {
     })
   }
 
+  private round(num: number) {
+    return Math.round((num + Number.EPSILON) * 100) / 100
+  }
+
+  private calculateDate(actualDate: Date) {
+    this.nowTimestamp = actualDate.toISOString()
+
+    const triggerDateTime = DateTime.fromISO(this.timestamp)
+    const actualDateTime = DateTime.fromJSDate(actualDate)
+
+    const diff = triggerDateTime.diff(actualDateTime, 'seconds').toObject()
+    this.timeDiff = this.round(diff.seconds ?? 0)
+  }
+
   public async getInfo() {
     try {
       if (this.logFetchInterval) {
@@ -65,9 +82,12 @@ export class AppComponent implements OnInit {
         readTimeout: 3000,
         connectTimeout: 3000,
       })
+      const now = new Date()
 
       this.connectionFailed = false
       this.timestamp = response.data.timestamp
+      this.calculateDate(now)
+
       this.info = response.data
       this.cameraConnected = true
       this.killWifiResponse = ''
@@ -89,8 +109,10 @@ export class AppComponent implements OnInit {
         readTimeout: 1000,
         connectTimeout: 1000,
       })
+      const now = new Date()
 
       this.timestamp = resp.data.timestamp
+      this.calculateDate(now)
       this.cameraConnected = true
       this.logs = resp.data.logs.sort(
         (a: any, b: any) =>

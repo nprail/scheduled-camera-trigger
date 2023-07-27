@@ -89,7 +89,9 @@
             {{ info.config.deviceName }}
             {{ cameraConnected ? 'Connected' : 'Disconnected' }}
           </h2>
-          <h4>{{ timestamp | date : 'mediumTime' }}</h4>
+          <h4>Trigger Time: {{ timestamp | date : 'mediumTime' }}</h4>
+          <h4>Actual Time: {{ timestamp | date : 'mediumTime' }}</h4>
+          <h4>Time Difference: {{ timeDiff }} seconds</h4>
           <h5>Type: {{ info.config.cameraType.toUpperCase() }}</h5>
         </div>
 
