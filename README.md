@@ -4,32 +4,35 @@ This tool is built to schedule a camera to wake up and start/stop recording vide
 
 ## Usage
 
-First, create a `config.json` file with the following contents.
+First, clone the repository and switch to that directory.
 
-```json
-{
-  "buttonGpioPort": 4,
-  "wakeUpTimeout": "5s",
-  "startBefore": "20s",
-  "endAfter": "30s",
-  "cameraType": "generic",
-  "generic": {
-    "releaseGpioPort": 25,
-    "focusGpioPort": 23
-  },
-  "logFile": "log.txt",
-  "attempts": [
-    {
-      "name": "First attempt",
-      "time": "2022-02-19T17:39:00.000Z"
-    },
-    {
-      "name": "Second attempt",
-      "time": "2022-02-20T17:39:00.000Z"
-    }
-  ]
-}
+```sh
+git clone git@github.com:nprail/scheduled-camera-trigger.git
+
+cd scheduled-camera-trigger
 ```
+
+Install the dependencies. Node.js is required for this.
+
+```sh
+npm install
+```
+
+Then copy the config file.
+
+```
+cp config.example.json config.json
+```
+
+And finally start up the server!
+
+```sh
+node trigger/index
+```
+
+## Config Options
+
+See [config.example.json](config.example.json) for an example config file.
 
 | Option                    | Description                                                                                                                       |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |

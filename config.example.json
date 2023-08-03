@@ -3,7 +3,7 @@
   "wakeUpTimeout": "5s",
   "startBefore": "20s",
   "endAfter": "30s",
-  "camera": "generic",
+  "cameraType": "generic",
   "generic": {
     "releaseGpioPort": 25,
     "focusGpioPort": 23
