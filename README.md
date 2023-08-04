@@ -1,6 +1,8 @@
 # Scheduled Camera Trigger
 
-This tool is built to schedule a camera to wake up and start/stop recording video at a specific time. It was originally built to automatically start a camera for a rocket launch and is highly optimized for that use.
+This program is built to schedule a camera to wake up and start/stop recording video at specific times. It was originally built to automatically start a camera for a rocket launch and is highly optimized for that use. It can trigger any camera with a standard remote trigger port as well as ZCams over their HTTP API. 
+
+It is optimized for use on a low power Raspberry Pi Zero W. 
 
 ## Usage
 
