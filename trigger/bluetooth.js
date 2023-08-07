@@ -18,11 +18,15 @@ export const initBluetooth = ({ configFile, scheduler, logger }) => {
       return
     }
 
-    const deviceName = scheduler.config.deviceName
+    const deviceName = scheduler.config.name
 
     // let notificationCharacteristic
 
     const serviceUuid = '530c35d9-866f-4fb1-87f6-11c0f598ea84'
+
+    const CONFIG_CHARACTERISTIC_UUID = '90b4137b-88d7-4b15-a48b-13f9077a487e'
+    const READ_LOGS_CHARACTERISTIC_UUID = '84425c54-3368-43f6-933c-ef2fba2b1a52'
+    const RUN_TEST_CHARACTERISTIC_UUID = 'e7a9479e-cec7-423c-8338-69f55fc04b5f'
 
     manager.gattDb.setDeviceName(deviceName)
     manager.gattDb.addServices([
@@ -30,11 +34,20 @@ export const initBluetooth = ({ configFile, scheduler, logger }) => {
         uuid: serviceUuid,
         characteristics: [
           {
-            uuid: '90b4137b-88d7-4b15-a48b-13f9077a487e', // config
+            uuid: CONFIG_CHARACTERISTIC_UUID, // config
             properties: ['read', 'write'],
             onRead: function (connection, callback) {
               logger.log('bluetooth', 'read config')
-              callback(AttErrors.SUCCESS, new Date().toString())
+              callback(
+                AttErrors.SUCCESS,
+                JSON.stringify({
+                  timestamp: new Date(),
+                  status: 'OK',
+                  jobs: scheduler.jobs,
+                  recording: scheduler.cam.recording,
+                  config: scheduler.config,
+                })
+              )
             },
             onWrite: function (connection, needsResponse, value, callback) {
               logger.log('bluetooth', 'write config', { needsResponse, value })
@@ -42,7 +55,7 @@ export const initBluetooth = ({ configFile, scheduler, logger }) => {
             },
           },
           {
-            uuid: '84425c54-3368-43f6-933c-ef2fba2b1a52', // read logs
+            uuid: READ_LOGS_CHARACTERISTIC_UUID, // read logs
             properties: ['read'],
             onRead: function (connection, callback) {
               logger.log('bluetooth', 'read logs')
@@ -50,7 +63,7 @@ export const initBluetooth = ({ configFile, scheduler, logger }) => {
             },
           },
           {
-            uuid: 'e7a9479e-cec7-423c-8338-69f55fc04b5f', // run test
+            uuid: RUN_TEST_CHARACTERISTIC_UUID, // run test
             properties: ['write'],
             onWrite: function (connection, needsResponse, value, callback) {
               logger.log('bluetooth', 'run test', { needsResponse, value })
