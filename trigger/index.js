@@ -6,6 +6,7 @@ import { Logger } from './lib/logger.js'
 import { Scheduler } from './lib/scheduler.js'
 import { initServer } from './server.js'
 import { initButton } from './button.js'
+import { initBluetooth } from './bluetooth.js'
 
 const configFile = resolve(process.env.CAMERA_CONFIG_FILE ?? './config.json')
 const configJson = await readJson(configFile)
@@ -17,6 +18,7 @@ const scheduler = new Scheduler({ logger })
 scheduler.initialize(configJson)
 
 const { server, bonjour } = initServer({ configFile, scheduler, logger })
+initBluetooth({ configFile, scheduler, logger })
 const button = initButton({ config: configJson, logger })
 
 const shutdown = () => {
