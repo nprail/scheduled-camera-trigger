@@ -16,7 +16,8 @@ export const index = {
 }
 
 export const getConfigByIndex = (config, configIndex, secondIndex) => {
-  console.log(flat(config))
   const configName = index[configIndex]
-  return flat(config)[configName]
+  const flatConfig = flat(config)
+
+  return flatConfig[configName]
 }

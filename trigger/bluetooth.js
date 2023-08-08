@@ -63,7 +63,7 @@ export const initBluetooth = ({
 
                 configNotificationCharacteristic.notify(
                   connection,
-                  configEncoded
+                  configEncoded.buffer
                 )
               }
               callback(AttErrors.SUCCESS, new Date().toISOString())
