@@ -1,5 +1,6 @@
 import HciSocket from 'hci-socket'
 import NodeBleHost from 'ble-host'
+import { getConfigByIndex } from './lib/config-ble-index'
 
 const { BleManager, HciErrors, AttErrors, AdvertisingDataBuilder } = NodeBleHost
 
@@ -50,11 +51,21 @@ export const initBluetooth = ({
               logger.log('bluetooth', 'read config')
 
               // send the data as a notification
-              configNotificationCharacteristic.notify(
-                connection,
-                'Sample notification'
-              )
 
+              const enc = new TextEncoder()
+
+              for (let index = 0; index < 11; index++) {
+                const configString = getConfigByIndex(scheduler.config, index)
+                const configEncoded = enc.encode(configString)
+
+                console.log('config by index', index, configString)
+                console.log('config by index', index, configEncoded)
+
+                configNotificationCharacteristic.notify(
+                  connection,
+                  configEncoded
+                )
+              }
               callback(AttErrors.SUCCESS, new Date().toISOString())
             },
           },
@@ -110,6 +121,7 @@ export const initBluetooth = ({
     manager.setAdvertisingData(advDataBuffer)
     // call manager.setScanResponseData(...) if scan response data is desired too
     startAdv()
+    logger.log('bluetooth', 'Initialized')
 
     function startAdv() {
       manager.startAdvertising({}, (status, conn) => {
@@ -119,7 +131,7 @@ export const initBluetooth = ({
           return
         }
         conn.on('disconnect', startAdv) // restart advertising after disconnect
-        logger.log('bluetooth', 'Connection established!', conn)
+        logger.log('bluetooth', 'Connection established!')
       })
     }
   })
