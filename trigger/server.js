@@ -6,7 +6,7 @@ import { Bonjour } from 'bonjour-service'
 
 import { saveJson } from './lib/utils.js'
 
-export const initServer = ({ configFile, scheduler, logger }) => {
+export const initServer = ({ configFile, scheduler, controller, logger }) => {
   const app = express()
 
   const bonjour = new Bonjour({}, (err) => {
@@ -48,7 +48,7 @@ export const initServer = ({ configFile, scheduler, logger }) => {
   })
 
   app.post('/test', (req, res) => {
-    scheduler.cam
+    controller
       .test()
       .then(() => {
         res.status(200).json({
