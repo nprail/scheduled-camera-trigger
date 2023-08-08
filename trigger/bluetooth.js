@@ -28,7 +28,7 @@ export const initBluetooth = ({ configFile, scheduler, logger }) => {
     const READ_LOGS_CHARACTERISTIC_UUID = '84425c54-3368-43f6-933c-ef2fba2b1a52'
     const RUN_TEST_CHARACTERISTIC_UUID = 'e7a9479e-cec7-423c-8338-69f55fc04b5f'
 
-    manager.gattDb.setDeviceName(deviceName)
+    manager.gattDb.setDeviceName(scheduler.config.deviceName)
     manager.gattDb.addServices([
       {
         uuid: serviceUuid,
@@ -38,16 +38,17 @@ export const initBluetooth = ({ configFile, scheduler, logger }) => {
             properties: ['read', 'write'],
             onRead: function (connection, callback) {
               logger.log('bluetooth', 'read config')
-              callback(
-                AttErrors.SUCCESS,
-                JSON.stringify({
-                  timestamp: new Date(),
-                  status: 'OK',
-                  jobs: scheduler.jobs,
-                  recording: scheduler.cam.recording,
-                  config: scheduler.config,
-                })
-              )
+
+              const configData = JSON.stringify({
+                timestamp: new Date(),
+                status: 'OK',
+                jobs: scheduler.jobs,
+                recording: scheduler.cam.recording,
+                config: scheduler.config,
+              })
+              console.log(configData)
+
+              callback(AttErrors.SUCCESS, new Date().getTime())
             },
             onWrite: function (connection, needsResponse, value, callback) {
               logger.log('bluetooth', 'write config', { needsResponse, value })
