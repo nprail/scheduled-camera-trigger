@@ -5,7 +5,7 @@ export class ZCam extends BaseCamera {
   constructor(opts) {
     super(opts)
 
-    if (!opts.config.zcam || !opts.config.zcamCameraIp) {
+    if (!opts.config.zcamCameraIp) {
       throw new Error('ZCam camera configuration not set properly')
     }
 
