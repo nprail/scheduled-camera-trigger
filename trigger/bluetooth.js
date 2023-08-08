@@ -32,6 +32,8 @@ export const initBluetooth = ({
 
     const deviceName = scheduler.config.name
 
+    let notificationCharacteristic
+
     manager.gattDb.setDeviceName(scheduler.config.deviceName)
     manager.gattDb.addServices([
       {
