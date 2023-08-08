@@ -1,3 +1,5 @@
+import flat from 'flat'
+
 export const index = {
   0: 'name',
   1: 'wakeUpTimeout',

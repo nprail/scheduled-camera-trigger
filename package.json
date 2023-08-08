@@ -18,6 +18,7 @@
     "bonjour-service": "^1.1.1",
     "cors": "^2.8.5",
     "express": "^4.18.2",
+    "flat": "^5.0.2",
     "hci-socket": "^1.0.0",
     "lodash": "^4.17.21",
     "ms": "^2.1.3",
