@@ -68,6 +68,7 @@ export const initBluetooth = ({
                   configBuffer
                 )
               }
+              configNotificationCharacteristic.notify(connection, 'END')
               callback(AttErrors.SUCCESS, new Date().toISOString())
             },
           },
