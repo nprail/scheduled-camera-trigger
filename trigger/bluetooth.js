@@ -37,9 +37,9 @@ export const initBluetooth = ({
       {
         uuid: SERVICE_UUID,
         characteristics: [
-          {
+          (notificationCharacteristic = {
             uuid: CONFIG_READ_CHARACTERISTIC_UUID, // read config by index
-            properties: ['write'],
+            properties: ['write', 'notify'],
             onWrite: function (connection, needsResponse, value, callback) {
               const stringValue = value.toString('utf8')
               logger.log('bluetooth', 'read config', {
@@ -64,9 +64,20 @@ export const initBluetooth = ({
                 `${stringValue},${data}`,
                 'utf-8'
               )
+              notificationCharacteristic.notify(connection, responseBuffer)
               callback(AttErrors.SUCCESS, responseBuffer)
             },
-          },
+            onSubscriptionChange: function (
+              connection,
+              notification,
+              indication,
+              isWrite
+            ) {
+              if (notification) {
+                // Notifications are now enabled, so let's send something
+              }
+            },
+          }),
           {
             uuid: CONFIG_WRITE_CHARACTERISTIC_UUID, // write config
             properties: ['read'],
