@@ -41,9 +41,14 @@ export const initBluetooth = ({
             uuid: CONFIG_READ_CHARACTERISTIC_UUID, // read config by index
             properties: ['write'],
             onWrite: function (connection, needsResponse, value, callback) {
-              logger.log('bluetooth', 'write config', { needsResponse, value })
+              const stringValue = value.toString('utf8')
+              logger.log('bluetooth', 'read config', {
+                needsResponse,
+                value,
+                stringValue,
+              })
 
-              const requestData = value.split(',')
+              const requestData = stringValue.split(',')
 
               let data = getConfigValueByIndex(
                 scheduler.config,
@@ -55,7 +60,10 @@ export const initBluetooth = ({
                 data = data.length
               }
 
-              const responseBuffer = Buffer.from(`${value},${data}`, 'utf-8')
+              const responseBuffer = Buffer.from(
+                `${stringValue},${data}`,
+                'utf-8'
+              )
               callback(AttErrors.SUCCESS, responseBuffer)
             },
           },
