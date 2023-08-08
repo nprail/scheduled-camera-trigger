@@ -59,11 +59,15 @@ export const initBluetooth = ({
                 const configEncoded = enc.encode(configString)
 
                 console.log('config by index', index, configString)
-                console.log('config by index', index, configEncoded)
+                console.log(
+                  'config by index',
+                  index,
+                  Buffer.from(configEncoded)
+                )
 
                 configNotificationCharacteristic.notify(
                   connection,
-                  configEncoded.buffer
+                  Buffer.from(configEncoded)
                 )
               }
               callback(AttErrors.SUCCESS, new Date().toISOString())
