@@ -1,6 +1,6 @@
 import HciSocket from 'hci-socket'
 import NodeBleHost from 'ble-host'
-import { getConfigByIndex } from './lib/config-ble-index'
+import { getConfigByIndex } from './lib/config-ble-index.js'
 
 const { BleManager, HciErrors, AttErrors, AdvertisingDataBuilder } = NodeBleHost
 
