@@ -55,15 +55,18 @@ export const initBluetooth = ({
               const enc = new TextEncoder()
 
               for (let index = 0; index < 11; index++) {
-                const configString = getConfigByIndex(scheduler.config, index)
+                const configString = `${index}.${getConfigByIndex(
+                  scheduler.config,
+                  index
+                )}`
                 const configBuffer = Buffer.from(enc.encode(configString))
-                const indexBuffer = Buffer.from([index])
 
-                const fullBuffer = Buffer.concat([indexBuffer, configBuffer])
+                console.log('config by index', configString)
 
-                console.log('config by index', index, configString)
-
-                configNotificationCharacteristic.notify(connection, fullBuffer)
+                configNotificationCharacteristic.notify(
+                  connection,
+                  configBuffer
+                )
               }
               callback(AttErrors.SUCCESS, new Date().toISOString())
             },
