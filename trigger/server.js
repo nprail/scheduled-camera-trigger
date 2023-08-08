@@ -1,4 +1,3 @@
-import shell from 'shelljs'
 import express from 'express'
 import bodyParser from 'body-parser'
 import cors from 'cors'
@@ -30,20 +29,6 @@ export const initServer = ({ configFile, scheduler, controller, logger }) => {
     return res.status(200).json({
       timestamp: new Date(),
       logs: logger.logMessages,
-    })
-  })
-
-  app.post('/kill-wifi', (req, res) => {
-    return shell.exec('rfkill block wifi', (code, stdout, stderr) => {
-      const resp = {
-        timestamp: new Date(),
-        code,
-        stderr,
-        stdout,
-      }
-      logger.log('server', `rfkill block wifi: ${stdout || stderr}`, resp)
-
-      return res.status(code == 0 ? 200 : 500).json(resp)
     })
   })
 

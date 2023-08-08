@@ -1,6 +1,12 @@
 import HciSocket from 'hci-socket'
 import NodeBleHost from 'ble-host'
-import { getConfigByIndex } from './lib/config-ble-index.js'
+import {
+  CONFIG_READ_CHARACTERISTIC_UUID,
+  CONFIG_WRITE_CHARACTERISTIC_UUID,
+  RUN_TEST_CHARACTERISTIC_UUID,
+  SERVICE_UUID,
+  getConfigValueByIndex,
+} from './lib/config-ble-index.js'
 
 const { BleManager, HciErrors, AttErrors, AdvertisingDataBuilder } = NodeBleHost
 
@@ -26,50 +32,31 @@ export const initBluetooth = ({
 
     const deviceName = scheduler.config.name
 
-    let configNotificationCharacteristic
-    let shouldNotify = false
-
-    const serviceUuid = '530c35d9-866f-4fb1-87f6-11c0f598ea84'
-
-    const CONFIG_WRITE_CHARACTERISTIC_UUID =
-      '90b4137b-88d7-4b15-a48b-13f9077a487e'
-    const CONFIG_READ_CHARACTERISTIC_UUID =
-      '84425c54-3368-43f6-933c-ef2fba2b1a52'
-    const CONFIG_NOTIFICATION_CHARACTERISTIC_UUID =
-      '18f13e24-eb64-4ccd-b67c-4eda2b0af806'
-    const RUN_TEST_CHARACTERISTIC_UUID = 'e7a9479e-cec7-423c-8338-69f55fc04b5f'
-
     manager.gattDb.setDeviceName(scheduler.config.deviceName)
     manager.gattDb.addServices([
       {
-        uuid: serviceUuid,
+        uuid: SERVICE_UUID,
         characteristics: [
           {
-            uuid: CONFIG_READ_CHARACTERISTIC_UUID, // config
-            properties: ['read'],
-            onRead: function (connection, callback) {
-              logger.log('bluetooth', 'read config')
+            uuid: CONFIG_READ_CHARACTERISTIC_UUID, // read config by index
+            properties: ['write'],
+            onWrite: function (connection, needsResponse, value, callback) {
+              logger.log('bluetooth', 'write config', { needsResponse, value })
 
-              // send the data as a notification
+              const requestData = value.split(',')
 
-              const enc = new TextEncoder()
+              let data = getConfigValueByIndex(
+                scheduler.config,
+                requestData[0] /* item index */,
+                requestData[1] /* array index */
+              )
 
-              for (let index = 0; index < 11; index++) {
-                const configString = `${index}.${getConfigByIndex(
-                  scheduler.config,
-                  index
-                )}`
-                const configBuffer = Buffer.from(enc.encode(configString))
-
-                console.log('config by index', configString)
-
-                configNotificationCharacteristic.notify(
-                  connection,
-                  configBuffer
-                )
+              if (Array.isArray(data)) {
+                data = data.length
               }
-              configNotificationCharacteristic.notify(connection, 'END')
-              callback(AttErrors.SUCCESS, new Date().toISOString())
+
+              const responseBuffer = Buffer.from(`${value},${data}`, 'utf-8')
+              callback(AttErrors.SUCCESS, responseBuffer)
             },
           },
           {
@@ -95,23 +82,6 @@ export const initBluetooth = ({
                 })
             },
           },
-          (configNotificationCharacteristic = {
-            uuid: CONFIG_NOTIFICATION_CHARACTERISTIC_UUID,
-            properties: ['notify'],
-            onSubscriptionChange: function (
-              connection,
-              notification,
-              indication,
-              isWrite
-            ) {
-              console.log('onSubscriptionChange', {
-                notification,
-                indication,
-                isWrite,
-              })
-              shouldNotify = notification
-            },
-          }),
         ],
       },
     ])
@@ -119,7 +89,7 @@ export const initBluetooth = ({
     const advDataBuffer = new AdvertisingDataBuilder()
       .addFlags(['leGeneralDiscoverableMode', 'brEdrNotSupported'])
       .addLocalName(/*isComplete*/ true, deviceName)
-      .add128BitServiceUUIDs(/*isComplete*/ true, [serviceUuid])
+      .add128BitServiceUUIDs(/*isComplete*/ true, [SERVICE_UUID])
       .build()
     manager.setAdvertisingData(advDataBuffer)
     // call manager.setScanResponseData(...) if scan response data is desired too

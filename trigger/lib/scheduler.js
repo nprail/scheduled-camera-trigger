@@ -1,5 +1,4 @@
 import schedule from 'node-schedule'
-import ms from 'ms'
 import { v4 as uuid } from 'uuid'
 
 import { Generic } from '../cameras/generic.js'
@@ -36,22 +35,24 @@ export class Scheduler {
     })
 
     this.jobs = this.config.attempts.map((attempt) => {
-      const launchTime = new Date(attempt.time)
+      const launchTime = new Date(attempt)
 
       // start recording x seconds before ignition
       const recordTime = new Date(
-        launchTime.getTime() - ms(this.config.startBefore)
+        launchTime.getTime() - this.config.startBefore * 1000
       )
       // wake up the camera x seconds before recording
       const wakeUpTime = new Date(
-        recordTime.getTime() - ms(this.config.wakeUpTimeout)
+        recordTime.getTime() - this.config.wakeUpTimeout * 1000
       )
       // stop recording x seconds after ignition
-      const stopTime = new Date(launchTime.getTime() + ms(this.config.endAfter))
+      const stopTime = new Date(
+        launchTime.getTime() + this.config.endAfter * 1000
+      )
 
       // wake up the camera
       const wakeUpJob = schedule.scheduleJob(wakeUpTime, () => {
-        this.logger.log('index', `Start '${attempt.name}'`)
+        this.logger.log('index', `Start '${attempt}'`)
 
         this.cam.wake()
       })
@@ -67,7 +68,7 @@ export class Scheduler {
       const stopJob = schedule.scheduleJob(stopTime, async () => {
         await this.cam.stop()
 
-        this.logger.log('index', `Complete '${attempt.name}'`)
+        this.logger.log('index', `Complete '${attempt}'`)
 
         await this.cam.sleep()
       })
@@ -75,7 +76,6 @@ export class Scheduler {
 
       return {
         id: uuid(),
-        name: attempt.name,
         camera: this.config.cameraType,
         config: {
           wakeUpTime,

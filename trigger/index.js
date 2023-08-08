@@ -4,8 +4,7 @@ import { readJson } from './lib/utils.js'
 import { Logger } from './lib/logger.js'
 
 import { Scheduler } from './lib/scheduler.js'
-import { initServer } from './server.js'
-import { initButton } from './button.js'
+// import { initServer } from './server.js'
 import { initBluetooth } from './bluetooth.js'
 import { initController } from './controller.js'
 
@@ -20,24 +19,9 @@ scheduler.initialize(configJson)
 
 const controller = initController({ configFile, scheduler, logger })
 
-const { server, bonjour } = initServer({
-  configFile,
-  scheduler,
-  controller,
-  logger,
-})
 initBluetooth({ configFile, scheduler, controller, logger })
-const button = initButton({ config: configJson, logger })
 
-const shutdown = () => {
-  bonjour.unpublishAll()
-
-  if (button) button.unexport()
-
-  server.close(() => {
-    bonjour.destroy()
-  })
-}
+const shutdown = () => {}
 
 process.on('SIGINT', shutdown)
 process.on('SIGTERM', shutdown)
