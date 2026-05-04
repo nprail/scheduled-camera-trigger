@@ -1,7 +1,6 @@
-import { Injectable, NgZone } from '@angular/core'
-import { Subject } from 'rxjs'
 import {
   BleClient,
+  ConnectionPriority,
   numbersToDataView,
   ScanResult,
 } from '@capacitor-community/bluetooth-le'
@@ -15,7 +14,7 @@ const HEADER_LEN = 4
 const FLAG_LAST = 0x01
 
 // Conservative chunk size for client -> device writes. Fits MTU 27 with the
-// 4-byte framing header. Once requestMtu() succeeds we ramp up.
+// 4-byte framing header.
 const SAFE_CHUNK_PAYLOAD = 19
 
 export interface BleDevice {
@@ -26,13 +25,13 @@ export interface BleDevice {
 
 export interface RpcEvent {
   name: string
-  data: any
+  data: unknown
 }
 
 interface PendingRequest {
-  resolve: (data: any) => void
+  resolve: (data: unknown) => void
   reject: (err: Error) => void
-  timer: any
+  timer: ReturnType<typeof setTimeout>
 }
 
 interface ReassemblyEntry {
@@ -40,16 +39,12 @@ interface ReassemblyEntry {
   lastSeq?: number
 }
 
-@Injectable({ providedIn: 'root' })
 export class BleService {
-  /** Devices discovered via active scan. */
-  public devices$ = new Subject<BleDevice[]>()
-  /** Stream of `evt` messages pushed by the device (status, log, ...). */
-  public events$ = new Subject<RpcEvent>()
-  /** Connection state changes. */
-  public connected$ = new Subject<boolean>()
+  public onDevices?: (devices: BleDevice[]) => void
+  public onConnected?: (connected: boolean) => void
+  public onEvent?: (evt: RpcEvent) => void
 
-  private devices = new Map<string, BleDevice>()
+  private devicesMap = new Map<string, BleDevice>()
   private currentDeviceId: string | null = null
   private isInitialized = false
 
@@ -60,14 +55,8 @@ export class BleService {
   private reasm = new Map<number, ReassemblyEntry>()
   private chunkPayload = SAFE_CHUNK_PAYLOAD
 
-  constructor(private ngZone: NgZone) {}
-
   public get isConnected(): boolean {
     return this.currentDeviceId != null
-  }
-
-  public get connectedDeviceId(): string | null {
-    return this.currentDeviceId
   }
 
   // ----- Lifecycle -----
@@ -80,7 +69,7 @@ export class BleService {
 
   public async startScan(): Promise<void> {
     await this.ensureInit()
-    this.devices.clear()
+    this.devicesMap.clear()
     this.emitDevices()
 
     await BleClient.requestLEScan(
@@ -91,7 +80,7 @@ export class BleService {
           name: result.device.name ?? result.localName ?? undefined,
           rssi: result.rssi,
         }
-        this.devices.set(dev.deviceId, dev)
+        this.devicesMap.set(dev.deviceId, dev)
         this.emitDevices()
       }
     )
@@ -106,16 +95,45 @@ export class BleService {
     }
   }
 
+  // Opens the browser's native BLE device-picker (web) or a system dialog
+  // (native). Returns the selected device without connecting.
+  public async requestDevice(): Promise<BleDevice> {
+    await this.ensureInit()
+    const result = await BleClient.requestDevice({ services: [SERVICE_UUID] })
+    return {
+      deviceId: result.deviceId,
+      name: result.name ?? undefined,
+    }
+  }
+
   public async connect(deviceId: string): Promise<void> {
     await this.ensureInit()
     await this.stopScan()
 
     await BleClient.connect(deviceId, () => this.handleDisconnected(deviceId))
     this.currentDeviceId = deviceId
-
-    // The plugin negotiates MTU automatically but doesn't expose the result,
-    // so we stick to the conservative chunk size that fits MTU 27.
     this.chunkPayload = SAFE_CHUNK_PAYLOAD
+
+    // Request high-priority connection (lower interval) and negotiate a larger
+    // MTU so we can fit more payload per chunk. getMtu() returns the negotiated
+    // ATT MTU; subtract 3 (ATT overhead) and 4 (our frame header) for the
+    // usable payload size. Fall back to the safe default if either call fails.
+    try {
+      await BleClient.requestConnectionPriority(
+        deviceId,
+        ConnectionPriority.CONNECTION_PRIORITY_HIGH
+      )
+    } catch {
+      // non-fatal — Android only
+    }
+    try {
+      const mtu = await BleClient.getMtu(deviceId)
+      if (mtu > HEADER_LEN + 3) {
+        this.chunkPayload = mtu - 3 - HEADER_LEN
+      }
+    } catch {
+      // non-fatal — keep SAFE_CHUNK_PAYLOAD
+    }
 
     await BleClient.startNotifications(
       deviceId,
@@ -124,7 +142,7 @@ export class BleService {
       (value) => this.handleNotification(value)
     )
 
-    this.ngZone.run(() => this.connected$.next(true))
+    this.onConnected?.(true)
   }
 
   public async disconnect(): Promise<void> {
@@ -132,10 +150,14 @@ export class BleService {
     const id = this.currentDeviceId
     try {
       await BleClient.stopNotifications(id, SERVICE_UUID, TX_UUID)
-    } catch {}
+    } catch {
+      // ignore
+    }
     try {
       await BleClient.disconnect(id)
-    } catch {}
+    } catch {
+      // ignore
+    }
     this.handleDisconnected(id)
   }
 
@@ -147,21 +169,25 @@ export class BleService {
       p.reject(new Error('Disconnected'))
     }
     this.pending.clear()
-    this.ngZone.run(() => this.connected$.next(false))
+    this.onConnected?.(false)
   }
 
   // ----- High-level API -----
 
   public getStatus = () => this.request('getStatus')
   public getConfig = () => this.request('getConfig')
-  public setConfig = (config: any) => this.request('setConfig', config)
+  public setConfig = (config: unknown) => this.request('setConfig', config)
   public getLogs = (params?: { since?: string; limit?: number }) =>
     this.request('getLogs', params)
   public test = () => this.request('test')
 
   // ----- RPC plumbing -----
 
-  private request(method: string, params?: any, timeoutMs = 10000): Promise<any> {
+  private request(
+    method: string,
+    params?: unknown,
+    timeoutMs = 10000
+  ): Promise<unknown> {
     if (!this.currentDeviceId) {
       return Promise.reject(new Error('Not connected'))
     }
@@ -210,7 +236,7 @@ export class BleService {
       frame[3] = isLast ? FLAG_LAST : 0
       frame.set(chunk, HEADER_LEN)
 
-      await BleClient.write(
+      await BleClient.writeWithoutResponse(
         deviceId,
         SERVICE_UUID,
         RX_UUID,
@@ -265,7 +291,7 @@ export class BleService {
     }
     this.reasm.delete(msgId)
 
-    let msg: any
+    let msg: unknown
     try {
       msg = JSON.parse(new TextDecoder().decode(assembled))
     } catch (err) {
@@ -276,25 +302,40 @@ export class BleService {
     this.handleMessage(msg)
   }
 
-  private handleMessage(msg: any) {
-    if (msg?.type === 'res' && typeof msg.id === 'number') {
-      const pending = this.pending.get(msg.id)
+  private handleMessage(msg: unknown) {
+    if (
+      typeof msg === 'object' &&
+      msg !== null &&
+      'type' in msg &&
+      (msg as Record<string, unknown>).type === 'res' &&
+      typeof (msg as Record<string, unknown>).id === 'number'
+    ) {
+      const m = msg as Record<string, unknown>
+      const pending = this.pending.get(m.id as number)
       if (!pending) return
-      this.pending.delete(msg.id)
+      this.pending.delete(m.id as number)
       clearTimeout(pending.timer)
-      if (msg.ok) pending.resolve(msg.data)
-      else pending.reject(new Error(msg.error || 'RPC error'))
+      if (m.ok) pending.resolve(m.data)
+      else pending.reject(new Error((m.error as string) || 'RPC error'))
       return
     }
 
-    if (msg?.type === 'evt' && typeof msg.name === 'string') {
-      this.ngZone.run(() => this.events$.next({ name: msg.name, data: msg.data }))
-      return
+    if (
+      typeof msg === 'object' &&
+      msg !== null &&
+      'type' in msg &&
+      (msg as Record<string, unknown>).type === 'evt' &&
+      typeof (msg as Record<string, unknown>).name === 'string'
+    ) {
+      const m = msg as Record<string, unknown>
+      this.onEvent?.({ name: m.name as string, data: m.data })
     }
   }
 
   private emitDevices() {
-    const list = Array.from(this.devices.values())
-    this.ngZone.run(() => this.devices$.next(list))
+    const list = Array.from(this.devicesMap.values())
+    this.onDevices?.(list)
   }
 }
+
+export const bleService = new BleService()

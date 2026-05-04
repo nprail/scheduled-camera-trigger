@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Background -->
+  <rect width="1024" height="1024" fill="#0f172a"/>
+
+  <!-- Camera body -->
+  <rect x="154" y="369" width="716" height="491" rx="72" fill="#1e293b"/>
+
+  <!-- Viewfinder bump -->
+  <rect x="338" y="277" width="226" height="123" rx="41" fill="#1e293b"/>
+
+  <!-- Lens outer ring -->
+  <circle cx="512" cy="614" r="185" fill="#0f172a"/>
+
+  <!-- Lens inner -->
+  <circle cx="512" cy="614" r="133" fill="#1e293b"/>
+
+  <!-- Clock hour hand (~10 o'clock) -->
+  <line x1="512" y1="614" x2="461" y2="558" stroke="#f8fafc" stroke-width="18" stroke-linecap="round"/>
+  <!-- Clock minute hand (~12 o'clock) -->
+  <line x1="512" y1="614" x2="512" y2="532" stroke="#f97316" stroke-width="14" stroke-linecap="round"/>
+  <!-- Center pivot -->
+  <circle cx="512" cy="614" r="15" fill="#f8fafc"/>
+</svg>
