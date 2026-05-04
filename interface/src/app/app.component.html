@@ -5,44 +5,57 @@
         <h1>Camera Scheduler</h1>
 
         <div *ngIf="!cameraConnected">
-          <div class="mb-3">
-            <label for="ipAddress" class="form-label"> IP Address </label>
-            <input
-              type="text"
-              class="form-control"
-              id="ipAddress"
-              [(ngModel)]="ipAddress"
-            />
-          </div>
+          <div class="d-flex justify-content-center mb-3">
+            <button
+              type="button"
+              class="btn btn-primary mx-1"
+              [disabled]="loadingScan || loadingConnect"
+              (click)="scan()"
+            >
+              <ng-container *ngIf="!loadingScan">Scan for devices</ng-container>
+              <ng-container *ngIf="loadingScan">
+                <span
+                  class="spinner-border spinner-border-sm"
+                  role="status"
+                  aria-hidden="true"
+                ></span>
+                Scanning...
+              </ng-container>
+            </button>
 
-          <button
-            type="button"
-            class="btn btn-primary mb-3"
-            (click)="connect()"
-          >
-            Connect
-          </button>
+            <button
+              *ngIf="lastDeviceId"
+              type="button"
+              class="btn btn-outline-primary mx-1"
+              [disabled]="loadingConnect"
+              (click)="connect()"
+            >
+              <ng-container *ngIf="!loadingConnect">
+                Reconnect to last device
+              </ng-container>
+              <ng-container *ngIf="loadingConnect">
+                <span
+                  class="spinner-border spinner-border-sm"
+                  role="status"
+                  aria-hidden="true"
+                ></span>
+                Connecting...
+              </ng-container>
+            </button>
+          </div>
 
           <div class="list-group mb-3">
             <a
-              *ngFor="let service of services"
+              *ngFor="let device of devices"
               class="list-group-item list-group-item-action"
               href="javascript:void(0)"
-              (click)="select(service)"
+              (click)="selectDevice(device)"
             >
-              {{ service.name }}
+              {{ device.name || '(unnamed device)' }}
               <br />
-              <small>{{ service.ipv4Addresses.join(' / ') }}</small>
+              <small>{{ device.deviceId }}</small>
               <br />
-              <small
-                *ngIf="service.txtRecord['_scheduled_camera_trigger_type']"
-              >
-                {{
-                  service.txtRecord[
-                    '_scheduled_camera_trigger_type'
-                  ].toUpperCase()
-                }}
-              </small>
+              <small *ngIf="device.rssi">RSSI: {{ device.rssi }} dBm</small>
             </a>
           </div>
         </div>
@@ -74,6 +87,7 @@
 
         <p *ngIf="connectionFailed" class="text-danger mt-3">
           Failed to connect to camera scheduler.
+          <span *ngIf="connectionError"><br /><small>{{ connectionError }}</small></span>
         </p>
       </div>
 
@@ -82,8 +96,7 @@
           <h2
             [ngClass]="{
               'text-success': cameraConnected,
-              'text-danger': !cameraConnected,
-              'text-warning': cameraConnected && requestFailCount > 0
+              'text-danger': !cameraConnected
             }"
           >
             {{ info.config.deviceName }}
@@ -153,41 +166,6 @@
                       <pre><code>{{ log.data | json }}</code></pre>
                     </div>
                   </div>
-                </ng-template>
-              </div>
-            </div>
-          </div>
-
-          <div ngbAccordionItem>
-            <h2 ngbAccordionHeader>
-              <button ngbAccordionButton>Danger Area</button>
-            </h2>
-            <div ngbAccordionCollapse>
-              <div ngbAccordionBody>
-                <ng-template>
-                  <button
-                    type="button"
-                    class="btn btn-danger"
-                    [disabled]="loadingKillWifi"
-                    (click)="killWifi()"
-                  >
-                    <ng-container *ngIf="!loadingKillWifi">
-                      {{ killWifiConfirmed ? 'Are you sure?' : 'Kill WiFi' }}
-                    </ng-container>
-
-                    <ng-container *ngIf="loadingKillWifi">
-                      <span
-                        class="spinner-border spinner-border-sm"
-                        role="status"
-                        aria-hidden="true"
-                      ></span>
-                      Killing...
-                    </ng-container>
-                  </button>
-
-                  <p *ngIf="killWifiResponse" class="mt-4">
-                    {{ killWifiResponse }}
-                  </p>
                 </ng-template>
               </div>
             </div>

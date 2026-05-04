@@ -1,17 +1,20 @@
-import { Component, Input } from '@angular/core'
+import { Component, Input, OnInit } from '@angular/core'
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap'
-import { CapacitorHttp } from '@capacitor/core'
+
+import { BleService } from '../utils/ble.service'
 
 @Component({
   selector: 'app-config-modal',
   templateUrl: 'config-modal.component.html',
   styles: [],
 })
-export class ConfigModalComponent {
+export class ConfigModalComponent implements OnInit {
   @Input() public config: any
-  @Input() private baseUrl: string = ''
 
-  constructor(public activeModal: NgbActiveModal) {}
+  public saving = false
+  public error = ''
+
+  constructor(public activeModal: NgbActiveModal, private ble: BleService) {}
 
   ngOnInit() {
     if (!this.config.zcam) {
@@ -23,14 +26,16 @@ export class ConfigModalComponent {
   }
 
   public async save() {
-    const resp = await CapacitorHttp.post({
-      url: `${this.baseUrl}/save`,
-      data: this.config,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-    this.activeModal.close('save')
+    this.saving = true
+    this.error = ''
+    try {
+      await this.ble.setConfig(this.config)
+      this.activeModal.close('save')
+    } catch (err: any) {
+      this.error = err?.message ?? String(err)
+    } finally {
+      this.saving = false
+    }
   }
 
   public addAttempt() {

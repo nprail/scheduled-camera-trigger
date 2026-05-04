@@ -1,3 +1,5 @@
+import { saveJson } from './lib/utils.js'
+
 export const initController = ({ configFile, scheduler, logger }) => {
   const test = async () => {
     await scheduler.cam.test()
@@ -17,5 +19,7 @@ export const initController = ({ configFile, scheduler, logger }) => {
     scheduler.initialize(newConfig)
   }
 
-  return { test, save }
+  const getConfig = () => scheduler.config
+
+  return { test, save, getConfig }
 }

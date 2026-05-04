@@ -1,155 +1,142 @@
-import { Component, OnInit } from '@angular/core'
-import { CapacitorHttp } from '@capacitor/core'
+import { Component, OnDestroy, OnInit } from '@angular/core'
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import { cloneDeep } from 'lodash'
-import { ZeroConfService } from 'capacitor-zeroconf'
 import { DateTime } from 'luxon'
+import { Subscription } from 'rxjs'
 
 import { ConfigModalComponent } from './config-modal/config-modal.component'
-import { BonjourService } from './utils/bonjour.service'
+import { BleDevice, BleService } from './utils/ble.service'
 
-const LOCAL_STORAGE_KEY = '_camera_scheduler_ip_address'
+const LOCAL_STORAGE_KEY = '_camera_scheduler_ble_device_id'
+const MAX_LOG_LINES = 500
 
 @Component({
   selector: 'app-root',
   templateUrl: 'app.component.html',
   styleUrls: ['app.component.scss'],
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
   public info: any
   public logs: any[] = []
   public timestamp = ''
   public nowTimestamp = ''
   public timeDiff: number | undefined = 0
 
-  public killWifiConfirmed = false
-  public loadingKillWifi = false
-  public killWifiResponse = ''
   public loadingTest = false
+  public loadingScan = false
+  public loadingConnect = false
 
-  private logFetchInterval: number | undefined
-  public requestFailCount = 0
   public cameraConnected = false
-
   public connectionFailed = false
+  public connectionError = ''
 
-  public ipAddress: string = localStorage.getItem(LOCAL_STORAGE_KEY) ?? ''
+  public devices: BleDevice[] = []
+  public lastDeviceId: string =
+    localStorage.getItem(LOCAL_STORAGE_KEY) ?? ''
 
-  public get baseUrl() {
-    return `http://${this.ipAddress}:3000`
-  }
+  private statusPollHandle: any = null
+  private subs: Subscription[] = []
 
-  public services: ZeroConfService[] = []
-
-  constructor(private modalService: NgbModal, public bonjour: BonjourService) {}
-
-  public select(service: any) {
-    this.ipAddress = service.ipv4Addresses[0]
-    this.connect()
-  }
+  constructor(private modalService: NgbModal, public ble: BleService) {}
 
   ngOnInit() {
-    this.bonjour.start()
+    this.subs.push(
+      this.ble.devices$.subscribe((devices) => (this.devices = devices))
+    )
 
-    this.bonjour.services$.subscribe((services) => {
-      this.services = services
-    })
-  }
-
-  private round(num: number) {
-    return Math.round((num + Number.EPSILON) * 100) / 100
-  }
-
-  private calculateDate(actualDate: Date) {
-    this.nowTimestamp = actualDate.toISOString()
-
-    const triggerDateTime = DateTime.fromISO(this.timestamp)
-    const actualDateTime = DateTime.fromJSDate(actualDate)
-
-    const diff = triggerDateTime.diff(actualDateTime, 'seconds').toObject()
-    this.timeDiff = this.round(diff.seconds ?? 0)
-  }
-
-  public async getInfo() {
-    try {
-      if (this.logFetchInterval) {
-        clearInterval(this.logFetchInterval)
-        this.logFetchInterval = undefined
-      }
-
-      const response = await CapacitorHttp.get({
-        url: this.baseUrl,
-        readTimeout: 3000,
-        connectTimeout: 3000,
+    this.subs.push(
+      this.ble.connected$.subscribe((connected) => {
+        this.cameraConnected = connected
+        if (!connected) {
+          this.stopStatusPoll()
+        }
       })
-      const now = new Date()
+    )
 
-      this.connectionFailed = false
-      this.timestamp = response.data.timestamp
-      this.calculateDate(now)
+    this.subs.push(
+      this.ble.events$.subscribe((evt) => {
+        if (evt.name === 'log') {
+          this.logs = [evt.data, ...this.logs].slice(0, MAX_LOG_LINES)
+        } else if (evt.name === 'status') {
+          this.applyStatus(evt.data)
+        }
+      })
+    )
 
-      this.info = response.data
-      this.cameraConnected = true
-      this.killWifiResponse = ''
+    this.scan().catch((err) => console.error(err))
+  }
 
-      this.fetchLogs()
+  ngOnDestroy() {
+    this.stopStatusPoll()
+    for (const s of this.subs) s.unsubscribe()
+  }
 
-      this.logFetchInterval = setInterval(() => {
-        this.fetchLogs()
-      }, 1000) as any
-    } catch (err) {
+  public async scan() {
+    this.loadingScan = true
+    this.connectionError = ''
+    try {
+      await this.ble.startScan()
+      // Stop the active scan after 10s to save battery.
+      setTimeout(() => this.ble.stopScan().catch(() => {}), 10000)
+    } catch (err: any) {
+      this.connectionError = err?.message ?? String(err)
+    } finally {
+      this.loadingScan = false
+    }
+  }
+
+  public selectDevice(device: BleDevice) {
+    this.connect(device.deviceId)
+  }
+
+  public async connect(deviceId?: string) {
+    const id = deviceId || this.lastDeviceId
+    if (!id) {
+      this.connectionError = 'No device selected'
+      return
+    }
+
+    this.loadingConnect = true
+    this.connectionFailed = false
+    this.connectionError = ''
+    try {
+      await this.ble.connect(id)
+      localStorage.setItem(LOCAL_STORAGE_KEY, id)
+      this.lastDeviceId = id
+
+      const [status, config, logs] = await Promise.all([
+        this.ble.getStatus(),
+        this.ble.getConfig(),
+        this.ble.getLogs({ limit: MAX_LOG_LINES }),
+      ])
+      this.applyStatus(status)
+      this.info = { config, jobs: status?.jobs ?? [] }
+      this.logs = (logs ?? [])
+        .slice()
+        .sort(
+          (a: any, b: any) =>
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        )
+
+      this.startStatusPoll()
+    } catch (err: any) {
       this.connectionFailed = true
+      this.connectionError = err?.message ?? String(err)
+    } finally {
+      this.loadingConnect = false
     }
   }
 
-  public async fetchLogs() {
-    try {
-      const resp = await CapacitorHttp.get({
-        url: `${this.baseUrl}/logs`,
-        readTimeout: 1000,
-        connectTimeout: 1000,
-      })
-      const now = new Date()
-
-      this.timestamp = resp.data.timestamp
-      this.calculateDate(now)
-      this.cameraConnected = true
-      this.logs = resp.data.logs.sort(
-        (a: any, b: any) =>
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      )
-      this.requestFailCount = 0
-    } catch (err) {
-      this.requestFailCount++
-
-      if (this.requestFailCount >= 5) {
-        clearInterval(this.logFetchInterval)
-        this.logFetchInterval = undefined
-        this.cameraConnected = false
-      }
-    }
-  }
-
-  public connect() {
-    localStorage.setItem(LOCAL_STORAGE_KEY, this.ipAddress)
-
-    this.getInfo()
-  }
-
-  public disconnect() {
+  public async disconnect() {
+    this.stopStatusPoll()
+    await this.ble.disconnect()
     this.cameraConnected = false
-    clearInterval(this.logFetchInterval)
-    this.logFetchInterval = undefined
   }
 
   public async test() {
     this.loadingTest = true
     try {
-      const resp = await CapacitorHttp.post({
-        url: `${this.baseUrl}/test`,
-        readTimeout: 3000,
-        connectTimeout: 3000,
-      })
+      await this.ble.test()
     } catch (err) {
       console.error(err)
     } finally {
@@ -158,47 +145,69 @@ export class AppComponent implements OnInit {
   }
 
   public async edit() {
+    if (!this.info?.config) return
     const modalRef = this.modalService.open(ConfigModalComponent)
     modalRef.componentInstance.config = cloneDeep(this.info.config)
-    modalRef.componentInstance.baseUrl = this.baseUrl
-    modalRef.result
-      .then((resp) => {
-        if (resp === 'save') this.getInfo()
-      })
-      .catch(() => {
-        // ignore
-      })
+    try {
+      const result = await modalRef.result
+      if (result === 'save') {
+        const [status, config] = await Promise.all([
+          this.ble.getStatus(),
+          this.ble.getConfig(),
+        ])
+        this.applyStatus(status)
+        this.info = { config, jobs: status?.jobs ?? [] }
+      }
+    } catch {
+      // dismissed
+    }
   }
 
-  public async killWifi() {
-    if (!this.killWifiConfirmed) {
-      this.killWifiConfirmed = true
-      return
+  private applyStatus(status: any) {
+    if (!status) return
+    this.timestamp = status.timestamp
+    this.calculateDate(new Date())
+    this.info = {
+      ...(this.info ?? {}),
+      config: this.info?.config ?? {
+        deviceId: status.deviceId,
+        deviceName: status.deviceName,
+        cameraType: status.cameraType,
+      },
+      jobs: status.jobs ?? [],
+      recording: status.recording,
     }
+  }
 
-    this.loadingKillWifi = true
-    this.killWifiConfirmed = false
-
-    try {
-      const resp = await CapacitorHttp.post({
-        url: `${this.baseUrl}/kill-wifi`,
-        readTimeout: 3000,
-        connectTimeout: 3000,
-      })
-
-      this.loadingKillWifi = false
-      this.killWifiResponse =
-        'Response was received. The command probably failed?'
-    } catch (err: any) {
-      if (err?.message ?? err === 'timeout') {
-        this.killWifiResponse =
-          'Response timed out. WiFi was probably successfully killed'
-      } else {
-        this.killWifiResponse =
-          'Non-timeout error ocurred. The command probably failed?'
+  private startStatusPoll() {
+    this.stopStatusPoll()
+    this.statusPollHandle = setInterval(async () => {
+      try {
+        const status = await this.ble.getStatus()
+        this.applyStatus(status)
+      } catch (err) {
+        // Ignore transient errors; disconnect handler will fire if link drops.
       }
+    }, 2000)
+  }
 
-      this.loadingKillWifi = false
+  private stopStatusPoll() {
+    if (this.statusPollHandle) {
+      clearInterval(this.statusPollHandle)
+      this.statusPollHandle = null
     }
+  }
+
+  private round(num: number) {
+    return Math.round((num + Number.EPSILON) * 100) / 100
+  }
+
+  private calculateDate(actualDate: Date) {
+    this.nowTimestamp = actualDate.toISOString()
+    if (!this.timestamp) return
+    const triggerDateTime = DateTime.fromISO(this.timestamp)
+    const actualDateTime = DateTime.fromJSDate(actualDate)
+    const diff = triggerDateTime.diff(actualDateTime, 'seconds').toObject()
+    this.timeDiff = this.round(diff.seconds ?? 0)
   }
 }

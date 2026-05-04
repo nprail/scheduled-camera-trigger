@@ -5,6 +5,13 @@ export class Logger {
   constructor({ logFile }) {
     this.logFile = resolve(logFile)
     this.logMessages = []
+    this.subscribers = new Set()
+  }
+
+  /** Register a callback invoked with each new log entry. Returns an unsubscribe fn. */
+  subscribe(fn) {
+    this.subscribers.add(fn)
+    return () => this.subscribers.delete(fn)
   }
 
   log(namespace, message, data = {}) {
@@ -22,5 +29,13 @@ export class Logger {
     this.logMessages.push(log)
 
     appendFile(this.logFile, messageString).catch(console.error)
+
+    for (const fn of this.subscribers) {
+      try {
+        fn(log)
+      } catch (err) {
+        console.error('Logger subscriber threw:', err)
+      }
+    }
   }
 }
