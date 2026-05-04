@@ -1,0 +1,14 @@
+[Unit]
+Description=scheduled-camera-trigger
+Documentation=https://nprail.dev
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Environment=CAMERA_CONFIG_FILE=/boot/camera-config.json
+ExecStart=/usr/local/bin/node --no-expose-wasm /home/pi/scheduled-camera-trigger/trigger/index.js
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
