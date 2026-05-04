@@ -30,17 +30,6 @@ export const initBle = ({ scheduler, controller, logger }) => {
     logger,
   })
 
-  // Stream every new log line to the connected client.
-  const unsubscribeLogs = logger.subscribe((entry) => {
-    if (!hasSubscriber()) return
-    try {
-      send({ type: 'evt', name: 'log', data: entry })
-    } catch (err) {
-      // Avoid recursing back into logger here.
-      console.error('[ble] failed to forward log event:', err)
-    }
-  })
-
   const localName = String(scheduler.config?.deviceName || 'CamTrigger').slice(
     0,
     20 // BLE local-name in advertisement is limited
@@ -88,7 +77,6 @@ export const initBle = ({ scheduler, controller, logger }) => {
 
   return {
     stop: () => {
-      unsubscribeLogs()
       try {
         bleno.stopAdvertising()
       } catch {}

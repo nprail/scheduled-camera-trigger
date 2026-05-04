@@ -18,6 +18,33 @@ export const createGattService = ({ onMessage, logger }) => {
   let maxNotifyValueSize = 20 // updated on subscribe per current MTU
   let txMsgId = 0
 
+  // Notification queue — drains a small burst of frames per event-loop tick to
+  // avoid overwhelming the BLE stack while still keeping the pipeline filled.
+  const TX_BURST = 5 // frames sent per drain tick before yielding
+  const txQueue = []
+  let txBusy = false
+
+  const drainQueue = () => {
+    if (txBusy || txQueue.length === 0 || !notifyFn) return
+    txBusy = true
+
+    let sent = 0
+    while (txQueue.length > 0 && sent < TX_BURST) {
+      const frame = txQueue.shift()
+      if (notifyFn(frame) === false) {
+        // BLE stack signalled back-pressure; re-queue and back off.
+        txQueue.unshift(frame)
+        break
+      }
+      sent++
+    }
+
+    setImmediate(() => {
+      txBusy = false
+      drainQueue()
+    })
+  }
+
   const nextTxId = () => {
     txMsgId = (txMsgId + 1) & 0xffff
     if (txMsgId === 0) txMsgId = 1
@@ -51,7 +78,7 @@ export const createGattService = ({ onMessage, logger }) => {
           .catch((err) =>
             logger.log('ble', 'onMessage handler error', {
               err: err?.message ?? String(err),
-            })
+            }),
           )
       } catch (err) {
         logger.log('ble', 'onWriteRequest threw', { err: err?.message })
@@ -72,6 +99,7 @@ export const createGattService = ({ onMessage, logger }) => {
     },
     onUnsubscribe: () => {
       notifyFn = null
+      txQueue.length = 0
       logger.log('ble', 'Client unsubscribed from TX')
     },
   })
@@ -87,10 +115,11 @@ export const createGattService = ({ onMessage, logger }) => {
     const payload = Buffer.from(JSON.stringify(msg), 'utf8')
     const chunkSize = Math.max(
       SAFE_CHUNK_PAYLOAD,
-      maxNotifyValueSize - HEADER_LEN
+      maxNotifyValueSize - HEADER_LEN,
     )
     const frames = buildFrames(nextTxId(), payload, chunkSize)
-    for (const f of frames) notifyFn(f)
+    for (const f of frames) txQueue.push(f)
+    drainQueue()
     return true
   }
 
