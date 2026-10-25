@@ -1,0 +1,185 @@
+import SwiftUI
+import CameraTriggerKit
+
+struct ConfigEditorView: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var draft: CameraConfig?
+    @State private var saving = false
+    @State private var errorText: String?
+
+    private var busy: Bool {
+        let phase = model.live?.phase ?? .idle
+        return phase != .idle
+    }
+
+    var body: some View {
+        Group {
+            if draft != nil {
+                form
+            } else {
+                ProgressView()
+            }
+        }
+        .navigationTitle("Schedule & Settings")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") { save() }
+                    .disabled(!isDirty || saving || busy)
+            }
+        }
+        .onAppear { if draft == nil { draft = model.config } }
+        .alert("Couldn't save", isPresented: Binding(get: { errorText != nil }, set: { if !$0 { errorText = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorText ?? "")
+        }
+    }
+
+    private var isDirty: Bool { draft != model.config }
+
+    @ViewBuilder
+    private var form: some View {
+        if let binding = Binding($draft) {
+            Form {
+                if busy {
+                    Section {
+                        Label("The device is busy. Changes can be saved when it's idle.", systemImage: "lock")
+                            .foregroundStyle(.orange)
+                    }
+                }
+                attemptsSection(binding)
+                timingSection(binding)
+                cameraSection(binding)
+                generalSection(binding)
+            }
+            .disabled(saving)
+        }
+    }
+
+    // MARK: Sections
+
+    private func attemptsSection(_ config: Binding<CameraConfig>) -> some View {
+        Section {
+            ForEach(config.attempts) { $attempt in
+                VStack(alignment: .leading, spacing: 6) {
+                    TextField("Name", text: $attempt.name)
+                        .font(.headline)
+                    DatePicker(
+                        "Launch (T-0)",
+                        selection: $attempt.date,
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
+                }
+            }
+            .onDelete { config.wrappedValue.attempts.remove(atOffsets: $0) }
+
+            Button {
+                addAttempt(to: config)
+            } label: {
+                Label("Add attempt", systemImage: "plus.circle")
+            }
+        } header: {
+            Text("Launch attempts")
+        } footer: {
+            Text("Times are in your local time zone (\(TimeZone.current.abbreviation() ?? "local")). The device works in UTC. Up to 30 attempts.")
+        }
+    }
+
+    private func timingSection(_ config: Binding<CameraConfig>) -> some View {
+        Section {
+            Stepper(value: config.wakeUpTimeout, in: 0 ... 600, step: 1) {
+                LabeledContent("Wake camera", value: "\(Int(config.wrappedValue.wakeUpTimeout)) s before recording")
+            }
+            Stepper(value: config.startBefore, in: 0 ... 600, step: 1) {
+                LabeledContent("Start recording", value: "\(Int(config.wrappedValue.startBefore)) s before T-0")
+            }
+            Stepper(value: config.endAfter, in: 0 ... 600, step: 1) {
+                LabeledContent("Stop recording", value: "\(Int(config.wrappedValue.endAfter)) s after T-0")
+            }
+        } header: {
+            Text("Timing")
+        }
+    }
+
+    private func cameraSection(_ config: Binding<CameraConfig>) -> some View {
+        Section("Camera") {
+            Picker("Type", selection: config.cameraType) {
+                Text("Remote trigger (GPIO)").tag("generic")
+                Text("Z CAM (network)").tag("zcam")
+            }
+            if config.wrappedValue.cameraType == "generic" {
+                LabeledContent("Release pin") {
+                    TextField("GPIO", text: intText(config.generic.releaseGpioPin))
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                }
+                LabeledContent("Focus pin") {
+                    TextField("Optional", text: intText(config.generic.focusGpioPin))
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                }
+            } else {
+                LabeledContent("Camera IP") {
+                    TextField("192.168.1.50", text: optionalText(config.zcam.cameraIp))
+                        .keyboardType(.numbersAndPunctuation)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .multilineTextAlignment(.trailing)
+                }
+            }
+        }
+    }
+
+    private func generalSection(_ config: Binding<CameraConfig>) -> some View {
+        Section("Device") {
+            LabeledContent("Name") {
+                TextField("Optional", text: optionalText(config.name))
+                    .multilineTextAlignment(.trailing)
+            }
+            LabeledContent("Button pin") {
+                TextField("Optional", text: intText(config.buttonGpioPort))
+                    .keyboardType(.numberPad)
+                    .multilineTextAlignment(.trailing)
+            }
+        }
+    }
+
+    // MARK: Actions
+
+    private func addAttempt(to config: Binding<CameraConfig>) {
+        // default: the next full hour from now (or after the last attempt)
+        let base = max(Date(), config.wrappedValue.attempts.map(\.date).max() ?? Date())
+        let hour = Calendar.current.dateInterval(of: .hour, for: base)?.end ?? base.addingTimeInterval(3600)
+        let n = config.wrappedValue.attempts.count + 1
+        config.wrappedValue.attempts.append(.init(name: "Attempt \(n)", time: hour))
+    }
+
+    private func save() {
+        guard let draft else { return }
+        saving = true
+        Task {
+            let error = await model.saveConfig(draft)
+            saving = false
+            if let error { errorText = error } else { dismiss() }
+        }
+    }
+
+    // MARK: Text bindings
+
+    private func intText(_ binding: Binding<Int?>) -> Binding<String> {
+        Binding(
+            get: { binding.wrappedValue.map(String.init) ?? "" },
+            set: { binding.wrappedValue = Int($0.trimmingCharacters(in: .whitespaces)) }
+        )
+    }
+
+    private func optionalText(_ binding: Binding<String?>) -> Binding<String> {
+        Binding(
+            get: { binding.wrappedValue ?? "" },
+            set: { binding.wrappedValue = $0.isEmpty ? nil : $0 }
+        )
+    }
+}
