@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.js",
-    "dev": "nodemon --ignore interface/ trigger/index"
+    "dev": "nodemon trigger/index"
   },
   "keywords": [],
   "author": "Noah Prail <noah@prail.net>",

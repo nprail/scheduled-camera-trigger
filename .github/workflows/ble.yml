@@ -7,8 +7,8 @@ jobs:
     name: Device (Node)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 20.x
       # native modules (onoff, hci-socket) only build on the Pi
@@ -19,15 +19,13 @@ jobs:
     name: iOS (Swift)
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Test CameraTriggerKit
         working-directory: ios/CameraTriggerKit
         run: swift test
       - name: Build the app
         working-directory: ios
         run: |
-          brew install xcodegen
-          xcodegen
           xcodebuild build \
             -project CameraTrigger.xcodeproj \
             -scheme CameraTrigger \
