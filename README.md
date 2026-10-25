@@ -1,19 +1,62 @@
-# kairos
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/kairos-mark-reversed.svg">
+    <img src="brand/kairos-mark.svg" alt="Kairos mark: a camera viewfinder holding a timeline with one red playhead" width="112" height="112">
+  </picture>
+</p>
 
-Kairos is a camera trigger for the exact moment. It schedules a camera to wake up and start and stop recording video at specific times. It was originally built to start a camera automatically for a rocket launch and is highly optimized for that use. It can trigger any camera with a standard remote trigger port, as well as Z CAMs over their HTTP API.
+<h1 align="center">kairos</h1>
+
+<p align="center">
+  <strong>A camera trigger for the exact moment.</strong><br>
+  Wakes a camera and starts and stops recording at the second you choose, from a phone, with no network.
+</p>
+
+<p align="center">
+  <a href="https://github.com/nprail/scheduled-camera-trigger/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/nprail/scheduled-camera-trigger/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-14130f">
+  <img alt="Device: Raspberry Pi Zero W" src="https://img.shields.io/badge/device-Raspberry%20Pi%20Zero%20W-14130f">
+  <img alt="Apps: iOS 17+ and Android 8+" src="https://img.shields.io/badge/apps-iOS%2017%2B%20%C2%B7%20Android%208%2B-14130f">
+</p>
+
+<p align="center">
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#running-the-device">Run the device</a> ·
+  <a href="#config-options">Config</a> ·
+  <a href="#bluetooth-control">Bluetooth</a> ·
+  <a href="#the-apps">Apps</a> ·
+  <a href="#tests">Tests</a>
+</p>
+
+---
+
+Kairos schedules a camera to wake up and start and stop recording video at specific times. It was originally built to start a camera automatically for a rocket launch and is highly optimized for that use. It can trigger any camera with a standard remote trigger port, as well as Z CAMs over their HTTP API.
 
 It is optimized for a low power Raspberry Pi Zero W. You configure and control it from a phone over Bluetooth Low Energy, with no network needed.
+
+## How it works
+
+Each launch attempt has one moment that matters, **T-0**. Kairos works backwards and forwards from it:
+
+```text
+ wake camera       start recording          T-0           stop recording
+      ●─────────────────●───────────────────●───────────────────●
+      │◄─ wakeUpTimeout ─►│◄──  startBefore ──►│◄───  endAfter ───►│
+```
+
+You set the three timings once and list as many as 30 attempts. The device keeps the schedule, and the phone sets its clock every time it connects.
 
 ## What's in this repository
 
 | Path | What |
 | --- | --- |
-| `trigger/` | The program that runs on the Raspberry Pi (Node.js). |
-| `ios/` | The iPhone app (SwiftUI). See [ios/README.md](ios/README.md). |
-| `android/` | The Android app (Kotlin, Jetpack Compose, Material 3). See [android/README.md](android/README.md). |
-| `docs/BLE_PROTOCOL.md` | The Bluetooth protocol between the phone and the device. |
-| `docs/test-vectors.json` | Test vectors that the device and both apps are checked against. |
-| `AGENTS.md` | The app specification and the rules for working in this repository. |
+| [`trigger/`](trigger/) | The program that runs on the Raspberry Pi (Node.js). |
+| [`ios/`](ios/README.md) | The iPhone app (SwiftUI). |
+| [`android/`](android/README.md) | The Android app (Kotlin, Jetpack Compose, Material 3). |
+| [`docs/BLE_PROTOCOL.md`](docs/BLE_PROTOCOL.md) | The Bluetooth protocol between the phone and the device. |
+| [`docs/test-vectors.json`](docs/test-vectors.json) | Test vectors that the device and both apps are checked against. |
+| [`brand/`](brand/README.md) | The Kairos mark and fonts used by the apps. |
+| [`AGENTS.md`](AGENTS.md) | The app specification and the rules for working in this repository. |
 
 ## Running the device
 
@@ -39,7 +82,8 @@ node trigger/index.js
 
 By default it reads `./config.json`. Set `CAMERA_CONFIG_FILE` to use another path.
 
-The device writes to this file: it adds a `deviceId` and `configRev` the first time it runs, saves changes made from the apps, and stores the phone pairing key. Keep the file writable and private.
+> [!NOTE]
+> The device writes to this file: it adds a `deviceId` and `configRev` the first time it runs, saves changes made from the apps, and stores the phone pairing key. Keep the file writable and private.
 
 ## Config options
 
@@ -76,8 +120,10 @@ The device is configured and controlled over Bluetooth Low Energy: set the clock
 
 Both apps do the same things: find and connect to devices, pair with the button, show live status with a countdown to the next event, edit the schedule and camera settings, run a test, manually wake, start, stop and sleep the camera, and show the device log live.
 
-- **iPhone:** [ios/](ios/README.md), a native SwiftUI app for iOS 17 and later.
-- **Android:** [android/](android/README.md), a native Jetpack Compose app for Android 8.0 and later that follows the system light and dark theme and the Kairos brand colors.
+| | App | Requires |
+| --- | --- | --- |
+| **iPhone** | [`ios/`](ios/README.md), a native SwiftUI app | iOS 17 and later |
+| **Android** | [`android/`](android/README.md), a native Jetpack Compose app that follows the system light and dark theme and the Kairos brand colors | Android 8.0 and later |
 
 Bluetooth doesn't work in the iOS Simulator or an Android emulator, so run the apps on a phone. Debug builds have a demo mode that shows every screen with sample data (see [AGENTS.md](AGENTS.md)).
 
