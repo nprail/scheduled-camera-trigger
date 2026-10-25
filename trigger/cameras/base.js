@@ -3,6 +3,8 @@ export class BaseCamera {
     this.logger = logger
     this.config = config
     this.recording = false
+    /** false if the camera hardware/connection failed to initialise */
+    this.ready = true
   }
 
   /**
@@ -24,6 +26,11 @@ export class BaseCamera {
    * Put the camera to sleep
    */
   async sleep() {}
+
+  /**
+   * Release hardware resources (called when the config is replaced)
+   */
+  dispose() {}
 
   /**
    * Pause for specified time

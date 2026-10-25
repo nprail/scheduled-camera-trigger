@@ -2,26 +2,35 @@ import { resolve } from 'path'
 
 import { readJson } from './lib/utils.js'
 import { Logger } from './lib/logger.js'
+import { System } from './lib/system.js'
+import { cameras } from './cameras/index.js'
 
 import { Scheduler } from './lib/scheduler.js'
 // import { initServer } from './server.js'
-import { initBluetooth } from './bluetooth.js'
+import { initBle } from './ble/index.js'
 import { initController } from './controller.js'
 
 const configFile = resolve(process.env.CAMERA_CONFIG_FILE ?? './config.json')
 const configJson = await readJson(configFile)
 
 const logger = new Logger({ logFile: configJson.logFile })
+const system = new System()
 
-const scheduler = new Scheduler({ logger })
+const scheduler = new Scheduler({ logger, cameras })
 
 scheduler.initialize(configJson)
 
-const controller = initController({ configFile, scheduler, logger })
+const controller = initController({ configFile, scheduler, logger, system })
 
-initBluetooth({ configFile, scheduler, controller, logger })
+// The schedule must keep running even if Bluetooth can't start.
+initBle({ scheduler, controller, logger, system }).catch((err) => {
+  logger.log('ble', `Failed to start: ${err?.message ?? err}`)
+})
 
-const shutdown = () => {}
+const shutdown = () => {
+  scheduler.teardown()
+  process.exit(0)
+}
 
 process.on('SIGINT', shutdown)
 process.on('SIGTERM', shutdown)
