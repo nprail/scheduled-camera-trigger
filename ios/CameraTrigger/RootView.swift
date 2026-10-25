@@ -13,6 +13,16 @@ struct RootView: View {
             case .connecting(let name):
                 ProgressView("Connecting to \(name)…")
                     .controlSize(.large)
+                    #if DEBUG
+                    .toolbar {
+                        // a demo "connecting" scene has nothing to finish, so give it a way out
+                        if model.demo {
+                            ToolbarItem(placement: .topBarLeading) {
+                                Button("Cancel") { model.disconnect() }
+                            }
+                        }
+                    }
+                    #endif
             case .needsPairing(let reason):
                 PairingView(reason: reason)
             case .ready:
@@ -52,6 +62,10 @@ struct BannerView: View {
 
 struct ScanView: View {
     @Environment(AppModel.self) private var model
+    #if DEBUG
+    @State private var footerTaps = 0
+    @State private var showingDemoMenu = false
+    #endif
 
     var body: some View {
         List {
@@ -75,6 +89,16 @@ struct ScanView: View {
                     }
                 } footer: {
                     Text("Stay within a few metres. The first time, you'll pair with the button on the device.")
+                        #if DEBUG
+                        // debug builds: tap this hint 7 times for the demo menu (fixtures instead of Bluetooth)
+                        .onTapGesture {
+                            footerTaps += 1
+                            if footerTaps >= 7 {
+                                footerTaps = 0
+                                showingDemoMenu = true
+                            }
+                        }
+                        #endif
                 }
             case .unauthorized:
                 ContentUnavailableView {
@@ -106,8 +130,50 @@ struct ScanView: View {
         }
         .navigationTitle("Camera Triggers")
         .onAppear { model.startScanning() }
+        #if DEBUG
+        .sheet(isPresented: $showingDemoMenu) { DemoMenu() }
+        #endif
     }
 }
+
+#if DEBUG
+/// Debug builds only: pick a demo scene (sample data instead of Bluetooth), or leave demo mode.
+struct DemoMenu: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(AppModel.scenes, id: \.self) { scene in
+                        Button(scene) {
+                            dismiss()
+                            model.applyDemo(scene)
+                        }
+                        .tint(.primary)
+                    }
+                } footer: {
+                    Text("Show a screen with sample data instead of using Bluetooth. Debug builds only.")
+                }
+                if model.demo {
+                    Section {
+                        Button("Exit demo", role: .destructive) {
+                            dismiss()
+                            model.exitDemo()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Demo mode")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Close") { dismiss() } }
+            }
+        }
+    }
+}
+#endif
 
 struct DeviceRow: View {
     let device: DiscoveredDevice

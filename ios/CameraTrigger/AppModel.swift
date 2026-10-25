@@ -41,7 +41,22 @@ final class AppModel {
     @ObservationIgnored private var currentId: UUID?
     @ObservationIgnored private var listeners: [Task<Void, Never>] = []
 
+    #if DEBUG
+    /// True when the debug demo fixtures are driving the screens (no Bluetooth).
+    var demo = false
+    #endif
+
     init() {
+        attachCentral()
+        #if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-demo"), i + 1 < args.count {
+            applyDemo(args[i + 1])
+        }
+        #endif
+    }
+
+    private func attachCentral() {
         central.onStateChange = { [weak self] state in
             guard let self else { return }
             self.bluetooth = state
@@ -52,14 +67,6 @@ final class AppModel {
             guard let self, id == self.currentId else { return }
             self.connectionLost()
         }
-        #if DEBUG
-        let args = ProcessInfo.processInfo.arguments
-        if let i = args.firstIndex(of: "-demo"), i + 1 < args.count {
-            central.onStateChange = nil
-            central.onDevices = nil
-            applyDemo(args[i + 1])
-        }
-        #endif
     }
 
     func isPaired(_ device: DiscoveredDevice) -> Bool {
@@ -70,8 +77,36 @@ final class AppModel {
     // MARK: Scanning and connecting
 
     func startScanning() {
+        #if DEBUG
+        if demo { return }
+        #endif
         if bluetooth == .poweredOn { central.startScan() }
     }
+
+    #if DEBUG
+    /// Leave the debug demo and go back to the real Bluetooth stack.
+    func exitDemo() {
+        guard demo else { return }
+        demo = false
+        teardown()
+        banner = nil
+        devices = []
+        attachCentral()
+        bluetooth = central.state
+        startScanning()
+    }
+
+    /// Detach the real Bluetooth stack so fixtures can drive the screens.
+    func enterDemo() {
+        demo = true
+        central.stopScan()
+        central.onStateChange = nil
+        central.onDevices = nil
+        central.onDisconnect = nil
+        teardown()
+        devices = []
+    }
+    #endif
 
     func connect(_ device: DiscoveredDevice) {
         guard link == .disconnected else { return }
@@ -137,6 +172,9 @@ final class AppModel {
     func disconnect() {
         if let id = currentId { central.disconnect(id) }
         teardown()
+        #if DEBUG
+        if demo { return }
+        #endif
         central.startScan()
     }
 

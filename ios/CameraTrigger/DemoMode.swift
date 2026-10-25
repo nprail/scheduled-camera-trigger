@@ -7,8 +7,8 @@ import CameraTriggerKit
 /// Launch with `-demo <scene>`; see `scenes`.
 extension AppModel {
     static let scenes = [
-        "scan", "scanning", "off", "unauthorized", "connecting",
-        "pairing", "pairing-error", "ready", "recording", "banner",
+        "scan", "scanning", "off", "unauthorized", "unsupported", "connecting",
+        "pairing", "pairing-error", "ready", "generic", "recording", "banner",
     ]
 
     func applyDemo(_ scene: String) {
@@ -21,6 +21,7 @@ extension AppModel {
             return d
         }
 
+        enterDemo()
         bluetooth = .poweredOn
         banner = nil
         let now = Date()
@@ -32,6 +33,7 @@ extension AppModel {
         switch scene {
         case "off": bluetooth = .poweredOff
         case "unauthorized": bluetooth = .unauthorized
+        case "unsupported": bluetooth = .unsupported
         case "scanning": devices = []
         case "connecting": link = .connecting("Pad Cam-A1B2C3")
         case "pairing", "pairing-error":
@@ -39,7 +41,7 @@ extension AppModel {
             link = .needsPairing(reason: scene == "pairing"
                 ? "This device hasn't been paired with a phone yet."
                 : "Press the button on the device, then try again within 2 minutes.")
-        case "ready", "recording", "banner":
+        case "ready", "generic", "recording", "banner":
             let recording = scene == "recording"
             info = device
             clock = ClockSync(offset: 0.4, applied: true)
@@ -53,7 +55,7 @@ extension AppModel {
              "next":{"type":"\#(recording ? "stop" : "start")","at":"\#(next)","attempt":"Sunday 10:00"}}
             """#)
             config = json(#"""
-            {"deviceId":"A1B2C3","configRev":7,"name":"Pad Cam","cameraType":"zcam",
+            {"deviceId":"A1B2C3","configRev":7,"name":"Pad Cam","cameraType":"\#(scene == "generic" ? "generic" : "zcam")",
              "wakeUpTimeout":120,"startBefore":60,"endAfter":300,"logFile":"camera.log","buttonGpioPort":17,
              "generic":{"releaseGpioPin":23,"focusGpioPin":24},"zcam":{"cameraIp":"192.168.1.50"},
              "attempts":[{"name":"Sunday 10:00","time":"\#(iso(5400))"},{"name":"Sunday 12:00","time":"\#(iso(12600))"}]}
@@ -64,8 +66,9 @@ extension AppModel {
                  "recordTime":"\#(iso(at - 60))","launchTime":"\#(iso(at))","stopTime":"\#(iso(at + 1800))","state":"\#(state)"}
                 """#)
             }
-            jobs = [job("1", "Sunday 10:00", 5400, recording ? "recording" : "scheduled"),
-                    job("2", "Sunday 12:00", 12600, "scheduled")]
+            jobs = [job("1", "Sunday 10:00", 5400, recording ? "active" : "pending"),
+                    job("2", "Sunday 12:00", 12600, "pending"),
+                    job("0", "Sunday 08:00", -9000, "complete")]
             func log(_ seq: Int, _ at: TimeInterval, _ ns: String, _ msg: String) -> LogEntry {
                 json(#"""
                 {"seq":\#(seq),"ts":"\#(iso(at))","ns":"\#(ns)","msg":"\#(msg)"}
