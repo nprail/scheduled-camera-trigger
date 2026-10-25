@@ -23,6 +23,11 @@ public struct ClockSync: Equatable {
     public var offset: TimeInterval
     /// Whether the device clock was set.
     public var applied: Bool
+
+    public init(offset: TimeInterval, applied: Bool) {
+        self.offset = offset
+        self.applied = applied
+    }
 }
 
 private struct Request<P: Encodable>: Encodable {

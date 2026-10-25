@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreBluetooth
+import CameraTriggerKit
 
 struct RootView: View {
     @Environment(AppModel.self) private var model

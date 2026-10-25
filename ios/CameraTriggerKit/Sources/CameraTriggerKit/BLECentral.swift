@@ -16,6 +16,13 @@ public struct DiscoveredDevice: Identifiable, Equatable {
     public var rssi: Int
     public var lastSeen: Date
 
+    public init(id: UUID, name: String, rssi: Int, lastSeen: Date) {
+        self.id = id
+        self.name = name
+        self.rssi = rssi
+        self.lastSeen = lastSeen
+    }
+
     /// The device ID from an advertised name like "Pad Cam-ABC123".
     public var deviceId: String? {
         let tail = name.split(separator: "-").last.map(String.init) ?? name

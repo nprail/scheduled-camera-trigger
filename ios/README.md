@@ -17,15 +17,12 @@ Requires Xcode 15+ and iOS 17+. CoreBluetooth doesn't work in the Simulator, so 
 | --- | --- |
 | `CameraTriggerKit/` | Swift package: framing, auth, models, `DeviceClient`, CoreBluetooth. No UI. |
 | `CameraTrigger/` | The SwiftUI app (`AppModel` + views). |
-| `project.yml` | [XcodeGen](https://github.com/yonaskolb/XcodeGen) spec for the Xcode project. |
+| `CameraTrigger.xcodeproj` | The Xcode project. |
 
 ## Build
 
 ```sh
-brew install xcodegen
-cd ios
-xcodegen                 # generates CameraTrigger.xcodeproj
-open CameraTrigger.xcodeproj
+open ios/CameraTrigger.xcodeproj
 ```
 
 Pick your team under *Signing & Capabilities*, choose your iPhone, and run.

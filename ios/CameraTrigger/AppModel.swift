@@ -52,6 +52,14 @@ final class AppModel {
             guard let self, id == self.currentId else { return }
             self.connectionLost()
         }
+        #if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-demo"), i + 1 < args.count {
+            central.onStateChange = nil
+            central.onDevices = nil
+            applyDemo(args[i + 1])
+        }
+        #endif
     }
 
     func isPaired(_ device: DiscoveredDevice) -> Bool {
