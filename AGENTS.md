@@ -9,10 +9,11 @@ Guidance for agents working in this repository.
 | `trigger/`, `config.example.json` | The device side (Node, Raspberry Pi Zero W). It is controlled over Bluetooth only; there is no web interface or HTTP API. |
 | `docs/BLE_PROTOCOL.md` | **The BLE protocol (v1). The source of truth for everything the phone and device exchange.** |
 | `docs/test-vectors.json` | Cross-implementation test vectors, generated from the Node reference (`node test/vectors.js --write`). |
-| `ios/` | The native iOS app (SwiftUI) and `CameraTriggerKit`, a UI-free Swift package for the protocol. |
-| `android/` | The native Android app (Kotlin, Jetpack Compose, Material 3). The protocol code is in `app/src/main/java/com/noahprail/camtrigger/protocol/`. |
+| `ios/` | The native iOS app (SwiftUI) and `KairosKit`, a UI-free Swift package for the protocol. |
+| `brand/` | Kairos brand assets for the apps: the mark (SVG) and the two fonts. The design system itself is the "Kairos" artifact. |
+| `android/` | The native Android app (Kotlin, Jetpack Compose, Material 3). The protocol code is in `app/src/main/java/com/noahprail/kairos/protocol/`. |
 
-The iOS app is a standard Xcode project (`ios/CameraTrigger.xcodeproj`), with no project generator. Run the kit's tests with `cd ios/CameraTriggerKit && swift test`.
+The iOS app is a standard Xcode project (`ios/Kairos.xcodeproj`), with no project generator. Run the kit's tests with `cd ios/KairosKit && swift test`.
 
 The Android app is a Gradle project (`android/`, wrapper included, JDK 17+). Run its unit tests with `cd android && ./gradlew :app:testDebugUnitTest`, and build the debug APK with `./gradlew :app:assembleDebug`.
 
@@ -34,7 +35,7 @@ This section describes what the apps do. It was written from the iOS app and the
 
 ## 1. Purpose
 
-A phone app that configures and controls a **Scheduled Camera Trigger**, a Raspberry Pi device that wakes a camera and starts and stops recording at scheduled "launch attempt" times. The app talks to the device only over Bluetooth Low Energy (no Wi-Fi or internet needed), so it works in the field.
+A phone app that configures and controls **Kairos**, a Raspberry Pi device that wakes a camera and starts and stops recording at scheduled "launch attempt" times. The app talks to the device only over Bluetooth Low Energy (no Wi-Fi or internet needed), so it works in the field.
 
 Main jobs:
 1. Find nearby devices and connect.
@@ -47,7 +48,7 @@ Main jobs:
 
 ## 2. Architecture (mirror this split)
 
-- **Protocol library, with no UI** (iOS: `CameraTriggerKit`). It holds:
+- **Protocol library, with no UI** (iOS: `KairosKit`). It holds:
   - message framing and reassembly
   - authentication (HMAC proofs)
   - the request/response client (`DeviceClient`)
@@ -65,7 +66,7 @@ On Android, use the same split: a protocol module, a `ViewModel` (or equivalent)
 
 Read `docs/BLE_PROTOCOL.md` for the full detail. What the app depends on:
 
-- One GATT service (`7a3c0001-5e9b-4d2a-8f61-c0a7b2d4e9f3`) with four characteristics: Device Info (read, JSON), Status (read and notify, a fixed 12-byte value), Command (write), Response (notify).
+- One GATT service (`6b610001-6169-4f72-8f73-b3e1c5a97d24`) with four characteristics: Device Info (read, JSON), Status (read and notify, a fixed 12-byte value), Command (write), Response (notify).
 - Requests are JSON, `{id, op, d}`, split into fragments to fit the ATT write size. Responses and unsolicited events arrive on Response and are reassembled. **One request is in flight at a time; extra callers wait their turn.** Each request has a timeout (10 s by default, 20 s for camera actions); a timeout fails the request.
 - The Status value is parsed directly from bytes: flags (recording, camera ready, pairing open, clock set), phase (idle, awake, recording, test, error), config revision, next event time (Unix seconds, 0 for none), next event type (none, wake, start, stop), attempts remaining. Integers are little-endian.
 - Dates on the wire are ISO 8601 UTC with milliseconds. Parse with or without the fractional part.
@@ -73,7 +74,7 @@ Read `docs/BLE_PROTOCOL.md` for the full detail. What the app depends on:
 - Operations used: `hello`, `auth`, `auth.pair`, `status.get`, `config.get`, `config.set`, `jobs.get` (paged), `camera.wake|start|stop|sleep`, `test.run`, `logs.get` (paged), `logs.subscribe`, `time.get`, `time.set`.
 - Only protocol version **1** is supported. A different version in Device Info or `hello` is an error ("unsupported"), with a message telling the user to update the app.
 
-**Test vectors:** `docs/test-vectors.json` covers framing, HMAC proofs and status decoding. The Android protocol module must pass the same vectors (see `ios/CameraTriggerKit/Tests/` for how the iOS tests use them).
+**Test vectors:** `docs/test-vectors.json` covers framing, HMAC proofs and status decoding. The Android protocol module must pass the same vectors (see `ios/KairosKit/Tests/` for how the iOS tests use them).
 
 ## 4. Connection state machine
 
@@ -114,15 +115,15 @@ Connect sequence, after the user taps a device:
 
 ## 6. Screens and behavior
 
-### 6.1 Scan screen ("Camera Triggers")
+### 6.1 Scan screen (the Kairos lockup)
 
 Content depends on the Bluetooth state:
 
 | State | Shown |
 | --- | --- |
-| On | List of discovered devices. While the list is empty, a spinner with "Looking for camera triggers…". Footer: "Stay within a few metres. The first time, you'll pair with the button on the device." |
-| Unauthorized (permission denied) | "Bluetooth is off for this app", then "Allow Bluetooth for Camera Trigger in Settings." (iOS) or "Allow Nearby devices access for Camera Trigger in Settings." (Android, the name of its permission), and an **Open Settings** button that opens the app's system settings. Android also has an **Allow** button that asks for the permission again. |
-| Off | "Bluetooth is off", "Turn on Bluetooth to find your camera triggers." Android also has a **Turn on** button that asks the system to enable Bluetooth (iOS apps can't do this). |
+| On | List of discovered devices. While the list is empty, a spinner with "Looking for Kairos devices…". Footer: "Stay within a few metres. The first time, you'll pair with the button on the device." |
+| Unauthorized (permission denied) | "Bluetooth is off for this app", then "Allow Bluetooth for Kairos in Settings." (iOS) or "Allow Nearby devices access for Kairos in Settings." (Android, the name of its permission), and an **Open Settings** button that opens the app's system settings. Android also has an **Allow** button that asks for the permission again. |
+| Off | "Bluetooth is off", "Turn on Bluetooth to find your Kairos devices." Android also has a **Turn on** button that asks the system to enable Bluetooth (iOS apps can't do this). |
 | Unsupported | "Bluetooth isn't available", "This device doesn't support Bluetooth Low Energy." |
 | Unknown or resetting | A spinner. |
 
@@ -142,19 +143,19 @@ A centered spinner: "Connecting to {device name}…".
 
 ### 6.3 Pairing screen
 
-Title is the device name. Content: a button icon, "Pair with this device", and the text "Press the button on the camera trigger, then tap Pair within two minutes. This phone will then be the only one that can control it." Shows the reason or error in red if there is one. A **Pair** button (replaced by a spinner while working, and disabled then) and a **Cancel** button (disconnects).
+Title is the device name. Content: a button icon, "Pair with this device", and the text "Press the button on the Kairos device, then tap Pair within two minutes. This phone will then be the only one that can control it." Shows the reason or error in red if there is one. A **Pair** button (replaced by a spinner while working, and disabled then) and a **Cancel** button (disconnects).
 
 ### 6.4 Device screen
 
-Title: the device name (or "Camera Trigger" if empty). Toolbar: **Disconnect**. Sections, top to bottom:
+Title: the device name (or "Kairos" if empty). Toolbar: **Disconnect**. Sections, top to bottom:
 
 **Status**
-- Phase title and icon, colored: Idle (grey), Camera awake (orange), Recording (red), Running test (blue), Needs attention (orange). On Android these use the theme's roles (muted, tertiary, error, primary, tertiary) so they follow Material You, and may not be literally orange.
-- A red "REC" indicator while the Status `recording` flag is set.
-- If the Status `cameraReady` flag is false: "Camera not ready. Check the wiring or camera connection." in orange.
+- Phase title (in the `label` style, uppercase) and an icon: Idle, Camera awake, Recording, Running test, Needs attention. The state is always in the text and the icon shape, never in color alone. Idle uses `muted`; the others use `ink` (section 14).
+- A "REC" indicator with a `signal` dot while the Status `recording` flag is set. This is the one place `signal` is used on this card.
+- If the Status `cameraReady` flag is false: "Camera not ready. Check the wiring or camera connection." with a warning icon, in `ink`.
 
 **Next**
-- The next event type: "Wake the camera", "Start recording" or "Stop recording", the attempt name beneath it, and a **live countdown that ticks every second**: `H:MM:SS` when an hour or more remains, otherwise `MM:SS`, never negative.
+- The next event type: "Wake the camera", "Start recording" or "Stop recording", the attempt name beneath it, and a **live countdown that ticks every second**: T-minus notation in mono, `T-HH:MM:SS`, never negative.
 - An "At" row with the full local date and time.
 - If none: "Nothing scheduled".
 
@@ -164,7 +165,7 @@ Title: the device name (or "Camera Trigger" if empty). Toolbar: **Disconnect**. 
 - After each camera action, refresh status.
 
 **Schedule**
-- List of jobs: name, launch time (local), and a state pill: active (red), complete (green), missed (orange), anything else (blue). Android uses theme container colors for these, with its own fixed green for complete. The pill text is the state, capitalized.
+- List of jobs: name, launch time (local), and a state tag: a small outlined tag (hairline border, `radius-sm`) whose uppercase text is the state (Pending, Active, Complete, Missed). An active attempt also shows a filled dot. The tags carry no state colors.
 - "No attempts scheduled" when empty.
 - A link "Edit schedule and settings" to the editor.
 
@@ -178,7 +179,7 @@ Title: the device name (or "Camera Trigger" if empty). Toolbar: **Disconnect**. 
 
 Opened from the device screen. Works on a **draft copy** of the config. **Save** is enabled only when the draft differs from the device's config, no save is in progress, and the device is not busy. While saving, the form is disabled.
 
-"Busy" means the live phase is anything other than idle (awake, recording, test and error all count; see section 10). When busy, show an orange notice at the top: "The device is busy. Changes can be saved when it's idle."
+"Busy" means the live phase is anything other than idle (awake, recording, test and error all count; see section 10). When busy, show a notice at the top (a lock icon and the text, in `ink`): "The device is busy. Changes can be saved when it's idle."
 
 Sections:
 1. **Launch attempts** (up to 30). Each attempt has an editable name and a date-and-time picker labelled "Launch (T-0)". Swipe or delete to remove one. **Add attempt** appends "Attempt N", defaulting to the next full hour after now or after the latest existing attempt, whichever is later. Footer: "Times are in your local time zone ({abbrev}). The device works in UTC. Up to 30 attempts." Times are stored on the wire as UTC.
@@ -207,7 +208,7 @@ Log loading: after becoming ready, page through `logs.get` (100 per page, up to 
 
 ### 6.7 Error banner
 
-A dismissible red banner at the top of every screen, with a warning icon and the message. Used for connection failures, a lost connection, camera-action errors and test failures. Cleared when a new connection starts.
+A dismissible banner at the top of every screen, with a warning icon and the message, in `ink` with `ground` text (an inverse surface, with no shadow). Used for connection failures, a lost connection, camera-action errors and test failures. Cleared when a new connection starts.
 
 ## 7. Live updates
 
@@ -264,9 +265,9 @@ Show `DeviceError` messages to the user as friendly text. Mappings in the iOS ap
 
 Both apps have a debug-only demo mode that fills the app with fixture data and skips Bluetooth, so every screen can be checked without a device, in a simulator or emulator or on a phone. Both support the same scenes, which must be kept in step: `scan`, `scanning`, `off`, `unauthorized`, `unsupported`, `connecting`, `pairing`, `pairing-error`, `ready`, `generic`, `recording`, `banner`. The fixtures should match what a real device sends (for example job states `pending`, `active`, `complete`, `missed`).
 
-- **In the app (both):** on the scan screen, tap a hidden spot 7 times to open a "Demo mode" menu listing the scenes, plus **Exit demo** while in demo mode. The spot is the "Camera Triggers" title on Android and the "Stay within a few metres…" hint under the device list on iOS (a SwiftUI large navigation title can't take taps). In a demo scene, **Disconnect**, **Cancel** or Back returns to the scan screen.
-- **iOS launch argument:** `-demo <scene>`. Code: `ios/CameraTrigger/DemoMode.swift`.
-- **Android intent extras:** `--es demo <scene>`, optionally `--es screen config` or `--es screen logs`, passed to `adb shell am start -n com.noahprail.camtrigger/.MainActivity`. Code: `android/app/src/main/java/com/noahprail/camtrigger/DemoMode.kt`.
+- **In the app (both):** on the scan screen, tap a hidden spot 7 times to open a "Demo mode" menu listing the scenes, plus **Exit demo** while in demo mode. The spot is the Kairos lockup (mark and wordmark) on Android and the "Stay within a few metres…" hint under the device list on iOS (a SwiftUI large navigation title can't take taps). In a demo scene, **Disconnect**, **Cancel** or Back returns to the scan screen.
+- **iOS launch argument:** `-demo <scene>`. Code: `ios/Kairos/DemoMode.swift`.
+- **Android intent extras:** `--es demo <scene>`, optionally `--es screen config` or `--es screen logs`, passed to `adb shell am start -n com.noahprail.kairos/.MainActivity`. Code: `android/app/src/main/java/com/noahprail/kairos/DemoMode.kt`.
 
 Demo mode compiles into debug builds only.
 
@@ -276,3 +277,16 @@ Demo mode compiles into debug builds only.
 - No multi-device management (one connection at a time, though several pairing keys can be stored).
 - No firmware update, and no editing of the device's Wi-Fi network credentials.
 - No automated UI tests; only the protocol library has unit tests.
+
+## 14. Brand and look and feel
+
+The apps use the **Kairos** brand system (the "Kairos" design system artifact; the files the apps need are copied to `brand/`). Both apps wear the same brand and keep their platform's native controls (SwiftUI and Material 3).
+
+- **Name.** The wordmark is lowercase `kairos` (Space Grotesk SemiBold, -0.03em). In sentences and OS labels (home-screen name, permission text) it is "Kairos". The scan screen's title is the lockup: the mark, then the wordmark, with a gap of 0.3 of the mark's height.
+- **Color.** `ground` is the screen background, `raised` is for cards and rows, `ink` is text and the interactive color (buttons, links, toolbar actions), `muted` is secondary text, `hairline` separates surfaces. Both light and dark themes are supported (the values are in `brand/README.md`). Material You dynamic color is **off** on Android.
+- **`signal` (the only hue).** Spend it once per view: the record dot, or the single primary action (the **Pair** button, with `on-signal` text). Never use it for body text. An active attempt is marked by an `ink` dot, not `signal`, so a recording screen has only one signal element.
+- **Type.** Space Grotesk for the wordmark, headlines, titles and device names; JetBrains Mono for every time, duration, countdown and config value (pins, IP); the platform's own font (SF Pro, Roboto) for everything else, so the apps stay native. Section headers and state names use the uppercase `label` style.
+- **Shape.** Cards and buttons use 8 pt/dp corners, tags and inputs 4. Separate surfaces with hairline borders, not shadows. Motion is functional only.
+- **Errors and warnings** use an icon and text, never color alone: the banner is an inverse (`ink`) surface, and destructive actions (Forget pairing) are `ink` text, confirmed by a dialog.
+- **App icon.** The reversed small mark (cream brackets, `signal` playhead) on an `ink` tile. Android's adaptive icon also has a monochrome layer for themed icons. iOS also uses the mark and `ground` on its launch screen.
+- Fonts are OFL-licensed and bundled (`ios/Kairos/Fonts/`, `android/app/src/main/res/font/`). If a font fails to load, the platform falls back to its system font.

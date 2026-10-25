@@ -145,7 +145,7 @@ export class TestClient {
     const nonce = Buffer.from(hello.d.nonce, 'base64')
     const clientNonce = randomBytes(16)
     const key = Buffer.from(secretHex, 'hex')
-    const proof = createHmac('sha256', key).update('scs-auth-v1').update(nonce).update(clientNonce).digest()
+    const proof = createHmac('sha256', key).update('kairos-auth-v1').update(nonce).update(clientNonce).digest()
     const res = await this.request('auth', { clientNonce: clientNonce.toString('base64'), proof: proof.toString('base64') })
     return { hello, res, nonce, clientNonce, key }
   }

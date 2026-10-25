@@ -1,5 +1,5 @@
 // Cross-implementation test vectors (docs/test-vectors.json).
-// The Node implementation is the reference; ios/CameraTriggerKit tests read
+// The Node implementation is the reference; ios/KairosKit tests read
 // the same file. Regenerate with: node test/vectors.js --write
 import { writeFile } from 'fs/promises'
 import { fileURLToPath } from 'url'

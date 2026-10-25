@@ -1,6 +1,6 @@
-# Scheduled Camera Trigger
+# kairos
 
-This program schedules a camera to wake up and start and stop recording video at specific times. It was originally built to start a camera automatically for a rocket launch and is highly optimized for that use. It can trigger any camera with a standard remote trigger port, as well as Z CAMs over their HTTP API.
+Kairos is a camera trigger for the exact moment. It schedules a camera to wake up and start and stop recording video at specific times. It was originally built to start a camera automatically for a rocket launch and is highly optimized for that use. It can trigger any camera with a standard remote trigger port, as well as Z CAMs over their HTTP API.
 
 It is optimized for a low power Raspberry Pi Zero W. You configure and control it from a phone over Bluetooth Low Energy, with no network needed.
 
@@ -77,7 +77,7 @@ The device is configured and controlled over Bluetooth Low Energy: set the clock
 Both apps do the same things: find and connect to devices, pair with the button, show live status with a countdown to the next event, edit the schedule and camera settings, run a test, manually wake, start, stop and sleep the camera, and show the device log live.
 
 - **iPhone:** [ios/](ios/README.md), a native SwiftUI app for iOS 17 and later.
-- **Android:** [android/](android/README.md), a native Jetpack Compose app for Android 8.0 and later that follows the system light and dark theme, and uses Material You colors on Android 12 and up.
+- **Android:** [android/](android/README.md), a native Jetpack Compose app for Android 8.0 and later that follows the system light and dark theme and the Kairos brand colors.
 
 Bluetooth doesn't work in the iOS Simulator or an Android emulator, so run the apps on a phone. Debug builds have a demo mode that shows every screen with sample data (see [AGENTS.md](AGENTS.md)).
 
@@ -86,7 +86,7 @@ Bluetooth doesn't work in the iOS Simulator or an Android emulator, so run the a
 | What | Command |
 | --- | --- |
 | Device (protocol, auth, scheduler, config; no hardware needed) | `npm test` |
-| iPhone app's protocol library | `cd ios/CameraTriggerKit && swift test` |
+| iPhone app's protocol library | `cd ios/KairosKit && swift test` |
 | Android app | `cd android && ./gradlew :app:testDebugUnitTest` |
 
 The test vectors in `docs/test-vectors.json` are generated from the Node implementation (`node test/vectors.js --write`). If the protocol changes, regenerate them, and the tests for the device and both apps will show what drifted.

@@ -333,7 +333,7 @@ There is no filesystem. Everything persistent is in NVS, written through `Prefer
 
 Implement `docs/BLE_PROTOCOL.md` (v2: GATT layout, advertising, framing, security) with `NimBLE-Arduino`.
 
-- **GATT:** one primary service `7a3c0001-5e9b-4d2a-8f61-c0a7b2d4e9f3`. Device Info (read, now binary), Status (read + notify, 13 bytes), Command (`WRITE` | `WRITE_NR` | `WRITE_ENC`, so it **requires an encrypted link**), Response (notify).
+- **GATT:** one primary service `6b610001-6169-4f72-8f73-b3e1c5a97d24`. Device Info (read, now binary), Status (read + notify, 13 bytes), Command (`WRITE` | `WRITE_NR` | `WRITE_ENC`, so it **requires an encrypted link**), Response (notify).
 - **Device Info (binary):** `v u8` (2), `id[3]` (the 6 hex digits as raw bytes), `cam u8`, `fw` (`u8` length + ASCII), `name` (`u8` length + UTF-8). It is short, but keep using Read Long.
 - **Connections:** `-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1` in `build_flags`. Stop advertising on connect, restart on disconnect. Interval ~1 s.
 - **Advertising:** service UUID (128-bit, 18 bytes) in the advertisement. Local name in the scan response. The 31-byte scan response limits the name to 29 bytes.

@@ -41,16 +41,16 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_16.4.app
 
-      - name: Test CameraTriggerKit
-        working-directory: ios/CameraTriggerKit
+      - name: Test KairosKit
+        working-directory: ios/KairosKit
         run: swift test
 
       - name: Build the app
         working-directory: ios
         run: |
           xcodebuild build \
-            -project CameraTrigger.xcodeproj \
-            -scheme CameraTrigger \
+            -project Kairos.xcodeproj \
+            -scheme Kairos \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO
 

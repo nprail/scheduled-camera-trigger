@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "CameraTrigger"
+rootProject.name = "Kairos"
 include(":app")

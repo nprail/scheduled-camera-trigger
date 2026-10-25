@@ -1,12 +1,11 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- camera body -->
-    <path android:fillColor="#FFFFFF"
-        android:pathData="M30,40h10l3,-5h22l3,5h10a4,4 0,0 1,4 4v28a4,4 0,0 1,-4 4H30a4,4 0,0 1,-4 -4V44a4,4 0,0 1,4 -4z" />
-    <!-- lens -->
-    <path android:fillColor="#1E4B8F"
-        android:pathData="M54,50m-11,0a11,11 0,1 1,22 0a11,11 0,1 1,-22 0" />
-    <path android:fillColor="#FFFFFF"
-        android:pathData="M54,50m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0" />
+    <!-- the Kairos mark (small, heavier strokes), centered in the adaptive-icon safe zone -->
+    <group android:pivotX="60" android:pivotY="60" android:scaleX="0.5" android:scaleY="0.5" android:translateX="-6" android:translateY="-6">
+        <path android:strokeColor="#F2F0EA" android:strokeWidth="10" android:strokeLineCap="round" android:strokeLineJoin="round"
+            android:pathData="M8,34V10H32M88,10H112V34M112,86V110H88M32,110H8V86" />
+        <path android:strokeColor="#FF5A2E" android:strokeWidth="10" android:strokeLineCap="round" android:pathData="M60,42V92" />
+        <path android:fillColor="#FF5A2E" android:pathData="M60,18a13,13 0 1,0 0,26a13,13 0 1,0 0,-26z" />
+    </group>
 </vector>

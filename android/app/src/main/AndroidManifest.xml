@@ -19,9 +19,9 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
-        android:label="Camera Trigger"
+        android:label="Kairos"
         android:supportsRtl="true"
-        android:theme="@style/Theme.CameraTrigger">
+        android:theme="@style/Theme.Kairos">
         <activity
             android:name=".MainActivity"
             android:exported="true"

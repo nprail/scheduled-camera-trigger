@@ -4,11 +4,11 @@ export const PROTOCOL_VERSION = 1
 export const MAX_MESSAGE = 4096
 
 export const UUID = {
-  service: '7a3c0001-5e9b-4d2a-8f61-c0a7b2d4e9f3',
-  deviceInfo: '7a3c0002-5e9b-4d2a-8f61-c0a7b2d4e9f3',
-  status: '7a3c0003-5e9b-4d2a-8f61-c0a7b2d4e9f3',
-  command: '7a3c0004-5e9b-4d2a-8f61-c0a7b2d4e9f3',
-  response: '7a3c0005-5e9b-4d2a-8f61-c0a7b2d4e9f3',
+  service: '6b610001-6169-4f72-8f73-b3e1c5a97d24',
+  deviceInfo: '6b610002-6169-4f72-8f73-b3e1c5a97d24',
+  status: '6b610003-6169-4f72-8f73-b3e1c5a97d24',
+  command: '6b610004-6169-4f72-8f73-b3e1c5a97d24',
+  response: '6b610005-6169-4f72-8f73-b3e1c5a97d24',
 }
 
 export const ErrorCode = {

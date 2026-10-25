@@ -51,8 +51,8 @@
     "secretHex": "00112233445566778899aabbccddeeff",
     "nonceB64": "AAECAwQFBgcICQoLDA0ODw==",
     "clientNonceB64": "EBESExQVFhcYGRobHB0eHw==",
-    "clientProofB64": "89DvY0CHaSnFE+E0i61OLk9J5N2h2y4PS30OHrbZn7Y=",
-    "serverProofB64": "vm7AwRbUl78AkxZIdRY3SacOJYW13DYmA5W2AydScfQ="
+    "clientProofB64": "7laUuEybiw1MKJk9wH07/aJOd3/8M+6ab9v5zH0ya0E=",
+    "serverProofB64": "Eh5HzudbLa9BJNsg2a0WEi3vC7blZMyqXHLnmlG6P+Q="
   },
   "status": [
     {

@@ -1,6 +1,6 @@
-# Camera Trigger for Android
+# Kairos for Android
 
-A native Jetpack Compose app that controls a Scheduled Camera Trigger over Bluetooth Low Energy. It speaks the protocol in [docs/BLE_PROTOCOL.md](../docs/BLE_PROTOCOL.md) and behaves the same as the [iPhone app](../ios/README.md).
+A native Jetpack Compose app that controls a Kairos device over Bluetooth Low Energy. It speaks the protocol in [docs/BLE_PROTOCOL.md](../docs/BLE_PROTOCOL.md) and behaves the same as the [iPhone app](../ios/README.md).
 
 - Find and connect to nearby devices, and pair using the device's button
 - Phone-as-clock: the device's clock is set from the phone on every connect (the Pi has no RTC)
@@ -8,7 +8,7 @@ A native Jetpack Compose app that controls a Scheduled Camera Trigger over Bluet
 - Edit launch attempts, timing and camera settings, saved atomically to the device
 - Run a test, manually wake/start/stop/sleep the camera
 - Live device log
-- Material 3 design that follows the system light and dark theme, with Material You dynamic color on Android 12 and up
+- Material 3 design with the Kairos brand colors and fonts, following the system light and dark theme (Material You dynamic color is off, so the brand stays fixed)
 
 Requires Android 8.0 (API 26) or later, and Bluetooth Low Energy. Building needs JDK 17 or newer and the Android SDK (platform 36).
 
@@ -16,10 +16,10 @@ Requires Android 8.0 (API 26) or later, and Bluetooth Low Energy. Building needs
 
 | Path | What |
 | --- | --- |
-| `app/src/main/java/com/noahprail/camtrigger/protocol/` | Framing, auth, models and `DeviceClient`. No Android UI. |
-| `app/src/main/java/com/noahprail/camtrigger/ble/` | The BLE scanner and connection, and pairing key storage. |
-| `app/src/main/java/com/noahprail/camtrigger/AppModel.kt` | The `ViewModel` that owns the connection and everything on screen. |
-| `app/src/main/java/com/noahprail/camtrigger/ui/` | The Compose screens and theme. |
+| `app/src/main/java/com/noahprail/kairos/protocol/` | Framing, auth, models and `DeviceClient`. No Android UI. |
+| `app/src/main/java/com/noahprail/kairos/ble/` | The BLE scanner and connection, and pairing key storage. |
+| `app/src/main/java/com/noahprail/kairos/AppModel.kt` | The `ViewModel` that owns the connection and everything on screen. |
+| `app/src/main/java/com/noahprail/kairos/ui/` | The Compose screens and theme. |
 
 ## Build
 
@@ -46,7 +46,7 @@ The framing, HMAC proofs and binary status decoding are checked against `docs/te
 ## Pairing and security
 
 1. Tap the device in the list. If it isn't paired with this phone, you'll see the pairing screen.
-2. Press the button on the camera trigger, then tap **Pair**. The app generates a random 16-byte key, sends it to the device (only accepted during the 2-minute window), and stores it encrypted with a key held in the Android Keystore. The key isn't included in backups.
+2. Press the button on the Kairos device, then tap **Pair**. The app generates a random 16-byte key, sends it to the device (only accepted during the 2-minute window), and stores it encrypted with a key held in the Android Keystore. The key isn't included in backups.
 3. On later connections the app proves it holds the key with an HMAC challenge/response, and checks that the device does too.
 
 If the device was paired before and you can't connect, remove it under *Settings › Connected devices* and try again.
@@ -55,4 +55,4 @@ If the device was paired before and you can't connect, remove it under *Settings
 
 ## Demo mode
 
-Debug builds can show every screen with sample data and no Bluetooth: on the scan screen, tap the "Camera Triggers" title 7 times. See [AGENTS.md](../AGENTS.md) for the scenes and the `adb` shortcuts.
+Debug builds can show every screen with sample data and no Bluetooth: on the scan screen, tap the "Kairos" title 7 times. See [AGENTS.md](../AGENTS.md) for the scenes and the `adb` shortcuts.

@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.noahprail.camtrigger"
+    namespace = "com.noahprail.kairos"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.noahprail.camtrigger"
+        applicationId = "com.noahprail.kairos"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

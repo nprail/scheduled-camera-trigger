@@ -73,7 +73,7 @@ test('auth verifies both directions and rejects bad proofs', async () => {
   dev.scheduler.config.bleSecret = SECRET
   const c = new TestClient(dev.ble)
   const { res, nonce, clientNonce, key } = await c.authenticate(SECRET)
-  const expected = createHmac('sha256', key).update('scs-auth-v1-srv').update(nonce).update(clientNonce).digest('base64')
+  const expected = createHmac('sha256', key).update('kairos-auth-v1-srv').update(nonce).update(clientNonce).digest('base64')
   assert.equal(res.d.proof, expected)
 
   const c2 = new TestClient(dev.ble)

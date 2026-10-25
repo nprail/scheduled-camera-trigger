@@ -1,8 +1,8 @@
-# Scheduled Camera Trigger — BLE Protocol
+# kairos — BLE Protocol
 
 **Protocol version:** 1 · **Status:** Draft
 
-A Bluetooth Low Energy (GATT) protocol for configuring, monitoring and manually controlling a Scheduled Camera Trigger device (Raspberry Pi Zero W + `generic` GPIO or `zcam` camera) from a phone, with no Wi‑Fi or network needed.
+A Bluetooth Low Energy (GATT) protocol for configuring, monitoring and manually controlling a Kairos device (Raspberry Pi Zero W + `generic` GPIO or `zcam` camera) from a phone, with no Wi‑Fi or network needed.
 
 ## 1. Goals
 
@@ -17,11 +17,11 @@ One primary service, four characteristics. Multi-byte integers in fixed binary s
 
 | Name | UUID | Properties | Purpose |
 | --- | --- | --- | --- |
-| Service | `7a3c0001-5e9b-4d2a-8f61-c0a7b2d4e9f3` | — | Camera Trigger service |
-| Device Info | `7a3c0002-5e9b-4d2a-8f61-c0a7b2d4e9f3` | Read | Static identity (JSON) |
-| Status | `7a3c0003-5e9b-4d2a-8f61-c0a7b2d4e9f3` | Read, Notify | Compact live state (12 bytes) |
-| Command | `7a3c0004-5e9b-4d2a-8f61-c0a7b2d4e9f3` | Write, Write Without Response | Client → device messages |
-| Response | `7a3c0005-5e9b-4d2a-8f61-c0a7b2d4e9f3` | Notify | Device → client responses and events |
+| Service | `6b610001-6169-4f72-8f73-b3e1c5a97d24` | — | Kairos service |
+| Device Info | `6b610002-6169-4f72-8f73-b3e1c5a97d24` | Read | Static identity (JSON) |
+| Status | `6b610003-6169-4f72-8f73-b3e1c5a97d24` | Read, Notify | Compact live state (12 bytes) |
+| Command | `6b610004-6169-4f72-8f73-b3e1c5a97d24` | Write, Write Without Response | Client → device messages |
+| Response | `6b610005-6169-4f72-8f73-b3e1c5a97d24` | Notify | Device → client responses and events |
 
 ### Advertising
 
@@ -122,7 +122,7 @@ Example: a 60‑byte message at MTU 23 (20 payload bytes per fragment) is sent a
 
 ```jsonc
 // request
-{ "id": 1, "op": "hello", "d": { "client": "camscheduler-app/1.2.0" } }
+{ "id": 1, "op": "hello", "d": { "client": "kairos-app/1.2.0" } }
 // response
 { "id": 1, "ok": true, "d": {
     "v": 1,
@@ -279,8 +279,8 @@ The secret is stored (replacing any existing one, so a lost phone is recoverable
 
 ```jsonc
 { "id": 2, "op": "auth", "d": { "clientNonce": "<16 random bytes, base64>",
-                                "proof": "<base64 HMAC-SHA256(secret, 'scs-auth-v1' || nonce || clientNonce)>" } }
-→ { "ok": true, "d": { "proof": "<HMAC-SHA256(secret, 'scs-auth-v1-srv' || nonce || clientNonce)>" } }
+                                "proof": "<base64 HMAC-SHA256(secret, 'kairos-auth-v1' || nonce || clientNonce)>" } }
+→ { "ok": true, "d": { "proof": "<HMAC-SHA256(secret, 'kairos-auth-v1-srv' || nonce || clientNonce)>" } }
 ```
 
 - `nonce` comes from `hello`. The device compares in constant time.
