@@ -119,7 +119,6 @@ class StatusTest {
         val s = StatusValue.parse(hexBytes(Vectors.load().status[1].hex))!!
         assertTrue(s.recording)
         assertTrue(s.pairingOpen)
-        assertFalse(s.wifi)
         assertNull(s.nextEventDate)
         assertNull(StatusValue.parse(byteArrayOf(1, 2, 3)))
     }

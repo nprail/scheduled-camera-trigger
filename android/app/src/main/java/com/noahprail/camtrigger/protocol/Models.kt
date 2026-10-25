@@ -33,7 +33,6 @@ data class StatusValue(
 
     val recording get() = flags and RECORDING != 0
     val cameraReady get() = flags and CAMERA_READY != 0
-    val wifi get() = flags and WIFI != 0
     val pairingOpen get() = flags and PAIRING_OPEN != 0
     val clockSet get() = flags and CLOCK_SET != 0
 
@@ -42,9 +41,8 @@ data class StatusValue(
     companion object {
         const val RECORDING = 1 shl 0
         const val CAMERA_READY = 1 shl 1
-        const val WIFI = 1 shl 2
-        const val PAIRING_OPEN = 1 shl 3
-        const val CLOCK_SET = 1 shl 4
+        const val PAIRING_OPEN = 1 shl 2
+        const val CLOCK_SET = 1 shl 3
 
         fun parse(data: ByteArray): StatusValue? {
             if (data.size < 12) return null
@@ -89,7 +87,6 @@ data class StatusInfo(
     val phase: String,
     val recording: Boolean,
     val cameraReady: Boolean,
-    val wifi: Boolean,
     val configRev: Int,
     val next: Next? = null,
 ) {
@@ -135,9 +132,6 @@ internal data class CameraResponse(val recording: Boolean)
 
 @Serializable
 internal data class StartedResponse(val started: Boolean)
-
-@Serializable
-internal data class EnabledResponse(val enabled: Boolean)
 
 @Serializable
 internal class Empty

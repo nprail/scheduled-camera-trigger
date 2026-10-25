@@ -52,7 +52,7 @@ fun AppModel.applyDemo(scene: String, screen: String = "main") {
             info = if (generic) device.copy(cam = "generic") else device
             clock = ClockSync(offset = 0.4, applied = true)
             live = StatusValue(
-                flags = if (recording) 0b10111 else 0b10010,
+                flags = if (recording) 0b1011 else 0b1010,
                 phase = if (recording) StatusValue.Phase.RECORDING else StatusValue.Phase.AWAKE,
                 configRev = 7,
                 nextEventAt = now.epochSecond + if (recording) 1800 else 5400,
@@ -63,7 +63,6 @@ fun AppModel.applyDemo(scene: String, screen: String = "main") {
                 phase = if (recording) "recording" else "awake",
                 recording = recording,
                 cameraReady = true,
-                wifi = recording,
                 configRev = 7,
                 next = StatusInfo.Next(
                     type = if (recording) "stop" else "start",

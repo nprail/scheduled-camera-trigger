@@ -336,13 +336,6 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun setWifi(enabled: Boolean) {
-        perform { client ->
-            client.setWifi(enabled)
-            status = runCatching { client.status() }.getOrNull()
-        }
-    }
-
     fun syncClock() {
         perform { client -> clock = client.syncClock(threshold = 0.0) }
     }

@@ -101,10 +101,5 @@ export const initController = ({
     return { offsetMs }
   }
 
-  const setWifi = async (enabled) => {
-    await system.setWifi(enabled)
-    logger.log('index', `Wi-Fi ${enabled ? 'enabled' : 'disabled'}`)
-  }
-
-  return Object.assign(events, { test, save, setSecret, setTime, setWifi })
+  return Object.assign(events, { test, save, setSecret, setTime })
 }

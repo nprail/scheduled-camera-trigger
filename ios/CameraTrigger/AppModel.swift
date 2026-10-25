@@ -302,13 +302,6 @@ final class AppModel {
         }
     }
 
-    func setWifi(_ enabled: Bool) {
-        perform { [self] client in
-            try await client.setWifi(enabled)
-            status = try? await client.status()
-        }
-    }
-
     func syncClock() {
         perform { [self] client in
             clock = try await client.syncClock(threshold: 0)

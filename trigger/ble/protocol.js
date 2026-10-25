@@ -35,9 +35,8 @@ export class ProtocolError extends Error {
 export const Flag = {
   RECORDING: 1 << 0,
   CAMERA_READY: 1 << 1,
-  WIFI: 1 << 2,
-  PAIRING_OPEN: 1 << 3,
-  CLOCK_SET: 1 << 4,
+  PAIRING_OPEN: 1 << 2,
+  CLOCK_SET: 1 << 3,
 }
 export const PHASE = { idle: 0, awake: 1, recording: 2, test: 3, error: 4 }
 export const EVENT_TYPE = { none: 0, wake: 1, start: 2, stop: 3 }

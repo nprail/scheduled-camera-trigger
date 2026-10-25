@@ -28,7 +28,6 @@ export class StatusSource {
       phase,
       recording: Boolean(scheduler.cam?.recording),
       cameraReady: Boolean(scheduler.cam?.ready),
-      wifi: system.wifiEnabled,
       pairingOpen: pairing.isOpen,
       clockSet: system.clockSetSinceBoot,
       configRev: scheduler.config?.configRev ?? 0,
@@ -45,7 +44,6 @@ export class StatusSource {
       phase: s.phase,
       recording: s.recording,
       cameraReady: s.cameraReady,
-      wifi: s.wifi,
       configRev: s.configRev,
       next: s.next,
     }
@@ -56,7 +54,6 @@ export class StatusSource {
     let flags = 0
     if (s.recording) flags |= Flag.RECORDING
     if (s.cameraReady) flags |= Flag.CAMERA_READY
-    if (s.wifi) flags |= Flag.WIFI
     if (s.pairingOpen) flags |= Flag.PAIRING_OPEN
     if (s.clockSet) flags |= Flag.CLOCK_SET
 

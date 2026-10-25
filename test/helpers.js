@@ -19,11 +19,9 @@ export class FakeCamera extends BaseCamera {
 }
 
 export class FakeSystem {
-  wifiEnabled = true
   clockSetSinceBoot = false
   timeSet = []
   async setTime(ms) { this.timeSet.push(ms); this.clockSetSinceBoot = true }
-  async setWifi(on) { this.wifiEnabled = on }
 }
 
 export const baseConfig = (now, overrides = {}) => ({

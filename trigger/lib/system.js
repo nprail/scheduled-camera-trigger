@@ -18,7 +18,6 @@ const run = (cmd, args) =>
 export class System {
   constructor({ exec = run } = {}) {
     this.exec = exec
-    this.wifiEnabled = true
     this.clockSetSinceBoot = false
   }
 
@@ -30,8 +29,12 @@ export class System {
     this.clockSetSinceBoot = true
   }
 
-  async setWifi(enabled) {
-    await this.exec('rfkill', [enabled ? 'unblock' : 'block', 'wifi'])
-    this.wifiEnabled = enabled
+  /**
+   * The device never uses Wi-Fi: it is controlled over Bluetooth and the Z CAM is
+   * wired over Ethernet. Block the radio so it stays quiet (RF silence, less power,
+   * and no Wi-Fi/Bluetooth coexistence trouble on the shared chip).
+   */
+  async disableWifi() {
+    await this.exec('rfkill', ['block', 'wifi'])
   }
 }

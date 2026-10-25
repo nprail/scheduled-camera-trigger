@@ -27,7 +27,7 @@ test('hello reports pairing state and a fresh nonce', async () => {
 test('everything but the open ops needs auth', async () => {
   const dev = await makeDevice()
   const c = new TestClient(dev.ble)
-  for (const op of ['status.get', 'config.get', 'jobs.get', 'camera.start', 'test.run', 'logs.get', 'time.set', 'wifi.set', 'config.set']) {
+  for (const op of ['status.get', 'config.get', 'jobs.get', 'camera.start', 'test.run', 'logs.get', 'time.set', 'config.set']) {
     const r = await c.request(op, {})
     assert.equal(r.ok, false, op)
     assert.equal(r.err.code, 'unauthorized', op)
@@ -122,7 +122,6 @@ test('status.get and the binary Status value agree', async () => {
   const b = dev.ble.status.toBinary()
   assert.equal(b.length, 12)
   assert.equal(b[0] & 0b10, 0b10) // camera ready
-  assert.equal(b[0] & 0b100, 0b100) // wifi
   assert.equal(b[1], 0) // idle
   assert.equal(b.readUInt32LE(2), 1) // configRev
   assert.equal(b.readUInt32LE(6), Math.floor(Date.parse(r.d.next.at) / 1000))
@@ -221,7 +220,7 @@ test('time.set applies the clock, re-plans timers, and reports drift', async () 
   assert.ok(dev.timers.length > before) // rescheduled
   assert.equal((await client.request('time.set', { now: 'garbage' })).err.code, 'bad_request')
   // clock-set flag shows in Status
-  assert.equal(dev.ble.status.toBinary()[0] & 0b10000, 0b10000)
+  assert.equal(dev.ble.status.toBinary()[0] & 0b1000, 0b1000)
 })
 
 test('manual camera control works when idle and is idempotent', async () => {
@@ -323,14 +322,6 @@ test('logs.get pages by seq; logs.subscribe replays then streams', async () => {
   assert.equal(client.events.length, n)
 })
 
-test('wifi.set toggles Wi-Fi and the Status flag', async () => {
-  const { dev, client } = await paired()
-  assert.deepEqual((await client.request('wifi.set', { enabled: false })).d, { enabled: false })
-  assert.equal(dev.system.wifiEnabled, false)
-  assert.equal(dev.ble.status.toBinary()[0] & 0b100, 0)
-  assert.equal((await client.request('wifi.set', { enabled: 'no' })).err.code, 'bad_request')
-})
-
 test('malformed input gets an error response, not a crash', async () => {
   const { client } = await paired()
   const errs = []
@@ -352,8 +343,8 @@ test('malformed input gets an error response, not a crash', async () => {
 
 test('one request at a time: a second in flight is busy', async () => {
   const { dev, client } = await paired()
-  dev.controller.setWifi = () => new Promise((r) => setTimeout(r, 50))
-  const slow = client.request('wifi.set', { enabled: true })
+  dev.controller.setTime = () => new Promise((r) => setTimeout(() => r({ offsetMs: 0 }), 50))
+  const slow = client.request('time.set', { now: new Date().toISOString() })
   const second = await client.request('status.get')
   assert.equal(second.err.code, 'busy')
   assert.equal((await slow).ok, true)
@@ -371,11 +362,11 @@ test('a stalled reassembly times out with an error', async () => {
 
 test('pairing flag shows in Status while the window is open', async () => {
   const dev = await makeDevice()
-  assert.equal(dev.ble.status.toBinary()[0] & 0b1000, 0)
+  assert.equal(dev.ble.status.toBinary()[0] & 0b100, 0)
   dev.ble.pairing.open()
-  assert.equal(dev.ble.status.toBinary()[0] & 0b1000, 0b1000)
+  assert.equal(dev.ble.status.toBinary()[0] & 0b100, 0b100)
   dev.ble.pairing.close()
-  assert.equal(dev.ble.status.toBinary()[0] & 0b1000, 0)
+  assert.equal(dev.ble.status.toBinary()[0] & 0b100, 0)
 })
 
 test('attempts whose wake-up time already passed are marked missed', async () => {

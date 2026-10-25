@@ -6,7 +6,7 @@ A native SwiftUI app that controls a Scheduled Camera Trigger over Bluetooth Low
 - Phone-as-clock: the device's clock is set from the phone on every connect (the Pi has no RTC)
 - Live status with a countdown to the next wake, record or stop
 - Edit launch attempts, timing and camera settings, saved atomically to the device
-- Run a test, manually wake/start/stop/sleep the camera, toggle Wi-Fi
+- Run a test, manually wake/start/stop/sleep the camera
 - Live device log
 
 Requires Xcode 15+ and iOS 17+. CoreBluetooth doesn't work in the Simulator, so run on a device.

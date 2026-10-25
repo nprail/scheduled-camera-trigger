@@ -56,9 +56,9 @@
   },
   "status": [
     {
-      "hex": "0600010000001b79e76a0101",
+      "hex": "0a00010000001b79e76a0101",
       "expected": {
-        "flags": 6,
+        "flags": 10,
         "phase": "idle",
         "configRev": 1,
         "nextEventAt": 1793554715,
@@ -67,9 +67,9 @@
       }
     },
     {
-      "hex": "1b02785634120000000000ff",
+      "hex": "0f02785634120000000000ff",
       "expected": {
-        "flags": 27,
+        "flags": 15,
         "phase": "recording",
         "configRev": 305419896,
         "nextEventAt": 0,

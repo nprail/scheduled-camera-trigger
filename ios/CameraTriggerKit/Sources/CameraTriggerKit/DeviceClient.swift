@@ -301,11 +301,6 @@ public final class DeviceClient {
         let _: Empty = try await call("logs.subscribe", Params(enabled: enabled, after: after))
     }
 
-    public func setWifi(_ enabled: Bool) async throws {
-        struct Params: Encodable { let enabled: Bool }
-        let _: EnabledResponse = try await call("wifi.set", Params(enabled: enabled))
-    }
-
     public func deviceTime() async throws -> Date {
         let reply: TimeResponse = try await call("time.get")
         return DeviceDate.parse(reply.now) ?? Date()

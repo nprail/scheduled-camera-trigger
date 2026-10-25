@@ -39,17 +39,17 @@ export const build = () => {
   const status = [
     {
       hex: encodeStatus({
-        flags: Flag.CAMERA_READY | Flag.WIFI, phase: 'idle', configRev: 1,
+        flags: Flag.CAMERA_READY | Flag.CLOCK_SET, phase: 'idle', configRev: 1,
         nextEventAt: 1793554715, nextEventType: 'wake', attemptsRemaining: 1,
       }).toString('hex'),
-      expected: { flags: 6, phase: 'idle', configRev: 1, nextEventAt: 1793554715, nextEventType: 'wake', attemptsRemaining: 1 },
+      expected: { flags: 10, phase: 'idle', configRev: 1, nextEventAt: 1793554715, nextEventType: 'wake', attemptsRemaining: 1 },
     },
     {
       hex: encodeStatus({
         flags: Flag.RECORDING | Flag.CAMERA_READY | Flag.CLOCK_SET | Flag.PAIRING_OPEN, phase: 'recording',
         configRev: 305419896, nextEventAt: 0, nextEventType: 'none', attemptsRemaining: 255,
       }).toString('hex'),
-      expected: { flags: 27, phase: 'recording', configRev: 305419896, nextEventAt: 0, nextEventType: 'none', attemptsRemaining: 255 },
+      expected: { flags: 15, phase: 'recording', configRev: 305419896, nextEventAt: 0, nextEventType: 'none', attemptsRemaining: 255 },
     },
   ]
 

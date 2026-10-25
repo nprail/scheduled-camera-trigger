@@ -40,7 +40,7 @@ See [config.example.json](config.example.json) for an example config file.
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `cameraType`              | Type of camera being triggered. Can be either `generic` or `zcam`                                                                 |
 | `logFile`                 | File path to store logs at                                                                                                        |
-| `buttonGpioPort`          | GPIO pin connected to a button. Pressing it re-enables Wi-Fi and opens a 2-minute Bluetooth pairing window (optional)             |
+| `buttonGpioPort`          | GPIO pin connected to a button. Pressing it opens a 2-minute Bluetooth pairing window (optional)                                   |
 | `generic.releaseGpioPin`  | GPIO pin on the Raspberry Pi that is connected to the camera's shutter release pin (required when the `cameraType` is `generic`)  |
 | `generic.focusGpioPin`    | GPIO pin on the Raspberry Pi that is connected to the camera focus pin (optional)                                                 |
 | `zcam.cameraIp`           | IP address of the Z CAM (required when the `cameraType` is `zcam`)                                                                |
@@ -57,7 +57,8 @@ Older configs (plain date strings for `attempts`, `genericReleaseGpioPin`, `zcam
 
 The device is configured and controlled over Bluetooth Low Energy: set the clock, edit the schedule, run a test, watch the log, and manually control the camera, all with no network. The protocol is specified in [docs/BLE_PROTOCOL.md](docs/BLE_PROTOCOL.md).
 
-- **Device:** `trigger/ble/`. It talks HCI directly (via [`ble-host`](https://github.com/Emill/node-ble-host)), so stop `bluetoothd` (`sudo systemctl disable --now bluetooth`) and give Node access to the radio: `sudo setcap cap_net_admin=ep $(readlink -f $(which node))`. Date/Wi-Fi control additionally needs root (`date`, `timedatectl`, `rfkill`).
+- **Device:** `trigger/ble/`. It talks HCI directly (via [`ble-host`](https://github.com/Emill/node-ble-host)), so stop `bluetoothd` (`sudo systemctl disable --now bluetooth`) and give Node access to the radio: `sudo setcap cap_net_admin=ep $(readlink -f $(which node))`. Setting the clock and blocking Wi-Fi need root (`date`, `timedatectl`, `rfkill`).
+- **Wi-Fi is always off:** the device never uses Wi-Fi. It is controlled over Bluetooth, and a Z CAM is wired over Ethernet, so the service runs `rfkill block wifi` every time it starts.
 - **Pairing:** press the button wired to `buttonGpioPort`, then tap *Pair* in the app within 2 minutes. Only the paired phone can control the device afterwards.
 - **iPhone app:** [ios/](ios/README.md), a native SwiftUI app.
 - **Tests:** `npm test` (protocol, auth, scheduler and config behaviour, no hardware needed).

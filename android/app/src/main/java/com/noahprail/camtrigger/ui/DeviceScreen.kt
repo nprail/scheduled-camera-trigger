@@ -41,7 +41,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -71,7 +70,6 @@ private fun transparent() = ListItemDefaults.colors(containerColor = Color.Trans
 
 @Composable
 fun DeviceScreen(model: AppModel, onEditConfig: () -> Unit, onShowLogs: () -> Unit) {
-    var confirmWifiOff by remember { mutableStateOf(false) }
     var confirmForget by remember { mutableStateOf(false) }
     var confirmCamera by remember { mutableStateOf<CameraAction?>(null) }
 
@@ -113,23 +111,12 @@ fun DeviceScreen(model: AppModel, onEditConfig: () -> Unit, onShowLogs: () -> Un
                     model = model,
                     phase = phase,
                     onShowLogs = onShowLogs,
-                    onWifi = { on -> if (on) model.setWifi(true) else confirmWifiOff = true },
                     onForget = { confirmForget = true },
                 )
             }
         }
     }
 
-    if (confirmWifiOff) {
-        ConfirmDialog(
-            title = "Turn Wi-Fi off?",
-            message = "You can turn it back on here over Bluetooth, or with the button on the device.",
-            confirmLabel = "Turn Off Wi-Fi",
-            destructive = true,
-            onConfirm = { model.setWifi(false) },
-            onDismiss = { confirmWifiOff = false },
-        )
-    }
     if (confirmForget) {
         ConfirmDialog(
             title = "Forget this device?",
@@ -352,7 +339,6 @@ private fun DeviceSection(
     model: AppModel,
     phase: StatusValue.Phase,
     onShowLogs: () -> Unit,
-    onWifi: (Boolean) -> Unit,
     onForget: () -> Unit,
 ) {
     Section(title = "Device") {
@@ -360,13 +346,6 @@ private fun DeviceSection(
             modifier = Modifier.clickable(onClick = onShowLogs),
             headlineContent = { Text("Logs") },
             trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null) },
-            colors = transparent(),
-        )
-        ListItem(
-            headlineContent = { Text("Wi-Fi") },
-            trailingContent = {
-                Switch(checked = model.live?.wifi ?: true, onCheckedChange = onWifi)
-            },
             colors = transparent(),
         )
         ListItem(

@@ -6,7 +6,7 @@ Guidance for agents working in this repository.
 
 | Path | What |
 | --- | --- |
-| `trigger/`, `interface/`, `config.example.json` | The device side (Node, Raspberry Pi Zero W) and its web interface. |
+| `trigger/`, `config.example.json` | The device side (Node, Raspberry Pi Zero W). It is controlled over Bluetooth only; there is no web interface or HTTP API. |
 | `docs/BLE_PROTOCOL.md` | **The BLE protocol (v1). The source of truth for everything the phone and device exchange.** |
 | `docs/test-vectors.json` | Cross-implementation test vectors, generated from the Node reference (`node test/vectors.js --write`). |
 | `ios/` | The native iOS app (SwiftUI) and `CameraTriggerKit`, a UI-free Swift package for the protocol. |
@@ -42,7 +42,7 @@ Main jobs:
 3. Set the device clock from the phone (the Pi has no battery-backed clock).
 4. Show live status and a countdown to the next event.
 5. Edit the schedule, timing and camera settings.
-6. Manually test, wake, start, stop and sleep the camera, and toggle the device's Wi-Fi.
+6. Manually test, wake, start, stop and sleep the camera.
 7. Show the device log live.
 
 ## 2. Architecture (mirror this split)
@@ -67,10 +67,10 @@ Read `docs/BLE_PROTOCOL.md` for the full detail. What the app depends on:
 
 - One GATT service (`7a3c0001-5e9b-4d2a-8f61-c0a7b2d4e9f3`) with four characteristics: Device Info (read, JSON), Status (read and notify, a fixed 12-byte value), Command (write), Response (notify).
 - Requests are JSON, `{id, op, d}`, split into fragments to fit the ATT write size. Responses and unsolicited events arrive on Response and are reassembled. **One request is in flight at a time; extra callers wait their turn.** Each request has a timeout (10 s by default, 20 s for camera actions); a timeout fails the request.
-- The Status value is parsed directly from bytes: flags (recording, camera ready, Wi-Fi, pairing open, clock set), phase (idle, awake, recording, test, error), config revision, next event time (Unix seconds, 0 for none), next event type (none, wake, start, stop), attempts remaining. Integers are little-endian.
+- The Status value is parsed directly from bytes: flags (recording, camera ready, pairing open, clock set), phase (idle, awake, recording, test, error), config revision, next event time (Unix seconds, 0 for none), next event type (none, wake, start, stop), attempts remaining. Integers are little-endian.
 - Dates on the wire are ISO 8601 UTC with milliseconds. Parse with or without the fractional part.
 - Events pushed by the device: `job`, `config`, `test`, `log`.
-- Operations used: `hello`, `auth`, `auth.pair`, `status.get`, `config.get`, `config.set`, `jobs.get` (paged), `camera.wake|start|stop|sleep`, `test.run`, `logs.get` (paged), `logs.subscribe`, `wifi.set`, `time.get`, `time.set`.
+- Operations used: `hello`, `auth`, `auth.pair`, `status.get`, `config.get`, `config.set`, `jobs.get` (paged), `camera.wake|start|stop|sleep`, `test.run`, `logs.get` (paged), `logs.subscribe`, `time.get`, `time.set`.
 - Only protocol version **1** is supported. A different version in Device Info or `hello` is an error ("unsupported"), with a message telling the user to update the app.
 
 **Test vectors:** `docs/test-vectors.json` covers framing, HMAC proofs and status decoding. The Android protocol module must pass the same vectors (see `ios/CameraTriggerKit/Tests/` for how the iOS tests use them).
@@ -170,7 +170,6 @@ Title: the device name (or "Camera Trigger" if empty). Toolbar: **Disconnect**. 
 
 **Device**
 - **Logs** link.
-- **Wi-Fi** toggle, reflecting the Status `wifi` flag. Turning it **off** asks for confirmation: "Turn Wi-Fi off?", with "You can turn it back on here over Bluetooth, or with the button on the device." Turning it on needs no confirmation.
 - **Clock**: shows "Not checked", "Set from this phone (was N ms off)" or "In sync (N ms)", with a **Sync now** button (disabled unless idle). Sync now forces a set (threshold 0).
 - Read-only rows: ID, Camera (type), Software (firmware version).
 - **Forget pairing** (destructive), which asks for confirmation: "Forget this device?" with "To pair again, press the button on the device."
@@ -198,7 +197,7 @@ Behavior:
 - Attempt identity is local only. Equality for "is the draft changed" compares name and time, not the local ID. Local IDs are never sent to the device.
 - Fields the device owns (`deviceId`, `configRev`) are ignored on write.
 - **Save** sends `config.set` with the whole config. On success, refresh the config, jobs and status, then close the editor. On failure, show an alert "Couldn't save" with the error text, and keep the editor open. Validation errors (`invalid_config`) read "{field}: {message}".
-- The device also pushes `config` events (for example after a change from the web interface). When one arrives, refresh config, jobs and status.
+- The device also pushes `config` events (for example after another phone changes the schedule). When one arrives, refresh config, jobs and status.
 
 ### 6.6 Logs screen
 

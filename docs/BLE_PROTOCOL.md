@@ -6,7 +6,7 @@ A Bluetooth Low Energy (GATT) protocol for configuring, monitoring and manually 
 
 ## 1. Goals
 
-- Replace the HTTP API (`GET /`, `GET /logs`, `POST /test`, `POST /save`, `POST /kill-wifi`) with a BLE equivalent.
+- Replace the old HTTP API (`GET /`, `GET /logs`, `POST /test`, `POST /save`) with a BLE equivalent.
 - Work in the field with no network. The Pi Zero W has no RTC, so **the phone sets the device clock** (a wrong clock means a missed launch).
 - Run on BlueZ on a Pi Zero W (Bluetooth 4.1): assume the default 23-byte ATT MTU, take a larger one if negotiated.
 - Be hard to misuse: nobody nearby should be able to stop a recording mid-launch.
@@ -26,7 +26,7 @@ One primary service, four characteristics. Multi-byte integers in fixed binary s
 ### Advertising
 
 - Advertise the Service UUID in the advertisement packet.
-- Put the local name in the scan response: `deviceName` (`{name}-{deviceId}`, e.g. `Device Name-A1B2C3`), same as the Bonjour name today.
+- Put the local name in the scan response: `deviceName` (`{name}-{deviceId}`, e.g. `Device Name-A1B2C3`), the same name the old HTTP service advertised over Bonjour.
 - Interval ~1 s. One central at a time; stop advertising while connected, resume on disconnect.
 
 ### Device Info (read)
@@ -51,7 +51,7 @@ Fixed 12 bytes, cheap enough to poll or subscribe to at any MTU. Notified on eve
 
 | Offset | Type | Field | Values |
 | --- | --- | --- | --- |
-| 0 | u8 | `flags` | bit0 recording · bit1 camera ready · bit2 Wi‑Fi enabled · bit3 pairing window open · bit4 clock set since boot |
+| 0 | u8 | `flags` | bit0 recording · bit1 camera ready · bit2 pairing window open · bit3 clock set since boot |
 | 1 | u8 | `phase` | 0 idle · 1 awake (woken, waiting to record) · 2 recording · 3 test running · 4 error |
 | 2 | u32 | `configRev` | Increments on every successful config save |
 | 6 | u32 | `nextEventAt` | Unix seconds of the next wake/start/stop; 0 if none |
@@ -117,7 +117,6 @@ Example: a 60‑byte message at MTU 23 (20 payload bytes per fragment) is sent a
 | `test.run` | yes | `POST /test` | Wake → record 2 s → stop → sleep |
 | `logs.get` | yes | `GET /logs` | Page through the log buffer |
 | `logs.subscribe` | yes | polling `/logs` | Stream new log lines as events |
-| `wifi.set` | yes | `POST /kill-wifi` | Enable or disable Wi‑Fi |
 
 #### `hello`
 
@@ -153,7 +152,6 @@ Example: a 60‑byte message at MTU 23 (20 payload bytes per fragment) is sent a
     "phase": "idle",            // idle | awake | recording | test | error
     "recording": false,
     "cameraReady": true,
-    "wifi": true,
     "configRev": 12,
     "next": { "type": "wake", "at": "2026-11-02T17:38:35.000Z", "attempt": "Attempt 2" }
 } }
@@ -234,9 +232,9 @@ Each log line gets a monotonically increasing `seq` (the in-memory logger doesn'
 
 `after` defaults to 0 (oldest). Pages are capped so the response fits `maxMessage`. `logs.subscribe` `{ "enabled": true, "after": 140 }` replays missed lines, then pushes `{ "ev": "log", "d": { … } }` for each new line. The log `data` blob is omitted from BLE; read the log file over SSH if needed.
 
-#### `wifi.set`
+#### Wi‑Fi
 
-`{ "enabled": false }` disables Wi‑Fi (the old "kill Wi‑Fi" button); `true` re-enables it. This is reliable over BLE, unlike the HTTP version where the response never arrives. The GPIO button (`buttonGpioPort`) also re-enables Wi‑Fi.
+There is no Wi‑Fi control. The device never uses Wi‑Fi (it is controlled over Bluetooth and a Z CAM is wired over Ethernet), so it blocks the Wi‑Fi radio at startup with `rfkill` and leaves it blocked. There is nothing to configure or query over BLE.
 
 ### Events
 

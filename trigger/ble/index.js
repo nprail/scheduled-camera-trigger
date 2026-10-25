@@ -95,14 +95,13 @@ export const createBle = ({ scheduler, controller, logger, system }) => {
     })
     publish = server.notifyStatus
 
-    // Button: open the pairing window and make sure Wi-Fi is back on
+    // Button: open the pairing window
     const disposeButton = await initButton({
       port: scheduler.config.buttonGpioPort,
       logger,
       onPress: () => {
         pairing.open()
         logger.log('ble', 'Pairing window open for 120 s')
-        system.setWifi(true).catch((err) => logger.log('ble', err?.message ?? err))
       },
     })
 

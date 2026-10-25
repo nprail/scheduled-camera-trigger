@@ -103,7 +103,6 @@ final class StatusTests: XCTestCase {
         let s = try XCTUnwrap(StatusValue(data: Data(hex: v.hex)!))
         XCTAssertTrue(s.flags.contains(.recording))
         XCTAssertTrue(s.flags.contains(.pairingOpen))
-        XCTAssertFalse(s.flags.contains(.wifi))
         XCTAssertNil(s.nextEventDate)
         XCTAssertNil(StatusValue(data: Data([1, 2, 3])))
     }

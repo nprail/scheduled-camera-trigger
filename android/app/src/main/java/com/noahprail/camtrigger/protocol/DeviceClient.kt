@@ -311,14 +311,6 @@ class DeviceClient(private val transport: DeviceTransport, scope: CoroutineScope
         call("logs.subscribe", JsonObject(params), Empty.serializer())
     }
 
-    suspend fun setWifi(enabled: Boolean) {
-        call(
-            "wifi.set",
-            JsonObject(mapOf("enabled" to json.encodeToJsonElement(Boolean.serializer(), enabled))),
-            EnabledResponse.serializer(),
-        )
-    }
-
     suspend fun deviceTime(): Instant {
         val reply = call("time.get", TimeResponse.serializer())
         return DeviceDate.parse(reply.now) ?: Instant.now()

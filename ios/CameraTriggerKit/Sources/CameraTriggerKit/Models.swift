@@ -18,9 +18,8 @@ public struct StatusValue: Equatable {
         public init(rawValue: UInt8) { self.rawValue = rawValue }
         public static let recording = Flags(rawValue: 1 << 0)
         public static let cameraReady = Flags(rawValue: 1 << 1)
-        public static let wifi = Flags(rawValue: 1 << 2)
-        public static let pairingOpen = Flags(rawValue: 1 << 3)
-        public static let clockSet = Flags(rawValue: 1 << 4)
+        public static let pairingOpen = Flags(rawValue: 1 << 2)
+        public static let clockSet = Flags(rawValue: 1 << 3)
     }
 
     public enum Phase: UInt8 {
@@ -90,7 +89,6 @@ public struct StatusInfo: Codable, Equatable {
     public var phase: String
     public var recording: Bool
     public var cameraReady: Bool
-    public var wifi: Bool
     public var configRev: Int
     public var next: Next?
 }
@@ -134,7 +132,6 @@ struct ConfigEnvelope: Codable { var config: CameraConfig }
 struct ConfigSetResponse: Decodable { var configRev: Int }
 struct CameraResponse: Decodable { var recording: Bool }
 struct StartedResponse: Decodable { var started: Bool }
-struct EnabledResponse: Decodable { var enabled: Bool }
 struct Empty: Codable {}
 
 // MARK: - Config

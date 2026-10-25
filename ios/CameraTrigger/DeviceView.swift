@@ -3,7 +3,6 @@ import CameraTriggerKit
 
 struct DeviceView: View {
     @Environment(AppModel.self) private var model
-    @State private var confirmingDisconnectWifi = false
     @State private var confirmingForget = false
     @State private var confirmingCamera: CameraAction?
 
@@ -26,15 +25,6 @@ struct DeviceView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Disconnect") { model.disconnect() }
             }
-        }
-        .confirmationDialog(
-            "Turn Wi-Fi off?",
-            isPresented: $confirmingDisconnectWifi,
-            titleVisibility: .visible
-        ) {
-            Button("Turn Off Wi-Fi", role: .destructive) { model.setWifi(false) }
-        } message: {
-            Text("You can turn it back on here over Bluetooth, or with the button on the device.")
         }
         .confirmationDialog(
             "Forget this device?",
@@ -182,13 +172,6 @@ struct DeviceView: View {
     private var deviceSection: some View {
         Section("Device") {
             NavigationLink("Logs") { LogsView() }
-
-            Toggle("Wi-Fi", isOn: Binding(
-                get: { model.live?.flags.contains(.wifi) ?? true },
-                set: { on in
-                    if on { model.setWifi(true) } else { confirmingDisconnectWifi = true }
-                }
-            ))
 
             HStack {
                 VStack(alignment: .leading) {

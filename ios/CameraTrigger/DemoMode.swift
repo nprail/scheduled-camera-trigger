@@ -46,12 +46,12 @@ extension AppModel {
             info = device
             clock = ClockSync(offset: 0.4, applied: true)
             live = StatusValue(data: status(
-                flags: recording ? 0b10111 : 0b10010, phase: recording ? 2 : 1,
+                flags: recording ? 0b1011 : 0b1010, phase: recording ? 2 : 1,
                 next: now.addingTimeInterval(recording ? 1800 : 5400), type: recording ? 3 : 2))
             let next = iso(recording ? 1800 : 5400)
             self.status = json(#"""
             {"phase":"\#(recording ? "recording" : "awake")","recording":\#(recording),"cameraReady":true,
-             "wifi":\#(recording),"configRev":7,
+             "configRev":7,
              "next":{"type":"\#(recording ? "stop" : "start")","at":"\#(next)","attempt":"Sunday 10:00"}}
             """#)
             config = json(#"""

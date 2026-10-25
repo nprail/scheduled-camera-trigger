@@ -209,14 +209,6 @@ export const createDispatcher = ({
         }
       },
     },
-
-    'wifi.set': {
-      run: async (session, d) => {
-        requireBool(d?.enabled, 'enabled')
-        await controller.setWifi(d.enabled)
-        return { enabled: d.enabled }
-      },
-    },
   }
 
   /**
