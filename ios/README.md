@@ -9,7 +9,7 @@ A native SwiftUI app that controls a Scheduled Camera Trigger over Bluetooth Low
 - Run a test, manually wake/start/stop/sleep the camera
 - Live device log
 
-Requires Xcode 15+ and iOS 17+. CoreBluetooth doesn't work in the Simulator, so run on a device.
+Requires Xcode 16+ and iOS 17+. CoreBluetooth doesn't work in the Simulator, so run on a device.
 
 ## Layout
 
