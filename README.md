@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nprail/scheduled-camera-trigger/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/nprail/scheduled-camera-trigger/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/nprail/kairos/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/nprail/kairos/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-14130f">
   <img alt="Device: Raspberry Pi Zero W" src="https://img.shields.io/badge/device-Raspberry%20Pi%20Zero%20W-14130f">
   <img alt="Apps: iOS 17+ and Android 8+" src="https://img.shields.io/badge/apps-iOS%2017%2B%20%C2%B7%20Android%208%2B-14130f">
@@ -56,8 +56,8 @@ You set the three timings once and list your attempts. The device keeps the sche
 You need a Raspberry Pi Zero W, a camera with a remote trigger port (or a Z CAM), and a button for pairing. Then, on the Pi:
 
 ```sh
-git clone git@github.com:nprail/scheduled-camera-trigger.git
-cd scheduled-camera-trigger
+git clone git@github.com:nprail/kairos.git
+cd kairos
 npm install
 cp config.example.json config.json   # edit this for your camera and pins
 node trigger/index.js
@@ -74,7 +74,7 @@ With the apps you can find and connect to devices, pair with the button, see liv
 
 ## Documentation
 
-Read it online at [nprail.github.io/scheduled-camera-trigger/docs](https://nprail.github.io/scheduled-camera-trigger/docs/), or browse the files here.
+Read it online at [nprail.github.io/kairos/docs](https://nprail.github.io/kairos/docs/), or browse the files here.
 
 | Read | For |
 | --- | --- |

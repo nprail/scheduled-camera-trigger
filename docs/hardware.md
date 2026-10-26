@@ -19,7 +19,7 @@ Wi-Fi is off: the device is controlled over Bluetooth, and a Z CAM is wired over
 
 | Part | Notes |
 | --- | --- |
-| Raspberry Pi Zero W | The device. Runs Raspberry Pi OS and the Node.js program in [`trigger/`](https://github.com/nprail/scheduled-camera-trigger/tree/main/trigger). Provides Bluetooth Low Energy for the phone. |
+| Raspberry Pi Zero W | The device. Runs Raspberry Pi OS and the Node.js program in [`trigger/`](https://github.com/nprail/kairos/tree/main/trigger). Provides Bluetooth Low Energy for the phone. |
 | microSD card | For the OS and `config.json`. |
 | 5 V power supply | The Pi Zero W is low power, so a small battery pack works. |
 | Push button | Momentary, normally open. Opens the 2-minute pairing window. |

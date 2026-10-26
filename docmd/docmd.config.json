@@ -1,6 +1,6 @@
 {
   "title": "kairos docs",
-  "url": "https://nprail.github.io/scheduled-camera-trigger/docs",
+  "url": "https://nprail.github.io/kairos/docs",
   "src": "../docs",
   "out": "../site/docs",
   "engine": "js",
@@ -97,13 +97,13 @@
     },
     {
       "title": "kairos home",
-      "path": "https://nprail.github.io/scheduled-camera-trigger/",
+      "path": "https://nprail.github.io/kairos/",
       "icon": "arrow-up-right",
       "external": true
     },
     {
       "title": "GitHub",
-      "path": "https://github.com/nprail/scheduled-camera-trigger",
+      "path": "https://github.com/nprail/kairos",
       "icon": "github",
       "external": true
     }

@@ -7,8 +7,8 @@ How to run Kairos on a Raspberry Pi Zero W, and how the Bluetooth side of the de
 Clone the repository and install the dependencies. Node.js 20 is what the tests run on, and the native modules (`onoff`, `hci-socket`) only build on the Pi.
 
 ```sh
-git clone git@github.com:nprail/scheduled-camera-trigger.git
-cd scheduled-camera-trigger
+git clone git@github.com:nprail/kairos.git
+cd kairos
 npm install
 ```
 
@@ -42,7 +42,7 @@ The device is configured and controlled over Bluetooth Low Energy: set the clock
 
 Both apps find and connect to devices, pair with the button, show live status with a countdown to the next event, edit the schedule and camera settings, run a test, manually wake, start, stop and sleep the camera, and show the device log live.
 
-- **iPhone:** [ios/README.md](https://github.com/nprail/scheduled-camera-trigger/blob/main/ios/README.md)
-- **Android:** [android/README.md](https://github.com/nprail/scheduled-camera-trigger/blob/main/android/README.md)
+- **iPhone:** [ios/README.md](https://github.com/nprail/kairos/blob/main/ios/README.md)
+- **Android:** [android/README.md](https://github.com/nprail/kairos/blob/main/android/README.md)
 
-Bluetooth doesn't work in the iOS Simulator or an Android emulator, so run the apps on a phone. Debug builds have a demo mode that shows every screen with sample data (see [AGENTS.md](https://github.com/nprail/scheduled-camera-trigger/blob/main/AGENTS.md)).
+Bluetooth doesn't work in the iOS Simulator or an Android emulator, so run the apps on a phone. Debug builds have a demo mode that shows every screen with sample data (see [AGENTS.md](https://github.com/nprail/kairos/blob/main/AGENTS.md)).

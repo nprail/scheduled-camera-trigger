@@ -1,6 +1,6 @@
 # Configuration
 
-The device reads its settings from `config.json` (see [config.example.json](https://github.com/nprail/scheduled-camera-trigger/blob/main/config.example.json) for an example, and [SETUP.md](SETUP.md) for where the file lives). You can edit all of these from the apps.
+The device reads its settings from `config.json` (see [config.example.json](https://github.com/nprail/kairos/blob/main/config.example.json) for an example, and [SETUP.md](SETUP.md) for where the file lives). You can edit all of these from the apps.
 
 ## Options
 
