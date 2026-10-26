@@ -19,6 +19,7 @@ import com.noahprail.kairos.protocol.DeviceClient
 import com.noahprail.kairos.protocol.DeviceError
 import com.noahprail.kairos.protocol.DeviceEvent
 import com.noahprail.kairos.protocol.DeviceInfo
+import com.noahprail.kairos.protocol.PROTOCOL_VERSION
 import com.noahprail.kairos.protocol.Job
 import com.noahprail.kairos.protocol.LogEntry
 import com.noahprail.kairos.protocol.StatusValue
@@ -144,7 +145,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
                 connection.onDisconnect = { viewModelScope.launch { if (currentId == device.id) connectionLost() } }
 
                 val info = connection.readDeviceInfo()
-                if (info.v != 1) {
+                if (info.v != PROTOCOL_VERSION) {
                     throw DeviceError("unsupported", "This device uses protocol v${info.v}. Update the app.")
                 }
                 this@AppModel.info = info

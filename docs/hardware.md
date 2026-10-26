@@ -116,7 +116,7 @@ Pins (constants in `esp32/src/platform/board.h`; verify against your board):
 | W5500 SCLK / MOSI / MISO / CS (Z CAM only) | 12 / 11 / 13 / 10 |
 | W5500 INT / RST (Z CAM only) | 14 / 9 |
 | RTC SDA / SCL | 8 / 18 |
-| Pairing button | 4 (active high, internal pull-down) |
+| Pairing button | 0 on the S3, 9 on the C3: the board's BOOT button (active low, to ground), so no extra button is needed |
 | Camera release / focus | 5 / 6 |
 
 The ESP32-C3 has far fewer usable pins and uses a separate set (no W5500 INT/RST, no focus line): see `esp32/README.md`. The pins are fixed in the firmware and are not part of the protocol, so no phone can change them. To change them, edit the constants in `board.h` and rebuild (see `esp32/README.md`). The same optocoupler stage as for the Pi (see [Generic camera](#generic-camera-remote-trigger-port)) isolates the camera, and a pull-down on each driver input keeps the camera lines quiet while the chip boots. Use a CR2032 in the RTC only if its charging circuit is disabled (many cheap DS3231 modules charge the cell). The ESP32 version runs from an external battery pack. Flash it with PlatformIO, and see `esp32/README.md` for the details and the things still to be confirmed on real hardware.

@@ -1,11 +1,12 @@
-// The pairing button: a rising edge on a GPIO, debounced by 50 ms.
+// The pairing button: a press on a GPIO, debounced by 50 ms. Active low (the board's BOOT button: to ground, with a
+// pull-up) or active high (to 3.3 V, with a pull-down).
 #pragma once
 #include <Arduino.h>
 
 class Button {
  public:
-  /// Watch `pin` (the internal pull-down keeps it low until the button pulls it to 3.3 V). Rebinding moves the watch.
-  void bind(int pin);
+  /// Watch `pin`. The internal pull-up (active low) or pull-down (active high) holds it idle until the button is pressed.
+  void bind(int pin, bool activeLow);
   int pin() const { return pin_; }
   /// True once per press.
   bool consume() {

@@ -6,6 +6,7 @@
 // others for a few seconds at most (the HTTP timeouts), which the schedule's timings leave room for.
 #include <Arduino.h>
 #include <esp_mac.h>
+#include <esp_rom_sys.h>
 #include <esp_system.h>
 #include <esp_task_wdt.h>
 
@@ -75,6 +76,9 @@ const char* resetReason() {
     case ESP_RST_WDT: return "watchdog";
     case ESP_RST_BROWNOUT: return "brownout";
     case ESP_RST_DEEPSLEEP: return "deep sleep";
+#ifdef ESP_RST_USB
+    case ESP_RST_USB: return "usb";
+#endif
     default: return "unknown";
   }
 }
@@ -186,11 +190,12 @@ void setup() {
   // the camera lines must be inactive from the first instant: no accidental shutter
   for (uint8_t pin : {KAIROS_RELEASE_PIN, KAIROS_FOCUS_PIN}) {
     if (pin == kNoPin) continue;
+    pinMode(pin, OUTPUT);  // the output register is low after a reset, so the line stays inactive
     digitalWrite(pin, LOW);
-    pinMode(pin, OUTPUT);
   }
 
-  rlog.setSink([](const LogLine& l) { Serial.printf("%lu [%s] %s\n", static_cast<unsigned long>(l.ts), l.ns.c_str(), l.msg.c_str()); });
+  // the ROM printf goes to the console on both a UART bridge and native USB, even before a host opens the port
+  rlog.setSink([](const LogLine& l) { esp_rom_printf("%lu [%s] %s\n", static_cast<unsigned long>(l.ts), l.ns.c_str(), l.msg.c_str()); });
 
   uint8_t mac[6];
   esp_read_mac(mac, ESP_MAC_BT);  // the radio's own address: the id never changes across erases
@@ -212,8 +217,9 @@ void setup() {
   bleEvents = xQueueCreate(16, sizeof(BleMessage));
   const Config& c = controller.currentConfig();
   ble.begin(advertisedName(c.name, deviceId()), deviceInfoBytes(), bleEvents);
+  rlog.log("BLE", "Advertising as " + advertisedName(c.name, deviceId()));
   applyConfig();
-  button.bind(KAIROS_BUTTON_PIN);
+  button.bind(KAIROS_BUTTON_PIN, KAIROS_BUTTON_ACTIVE_LOW);
 
   // camera calls can block for several seconds (HTTP timeouts), so give the core task a long watchdog
   esp_task_wdt_config_t wdt = {.timeout_ms = 60000, .idle_core_mask = 0, .trigger_panic = true};

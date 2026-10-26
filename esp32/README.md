@@ -45,34 +45,35 @@ Every pin is a constant in [src/platform/board.h](src/platform/board.h). The val
 | W5500 SCLK / MOSI / MISO / CS (Z CAM only) | 12 / 11 / 13 / 10 |
 | W5500 INT / RST (Z CAM only) | 14 / 9 |
 | RTC SDA / SCL (DS3231) | 8 / 18 |
-| Pairing button | 4 |
+| Pairing button | 0, the BOOT button |
 | Camera release / focus | 5 / 6 |
 
 **The pins are not configurable at run time, and not part of the protocol.** The apps and the BLE config carry no pins. To use different pins, edit the constants in `src/platform/board.h`, rebuild and flash:
 
 ```cpp
-constexpr uint8_t KAIROS_BUTTON_PIN = 4;
+constexpr uint8_t KAIROS_BUTTON_PIN = 0;        // the BOOT button
+constexpr bool KAIROS_BUTTON_ACTIVE_LOW = true;  // to ground, with a pull-up
 constexpr uint8_t KAIROS_RELEASE_PIN = 5;
 constexpr uint8_t KAIROS_FOCUS_PIN = 6;  // or kairos::kNoPin: wake then pulses the release line
 constexpr int KAIROS_RTC_SDA = 8;        // and the W5500 and RTC pins above it
 ```
 
-Avoid the strapping pins (0, 3, 45, 46), USB (19, 20) and flash/PSRAM (26 to 37). The build stops if the button shares a pin with a camera line.
+Avoid the strapping pins (0, 3, 45, 46), USB (19, 20) and flash/PSRAM (26 to 37), except for the BOOT button, which is only read after boot. Pairing: press the BOOT button (not while resetting the board). The build stops if the button shares a pin with a camera line.
 
 ### ESP32-C3 (ESP32-C3-DevKitM-1)
 
-The C3 has only GPIO 0 to 21. After the strapping pins (2, 8, 9), USB (18, 19), the console UART (20, 21) and the flash (12 to 17), eight pins are left, and they are all used:
+The C3 has only GPIO 0 to 21. After the strapping pins (2, 8), USB (18, 19), the console UART (20, 21) and the flash (12 to 17), only a few pins are left, and they are all used. Pairing uses the BOOT button (GPIO 9) so no extra button is needed:
 
 | Function | GPIO |
 | --- | --- |
 | W5500 SCLK / MOSI / MISO / CS (Z CAM only) | 4 / 6 / 5 / 7 |
-| W5500 INT / RST (Z CAM only) | not wired (-1) |
+| W5500 INT / RST (Z CAM only) | 3 / not wired (-1) |
 | RTC SDA / SCL (DS3231) | 0 / 1 |
-| Pairing button | 3 |
+| Pairing button | 9, the BOOT button |
 | Camera release | 10 |
 | Camera focus | not wired: wake pulses the release line |
 
-With INT and RST not wired, the Ethernet driver polls the W5500 and the firmware does not reset it before probing. Whether the polling rate is fast enough for the Z CAM's HTTP calls is not tested. The C3 has one core, so the `core` task runs on core 0; the firmware is otherwise identical.
+With RST not wired, the firmware does not reset the W5500 before probing it. The C3 has one core, so the `core` task runs on core 0; the firmware is otherwise identical.
 
 ## Behavior notes
 

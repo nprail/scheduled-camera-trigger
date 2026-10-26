@@ -8,8 +8,8 @@
 class ArduinoGpio : public kairos::Gpio {
  public:
   void output(uint8_t pin) override {
-    digitalWrite(pin, LOW);  // inactive before the pin becomes an output: no accidental shutter
-    pinMode(pin, OUTPUT);
+    pinMode(pin, OUTPUT);  // the output register is low after a reset, so the line stays inactive
+    digitalWrite(pin, LOW);  // and make sure of it: no accidental shutter
   }
   void write(uint8_t pin, bool high) override { digitalWrite(pin, high ? HIGH : LOW); }
   void release(uint8_t pin) override {

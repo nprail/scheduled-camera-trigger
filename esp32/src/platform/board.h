@@ -13,24 +13,27 @@
 #include <sdkconfig.h>
 
 #if CONFIG_IDF_TARGET_ESP32C3
-// ESP32-C3-DevKitM-1. The C3 has only GPIO 0 to 21, and the strapping pins (2, 8, 9), the USB pins (18, 19),
-// the console UART (20, 21) and the flash (12 to 17) are left alone, which leaves exactly these eight.
-// That is why the W5500's INT and RST are not wired here: -1 makes the driver poll the chip, and the
-// firmware skips the reset. The focus line is not wired either: wake then pulses the release line.
+// ESP32-C3-DevKitM-1. The C3 has only GPIO 0 to 21, and the strapping pins (2, 8), the USB pins (18, 19),
+// the console UART (20, 21) and the flash (12 to 17) are left alone, which leaves these pins, plus 9 for the BOOT button.
+// Using the BOOT button for pairing frees GPIO 3 for the W5500's interrupt. RST is not wired (-1: the firmware
+// skips the reset), and neither is the focus line: wake then pulses the release line.
 
 // W5500 Ethernet (SPI)
 constexpr int KAIROS_W5500_SCLK = 4;
 constexpr int KAIROS_W5500_MOSI = 6;
 constexpr int KAIROS_W5500_MISO = 5;
 constexpr int KAIROS_W5500_CS = 7;
-constexpr int KAIROS_W5500_INT = -1;
+constexpr int KAIROS_W5500_INT = 3;
 constexpr int KAIROS_W5500_RST = -1;
 
 // DS3231 RTC (I2C)
 constexpr int KAIROS_RTC_SDA = 0;
 constexpr int KAIROS_RTC_SCL = 1;
 
-constexpr uint8_t KAIROS_BUTTON_PIN = 3;
+// The pairing button is the board's BOOT button (GPIO 9, to ground with a pull-up). Reading it after boot is fine:
+// the strapping only matters while the chip resets, and holding it then enters the flashing mode, as usual.
+constexpr uint8_t KAIROS_BUTTON_PIN = 9;
+constexpr bool KAIROS_BUTTON_ACTIVE_LOW = true;
 constexpr uint8_t KAIROS_RELEASE_PIN = 10;
 constexpr uint8_t KAIROS_FOCUS_PIN = kairos::kNoPin;
 #else
@@ -48,9 +51,10 @@ constexpr int KAIROS_W5500_RST = 9;
 constexpr int KAIROS_RTC_SDA = 8;
 constexpr int KAIROS_RTC_SCL = 18;
 
-// Pairing button (active high, internal pull-down) and the generic camera's lines.
-// The focus pin may be kairos::kNoPin: wake then pulses the release line.
-constexpr uint8_t KAIROS_BUTTON_PIN = 4;
+// The pairing button is the board's BOOT button (GPIO 0, to ground with a pull-up); see the C3 note above.
+// The camera lines follow. The focus pin may be kairos::kNoPin: wake then pulses the release line.
+constexpr uint8_t KAIROS_BUTTON_PIN = 0;
+constexpr bool KAIROS_BUTTON_ACTIVE_LOW = true;
 constexpr uint8_t KAIROS_RELEASE_PIN = 5;
 constexpr uint8_t KAIROS_FOCUS_PIN = 6;
 #endif

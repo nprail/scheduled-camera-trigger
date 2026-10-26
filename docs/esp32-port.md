@@ -52,7 +52,7 @@ All pins are constants in `esp32/src/platform/board.h`, not settings. Anyone wir
 | W5500 INT / RST | 14 / 9 | INT is required for efficient receive. RST lets firmware recover a hung PHY |
 | RTC SDA / SCL | 8 / 18 | Any free pins work. These avoid SPI2 |
 | RTC SQW/INT (optional) | 15 | 1 Hz edge for sub-second alignment (§7.3) |
-| Button (default) | 4 | |
+| Button | 0 (C3: 9) | The board's BOOT button, active low with a pull-up. Only read after boot |
 | Release / Focus (default) | 5 / 6 | |
 
 Avoid on ESP32-S3: GPIO 0, 3, 45, 46 (strapping), 19 and 20 (USB), 26–32 (flash), and 33–37 on octal-PSRAM modules.

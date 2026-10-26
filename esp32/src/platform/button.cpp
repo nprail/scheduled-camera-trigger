@@ -9,12 +9,12 @@ void IRAM_ATTR Button::isr(void* self) {
   }
 }
 
-void Button::bind(int pin) {
+void Button::bind(int pin, bool activeLow) {
   if (pin == pin_) return;
   if (pin_ >= 0) detachInterrupt(pin_);
   pin_ = pin;
   pressed_ = false;
   if (pin_ < 0) return;
-  pinMode(pin_, INPUT_PULLDOWN);
-  attachInterruptArg(pin_, &Button::isr, this, RISING);
+  pinMode(pin_, activeLow ? INPUT_PULLUP : INPUT_PULLDOWN);
+  attachInterruptArg(pin_, &Button::isr, this, activeLow ? FALLING : RISING);
 }
