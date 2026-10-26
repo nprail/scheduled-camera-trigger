@@ -111,11 +111,18 @@ struct ConfigEditorView: View {
         }
     }
 
+    private var available: [String] { model.info?.cams ?? CameraConfig.cameraTypes }
+
     private func cameraSection(_ config: Binding<CameraConfig>) -> some View {
         Section {
             Picker("Type", selection: config.cameraType) {
-                Text("Remote trigger (GPIO)").tag("generic")
-                Text("Z CAM (network)").tag("zcam")
+                // a device without the Ethernet module can't drive a Z CAM
+                if available.contains("generic") || config.wrappedValue.cameraType == "generic" {
+                    Text("Remote trigger (GPIO)").tag("generic")
+                }
+                if available.contains("zcam") || config.wrappedValue.cameraType == "zcam" {
+                    Text("Z CAM (network)").tag("zcam")
+                }
             }
             .kairosRow()
             if config.wrappedValue.cameraType == "zcam" {

@@ -39,7 +39,10 @@ extension AppModel {
                 : "Press the button on the device, then try again within 2 minutes.")
         case "ready", "generic", "recording", "banner":
             let recording = scene == "recording"
-            info = device
+            // the generic scene is a unit without the Ethernet module: no Z CAM option
+            info = scene == "generic"
+                ? DeviceInfo(v: Int(protocolVersion), id: "A1B2C3", name: "Pad Cam", cam: "generic", cams: ["generic"], fw: "1.2.0")
+                : device
             clock = ClockSync(offset: 0.4, applied: true)
             live = StatusValue(data: status(
                 flags: recording ? 0b1011 : 0b1010, phase: recording ? 2 : 1,

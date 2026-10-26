@@ -176,7 +176,7 @@ Bytes encodeStatus(const StatusValue& s) {
 
 Bytes encodeDeviceInfo(const DeviceInfo& d) {
   Writer w;
-  w.u8(d.v).raw(d.id, 3).u8(static_cast<uint8_t>(d.cam)).str(d.fw, 255).str(d.name, kMaxName);
+  w.u8(d.v).raw(d.id, 3).u8(static_cast<uint8_t>(d.cam)).u8(d.cams).str(d.fw, 255).str(d.name, kMaxName);
   return w.take();
 }
 

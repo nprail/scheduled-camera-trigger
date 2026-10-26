@@ -152,15 +152,25 @@ export const decodeConfig = (buf) => {
 
 // --- Device Info and Status ----------------------------------------------
 
-export const encodeDeviceInfo = ({ v = PROTOCOL_VERSION, id, cam, fw, name }) =>
-  new Writer().u8(v).hex(id.toLowerCase(), 3).u8(CAMERA_TYPE[cam] ?? 0).str(fw, 255).str(name ?? '', MAX_NAME).done()
+/** `cams` is the camera types the device can drive, as a bit set on the wire (bit = CAMERA_TYPE value). */
+export const encodeDeviceInfo = ({ v = PROTOCOL_VERSION, id, cam, cams = Object.keys(CAMERA_TYPE), fw, name }) =>
+  new Writer()
+    .u8(v)
+    .hex(id.toLowerCase(), 3)
+    .u8(CAMERA_TYPE[cam] ?? 0)
+    .u8(cams.reduce((mask, c) => mask | (1 << CAMERA_TYPE[c]), 0))
+    .str(fw, 255)
+    .str(name ?? '', MAX_NAME)
+    .done()
 
 export const decodeDeviceInfo = (buf) => {
   const r = new Reader(buf)
   const v = r.u8()
   const id = r.hex(3).toUpperCase()
   const cam = CAMERA_NAME[r.u8()] ?? 'generic'
-  return { v, id, cam, fw: r.str(), name: r.str() }
+  const mask = r.u8()
+  const cams = Object.keys(CAMERA_TYPE).filter((c) => mask & (1 << CAMERA_TYPE[c]))
+  return { v, id, cam, cams, fw: r.str(), name: r.str() }
 }
 
 export const encodeStatus = ({ flags, phase, configRev, nextEventAt, nextEventType, attemptsRemaining, nextAttempt }) =>

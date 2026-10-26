@@ -13,6 +13,8 @@ data class DeviceInfo(
     val name: String,
     val cam: String,
     val fw: String,
+    /** The camera types this device can drive. A device without the Ethernet module cannot drive a Z CAM. */
+    val cams: List<String> = CameraConfig.cameraTypes,
 ) {
     companion object {
         fun parse(data: ByteArray): DeviceInfo? {
@@ -20,10 +22,12 @@ data class DeviceInfo(
             val v = r.u8()
             val id = r.bytes(3).joinToString("") { "%02X".format(it) }
             val cam = r.u8()
+            val mask = r.u8()
             val fw = r.string()
             val name = r.string()
             if (!r.ok) return null
-            return DeviceInfo(v, id, name, CameraConfig.cameraTypes.getOrElse(cam) { "generic" }, fw)
+            val cams = CameraConfig.cameraTypes.filterIndexed { i, _ -> mask and (1 shl i) != 0 }
+            return DeviceInfo(v, id, name, CameraConfig.cameraTypes.getOrElse(cam) { "generic" }, fw, cams)
         }
     }
 }

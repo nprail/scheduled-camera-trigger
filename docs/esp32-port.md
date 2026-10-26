@@ -36,7 +36,7 @@ The boot-time and power wins matter in the field: the device can be cold-powered
 | Part | Notes |
 | --- | --- |
 | ESP32-S3 dev board | e.g. ESP32-S3-DevKitC-1 (N8; PSRAM is not needed). BLE 5, USB-serial/JTAG for flashing |
-| W5500 SPI Ethernet module | Hardware TCP/IP offload, 10/100 Mbit, supported by the Arduino core's `ETH` library. Connects to the Z CAM with a short Cat5e cable |
+| W5500 SPI Ethernet module (**optional**: only for the Z CAM integration) | Hardware TCP/IP offload, 10/100 Mbit, supported by the Arduino core's `ETH` library. Connects to the Z CAM with a short Cat5e cable |
 | RTC module | See §3.3 |
 | Push button | Pairing. Active-high with pull-down to match today's rising-edge behavior, or active-low with the internal pull-up (decide in §18) |
 | Output stage for `generic` cameras | 3.3 V GPIO is **not** enough to drive a camera release. Use an optocoupler or small MOSFET per line (release, focus) |
@@ -331,7 +331,7 @@ There is no filesystem. Everything persistent is in NVS, written through `Prefer
 Implement `docs/ble-protocol.md` (v2: GATT layout, advertising, framing, security) with `NimBLE-Arduino`.
 
 - **GATT:** one primary service `6b610001-6169-4f72-8f73-b3e1c5a97d24`. Device Info (read, now binary), Status (read + notify, 13 bytes), Command (`WRITE` | `WRITE_NR` | `WRITE_ENC`, so it **requires an encrypted link**), Response (notify).
-- **Device Info (binary):** `v u8` (2), `id[3]` (the 6 hex digits as raw bytes), `cam u8`, `fw` (`u8` length + ASCII), `name` (`u8` length + UTF-8). It is short, but keep using Read Long.
+- **Device Info (binary):** `v u8` (2), `id[3]` (the 6 hex digits as raw bytes), `cam u8`, `cams u8` (the camera types the unit can drive, a bit set: without a W5500 only `generic`), `fw` (`u8` length + ASCII), `name` (`u8` length + UTF-8). It is short, but keep using Read Long.
 - **Connections:** `-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1` in `build_flags`. Stop advertising on connect, restart on disconnect. Interval ~1 s.
 - **Advertising:** service UUID (128-bit, 18 bytes) in the advertisement. Local name in the scan response. The 31-byte scan response limits the name to 29 bytes.
   - **Pitfall (also in the Node code):** `gatt.js` truncates `deviceName.slice(0, 29)`, which cuts off the `-ID` suffix for names over ~22 characters, and the apps identify "already paired" devices by that suffix. On the ESP32 truncate the **name part**, not the ID: `name[:22] + "-" + ID`. State this rule in the v2 protocol doc.

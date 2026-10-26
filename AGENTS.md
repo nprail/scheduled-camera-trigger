@@ -192,7 +192,7 @@ Sections:
    - Start recording: "N s before T-0" (`startBefore`)
    - Stop recording: "N s after T-0" (`endAfter`)
 3. **Camera**:
-   - **Type** picker: "Remote trigger (GPIO)" (`generic`) or "Z CAM (network)" (`zcam`).
+   - **Type** picker: "Remote trigger (GPIO)" (`generic`) or "Z CAM (network)" (`zcam`). A type is offered only if Device Info `cams` lists it (a unit without the Ethernet module lists only `generic`), plus the draft's current type, so an existing selection never disappears.
    - For `zcam`: **Camera IP**, with the placeholder `192.168.1.50`, no auto-capitalization or autocorrect.
 4. **Device**: **Name** (optional text).
 

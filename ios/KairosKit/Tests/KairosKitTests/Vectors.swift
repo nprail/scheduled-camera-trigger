@@ -19,6 +19,7 @@ struct Vectors {
 
 extension Dictionary where Key == String, Value == Any {
     func str(_ key: String) -> String { self[key] as! String }
+    func strs(_ key: String) -> [String] { self[key] as! [String] }
     func int(_ key: String) -> Int { (self[key] as! NSNumber).intValue }
     func u64(_ key: String) -> UInt64 { (self[key] as! NSNumber).uint64Value }
     func bool(_ key: String) -> Bool { (self[key] as! NSNumber).boolValue }

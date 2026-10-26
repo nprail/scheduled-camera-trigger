@@ -34,10 +34,34 @@ void EthNet::onEvent(arduino_event_id_t event) {
   }
 }
 
-void EthNet::begin() {
-  Network.onEvent(&EthNet::onEvent);
+bool EthNet::probe() {
+  pinMode(KAIROS_W5500_CS, OUTPUT);
+  digitalWrite(KAIROS_W5500_CS, HIGH);
+  pinMode(KAIROS_W5500_RST, OUTPUT);
+  digitalWrite(KAIROS_W5500_RST, LOW);
+  delay(2);
+  digitalWrite(KAIROS_W5500_RST, HIGH);
+  delay(60);  // the chip's PLL needs about 50 ms after a reset
+
+  // VERSIONR is at 0x0039 in the common register block; a read is address, control byte 0x00, then the data
+  SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+  digitalWrite(KAIROS_W5500_CS, LOW);
+  SPI.transfer(0x00);
+  SPI.transfer(0x39);
+  SPI.transfer(0x00);
+  const uint8_t version = SPI.transfer(0x00);
+  digitalWrite(KAIROS_W5500_CS, HIGH);
+  SPI.endTransaction();
+  return version == 0x04;
+}
+
+bool EthNet::begin() {
   SPI.begin(KAIROS_W5500_SCLK, KAIROS_W5500_MISO, KAIROS_W5500_MOSI);
+  present_ = probe();
+  if (!present_) return false;  // nothing is started: no driver, no events, no DHCP
+  Network.onEvent(&EthNet::onEvent);
   ETH.begin(ETH_PHY_W5500, 1, KAIROS_W5500_CS, KAIROS_W5500_INT, KAIROS_W5500_RST, SPI);  // DHCP is the default
+  return true;
 }
 
 void EthNet::setCameraIp(const uint8_t ip[4]) {

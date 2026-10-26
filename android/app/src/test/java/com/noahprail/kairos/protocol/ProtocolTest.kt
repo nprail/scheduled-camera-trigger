@@ -9,6 +9,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Test
 import java.time.Instant
 
@@ -135,7 +137,7 @@ class StatusTest {
         for (v in Vectors.load().list("deviceInfo")) {
             val e = v.obj("expected")
             val info = DeviceInfo.parse(v.hex("hex"))
-            assertEquals(DeviceInfo(e.int("v"), e.str("id"), e.str("name"), e.str("cam"), e.str("fw")), info)
+            assertEquals(DeviceInfo(e.int("v"), e.str("id"), e.str("name"), e.str("cam"), e.str("fw"), e["cams"]!!.jsonArray.map { it.jsonPrimitive.content }), info)
         }
         assertNull(DeviceInfo.parse(byteArrayOf(2, 1, 2)))
     }

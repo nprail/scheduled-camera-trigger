@@ -35,7 +35,7 @@ test('hello reports pairing state and a fresh nonce', async () => {
 test('Device Info is binary and names the device', async () => {
   const dev = await makeDevice()
   assert.deepEqual(decodeDeviceInfo(dev.ble.deviceInfo()), {
-    v: 2, id: 'ABC123', cam: 'generic', fw: process.env.npm_package_version ?? '1.0.0', name: 'Test',
+    v: 2, id: 'ABC123', cam: 'generic', cams: ['generic', 'zcam'], fw: process.env.npm_package_version ?? '1.0.0', name: 'Test',
   })
 })
 

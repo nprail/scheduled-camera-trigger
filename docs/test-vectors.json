@@ -163,23 +163,44 @@
   ],
   "deviceInfo": [
     {
-      "hex": "02a1b2c30005312e302e30075061642043616d",
+      "hex": "02a1b2c3000305312e302e30075061642043616d",
       "expected": {
         "v": 2,
         "id": "A1B2C3",
         "cam": "generic",
+        "cams": [
+          "generic",
+          "zcam"
+        ],
         "fw": "1.0.0",
         "name": "Pad Cam"
       }
     },
     {
-      "hex": "0200ff10010a322e332e342d6265746100",
+      "hex": "0200ff1001030a322e332e342d6265746100",
       "expected": {
         "v": 2,
         "id": "00FF10",
         "cam": "zcam",
+        "cams": [
+          "generic",
+          "zcam"
+        ],
         "fw": "2.3.4-beta",
         "name": ""
+      }
+    },
+    {
+      "hex": "020a0b0c000105312e302e300b4e6f2045746865726e6574",
+      "expected": {
+        "v": 2,
+        "id": "0A0B0C",
+        "cam": "generic",
+        "cams": [
+          "generic"
+        ],
+        "fw": "1.0.0",
+        "name": "No Ethernet"
       }
     }
   ],

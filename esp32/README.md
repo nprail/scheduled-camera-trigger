@@ -35,12 +35,14 @@ The `device` environment uses the pioarduino platform (Arduino-ESP32 core 3.3.x)
 
 ## Pins
 
+The W5500 Ethernet module is optional: it is only needed to control a Z CAM. A `generic` (remote trigger) setup works without it. At boot the firmware reads the chip's version register; if the module does not answer, Ethernet is never started and Device Info reports only the `generic` camera type, so the apps hide the Z CAM option.
+
 Every pin is a constant in [src/platform/board.h](src/platform/board.h). The values below are for an ESP32-S3-DevKitC-1 (verify them against your board):
 
 | Function | GPIO |
 | --- | --- |
-| W5500 SCLK / MOSI / MISO / CS | 12 / 11 / 13 / 10 |
-| W5500 INT / RST | 14 / 9 |
+| W5500 SCLK / MOSI / MISO / CS (Z CAM only) | 12 / 11 / 13 / 10 |
+| W5500 INT / RST (Z CAM only) | 14 / 9 |
 | RTC SDA / SCL (DS3231) | 8 / 18 |
 | Pairing button | 4 |
 | Camera release / focus | 5 / 6 |

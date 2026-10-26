@@ -9,13 +9,16 @@ public struct DeviceInfo: Equatable {
     public var id: String
     public var name: String
     public var cam: String
+    /// The camera types this device can drive. A device without the Ethernet module cannot drive a Z CAM.
+    public var cams: [String]
     public var fw: String
 
-    public init(v: Int, id: String, name: String, cam: String, fw: String) {
+    public init(v: Int, id: String, name: String, cam: String, cams: [String] = CameraConfig.cameraTypes, fw: String) {
         self.v = v
         self.id = id
         self.name = name
         self.cam = cam
+        self.cams = cams
         self.fw = fw
     }
 
@@ -24,10 +27,16 @@ public struct DeviceInfo: Equatable {
         let v = Int(r.u8())
         let id = r.data(3).map { String(format: "%02X", $0) }.joined()
         let cam = Int(r.u8())
+        let mask = Int(r.u8())
         let fw = r.string()
         let name = r.string()
         guard r.ok else { return nil }
-        self.init(v: v, id: id, name: name, cam: cam < CameraConfig.cameraTypes.count ? CameraConfig.cameraTypes[cam] : "generic", fw: fw)
+        let types = CameraConfig.cameraTypes
+        self.init(
+            v: v, id: id, name: name,
+            cam: cam < types.count ? types[cam] : "generic",
+            cams: types.enumerated().filter { mask & (1 << $0.offset) != 0 }.map(\.element),
+            fw: fw)
     }
 }
 

@@ -130,7 +130,7 @@ fun ConfigEditorScreen(model: AppModel, onBack: () -> Unit) {
                 if (busy) BusyNotice()
                 AttemptsSection(current, enabled = !saving) { draft = it }
                 TimingSection(current, enabled = !saving) { draft = it }
-                CameraSection(current, enabled = !saving) { draft = it }
+                CameraSection(current, model.info?.cams ?: CameraConfig.cameraTypes, enabled = !saving) { draft = it }
                 GeneralSection(current, enabled = !saving) { draft = it }
                 androidx.compose.foundation.layout.Spacer(Modifier.size(24.dp))
             }
@@ -331,7 +331,7 @@ private fun Stepper(label: String, description: String, value: Double, enabled: 
 // region Camera and device
 
 @Composable
-private fun CameraSection(config: CameraConfig, enabled: Boolean, onChange: (CameraConfig) -> Unit) {
+private fun CameraSection(config: CameraConfig, available: List<String>, enabled: Boolean, onChange: (CameraConfig) -> Unit) {
     Section(title = "Camera") {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             var expanded by remember { mutableStateOf(false) }
@@ -346,7 +346,8 @@ private fun CameraSection(config: CameraConfig, enabled: Boolean, onChange: (Cam
                     modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
                 )
                 ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    CameraConfig.cameraTypes.forEach { type ->
+                    // a device without the Ethernet module can't drive a Z CAM
+                    CameraConfig.cameraTypes.filter { it in available || it == config.cameraType }.forEach { type ->
                         DropdownMenuItem(
                             text = { Text(cameraTypeLabel(type)) },
                             onClick = {

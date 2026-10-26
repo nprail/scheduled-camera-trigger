@@ -85,8 +85,9 @@ export const build = () => {
   ].map((s) => ({ hex: hex(encodeStatus(s)), expected: s }))
 
   const deviceInfo = [
-    { v: 2, id: 'A1B2C3', cam: 'generic', fw: '1.0.0', name: 'Pad Cam' },
-    { v: 2, id: '00FF10', cam: 'zcam', fw: '2.3.4-beta', name: '' },
+    { v: 2, id: 'A1B2C3', cam: 'generic', cams: ['generic', 'zcam'], fw: '1.0.0', name: 'Pad Cam' },
+    { v: 2, id: '00FF10', cam: 'zcam', cams: ['generic', 'zcam'], fw: '2.3.4-beta', name: '' },
+    { v: 2, id: '0A0B0C', cam: 'generic', cams: ['generic'], fw: '1.0.0', name: 'No Ethernet' },
   ].map((d) => ({ hex: hex(encodeDeviceInfo(d)), expected: d }))
 
   const req = (name, op, id, fields = {}) => ({ name, kind: 'request', op, id, fields, hex: hex(encodeRequest(op, id, fields)) })

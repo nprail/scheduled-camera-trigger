@@ -47,7 +47,8 @@ fun AppModel.applyDemo(scene: String, screen: String = "main") {
         "ready", "generic", "recording", "banner" -> {
             val recording = scene == "recording"
             val generic = scene == "generic"
-            info = if (generic) device.copy(cam = "generic") else device
+            // the generic scene is a unit without the Ethernet module: no Z CAM option
+            info = if (generic) device.copy(cam = "generic", cams = listOf("generic")) else device
             clock = ClockSync(offset = 0.4, applied = true)
             live = StatusValue(
                 flags = if (recording) 0b1011 else 0b1010,

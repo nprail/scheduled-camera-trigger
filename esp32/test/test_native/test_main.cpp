@@ -324,6 +324,8 @@ void test_vectors_status_and_device_info() {
     d.v = static_cast<uint8_t>(e["v"].n);
     TEST_ASSERT_TRUE(parseDeviceId(e["id"].s, d.id));
     d.cam = e["cam"].s == "zcam" ? CameraType::ZCam : CameraType::Generic;
+    d.cams = 0;
+    for (const auto& c : e["cams"].a) d.cams |= c.s == "zcam" ? kCamZcam : kCamGeneric;
     d.fw = e["fw"].s;
     d.name = e["name"].s;
     TEST_ASSERT_EQUAL_STRING(v["hex"].s.c_str(), toHex(encodeDeviceInfo(d)).c_str());

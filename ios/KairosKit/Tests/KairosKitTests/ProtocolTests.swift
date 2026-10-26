@@ -107,7 +107,7 @@ final class StatusTests: XCTestCase {
         for v in try Vectors.load().list("deviceInfo") {
             let e = v.obj("expected")
             let info = try XCTUnwrap(DeviceInfo(data: v.hexData("hex")))
-            XCTAssertEqual(info, DeviceInfo(v: e.int("v"), id: e.str("id"), name: e.str("name"), cam: e.str("cam"), fw: e.str("fw")))
+            XCTAssertEqual(info, DeviceInfo(v: e.int("v"), id: e.str("id"), name: e.str("name"), cam: e.str("cam"), cams: e.strs("cams"), fw: e.str("fw")))
         }
         XCTAssertNil(DeviceInfo(data: Data([2, 1, 2])))
     }

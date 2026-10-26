@@ -86,6 +86,7 @@ Bytes deviceInfoBytes() {
   DeviceInfo d;
   memcpy(d.id, g_id, 3);
   d.cam = c.cameraType;
+  d.cams = eth.present() ? (kCamGeneric | kCamZcam) : kCamGeneric;
   d.fw = FW_VERSION;
   d.name = c.name;
   return encodeDeviceInfo(d);
@@ -204,12 +205,15 @@ void setup() {
   controller.onConfigChanged([](uint32_t) { applyConfig(); });
   controller.begin();
 
+  // the Ethernet module is optional: Device Info (read below) says whether this unit can drive a Z CAM
+  eth.begin();  // Wi-Fi is never started
+  rlog.log("BOOT", eth.present() ? "Ethernet module found" : "No Ethernet module: Z CAM unavailable");
+
   bleEvents = xQueueCreate(16, sizeof(BleMessage));
   const Config& c = controller.currentConfig();
   ble.begin(advertisedName(c.name, deviceId()), deviceInfoBytes(), bleEvents);
   applyConfig();
   button.bind(KAIROS_BUTTON_PIN);
-  eth.begin();  // Wi-Fi is never started
 
   // camera calls can block for several seconds (HTTP timeouts), so give the core task a long watchdog
   esp_task_wdt_config_t wdt = {.timeout_ms = 60000, .idle_core_mask = 0, .trigger_panic = true};

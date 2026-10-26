@@ -36,8 +36,9 @@ One primary service, four characteristics. **All multi-byte integers are little-
 | --- | --- | --- |
 | 0 | u8 | `v`: protocol version, **2**. A client must refuse any version it does not know. |
 | 1 | 3 bytes | `id`: the 6 hex digits of the device id as 3 raw bytes (`A1B2C3` is `A1 B2 C3`) |
-| 4 | u8 | `cam`: camera type, 0 `generic` or 1 `zcam` |
-| 5 | u8 + bytes | `fw`: software version, a length-prefixed ASCII string |
+| 4 | u8 | `cam`: the configured camera type, 0 `generic` or 1 `zcam` |
+| 5 | u8 | `cams`: the camera types this device can drive, a bit set (bit 0 `generic`, bit 1 `zcam`). A device without the Ethernet hardware reports only `generic`, so a client offers Z CAM only when bit 1 is set. |
+| 6 | u8 + bytes | `fw`: software version, a length-prefixed ASCII string |
 | … | u8 + bytes | `name`: friendly name, a length-prefixed UTF‑8 string (may be empty) |
 
 Strings are a `u8` length followed by that many bytes. Clients must use Read Long.

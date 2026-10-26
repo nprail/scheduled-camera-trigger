@@ -5,6 +5,10 @@
 namespace kairos {
 
 constexpr uint8_t kProtocolVersion = 2;
+
+/// Device Info `cams`: the camera types a device can drive (a bit set; bit = CameraType value).
+constexpr uint8_t kCamGeneric = 1 << 0;
+constexpr uint8_t kCamZcam = 1 << 1;
 constexpr uint16_t kMaxMessage = 2048;
 constexpr uint8_t kNoPin = 0xFF;
 constexpr uint8_t kNoAttempt = 0xFF;

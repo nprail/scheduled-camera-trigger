@@ -26,7 +26,7 @@ Wi-Fi is off: the device is controlled over Bluetooth, and a Z CAM is wired over
 | Pull-down resistor for the button | Needed unless you enable the Pi's internal pull-down (below). |
 | **Generic cameras:** one optocoupler (or small transistor) per line, plus a resistor for each | Switches the camera's shutter (and optionally focus) line. See [Generic camera](#generic-camera-remote-trigger-port). |
 | **Generic cameras:** a cable or plug for your camera's remote trigger port | Varies by camera. Check your camera's manual for the pinout. |
-| **Z CAM:** a USB Ethernet adapter and a short Ethernet cable | The Pi Zero W has no Ethernet port. Use a micro-USB OTG Ethernet adapter. |
+| **Z CAM only (optional):** a USB Ethernet adapter and a short Ethernet cable | Only needed for the Z CAM integration. The Pi Zero W has no Ethernet port. Use a micro-USB OTG Ethernet adapter. |
 | Enclosure | Not specified yet. |
 
 ## GPIO pins
@@ -103,16 +103,18 @@ The firmware in [`esp32/`](https://github.com/nprail/kairos/tree/main/esp32) run
 | | Raspberry Pi Zero W | ESP32-S3 |
 | --- | --- | --- |
 | Clock | None: the phone sets it on every connection | **DS3231 RTC** on I2C with a coin cell: the clock survives power loss |
-| Z CAM link | USB Ethernet adapter | **W5500 module** on SPI, with DHCP from the camera (and a static fallback) |
+| Z CAM link (optional, only for the Z CAM integration) | USB Ethernet adapter | **W5500 module** on SPI, with DHCP from the camera (and a static fallback) |
 | Boot | 30 to 60 s | under 2 s |
 | Power | about 1 W | about 100 to 150 mW (measure it) |
+
+**The Ethernet module is optional.** Leave out the W5500 if you only use a remote trigger port (`generic`): everything else works without it. You only need it to control a Z CAM, and its pins in the table below can then stay unconnected. At boot the firmware looks for the module. If it does not answer, the device reports that it cannot drive a Z CAM, and the apps then only offer the remote trigger port.
 
 Pins (constants in `esp32/src/platform/board.h`; verify against your board):
 
 | Function | GPIO |
 | --- | --- |
-| W5500 SCLK / MOSI / MISO / CS | 12 / 11 / 13 / 10 |
-| W5500 INT / RST | 14 / 9 |
+| W5500 SCLK / MOSI / MISO / CS (Z CAM only) | 12 / 11 / 13 / 10 |
+| W5500 INT / RST (Z CAM only) | 14 / 9 |
 | RTC SDA / SCL | 8 / 18 |
 | Pairing button | 4 (active high, internal pull-down) |
 | Camera release / focus | 5 / 6 |

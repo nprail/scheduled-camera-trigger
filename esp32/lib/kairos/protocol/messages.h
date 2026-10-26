@@ -85,6 +85,7 @@ struct DeviceInfo {
   uint8_t v = kProtocolVersion;
   uint8_t id[3] = {0, 0, 0};
   CameraType cam = CameraType::Generic;
+  uint8_t cams = kCamGeneric | kCamZcam;
   std::string fw;
   std::string name;
 };
