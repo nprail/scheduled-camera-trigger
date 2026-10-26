@@ -79,19 +79,12 @@
           "path": "/ble-protocol/"
         },
         {
+          "title": "ESP32 firmware",
+          "path": "/esp32-port/"
+        },
+        {
           "title": "Development",
           "path": "/development/"
-        }
-      ]
-    },
-    {
-      "title": "Proposals",
-      "icon": "lightbulb",
-      "collapsible": false,
-      "children": [
-        {
-          "title": "ESP32 port",
-          "path": "/esp32-port/"
         }
       ]
     },

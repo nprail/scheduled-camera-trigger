@@ -1,12 +1,12 @@
-# ESP32 Port — Design Proposal
+# ESP32 firmware: design
 
-**Status:** Implemented in [`esp32/`](https://github.com/nprail/kairos/tree/main/esp32) (builds, with host tests; not yet run on hardware). See [Implementation notes](#implementation-notes) for where it differs from this proposal. · **Target:** ESP32-S3 (and ESP32-C3, see §19) + W5500 Ethernet + external RTC · **Framework:** Arduino-ESP32 on PlatformIO · **Storage:** NVS only · **Protocol:** new binary BLE protocol v2
+**Status:** Implemented in [`esp32/`](https://github.com/nprail/kairos/tree/main/esp32) (builds, with host tests; not yet run on hardware). The ESP32 is the recommended device, and the Raspberry Pi version is legacy. See [Implementation notes](#implementation-notes) for where the firmware differs from this design, which was written as a proposal. · **Target:** ESP32-S3 (and ESP32-C3, see §19) + W5500 Ethernet + external RTC · **Framework:** Arduino-ESP32 on PlatformIO · **Storage:** NVS only · **Protocol:** new binary BLE protocol v2
 
-This document describes how to port the device side of Kairos (`trigger/`, currently Node on a Raspberry Pi Zero W) to an ESP32. Because nobody uses the current system yet, the port also replaces the JSON BLE protocol (v1) with a compact binary one (v2, §5). **Both apps change with it.** Nothing needs to stay compatible with v1.
+This document describes the ESP32 version of the device side of Kairos, a port of the original program (`trigger/`, Node on a Raspberry Pi Zero W, now legacy). Because nobody uses the current system yet, the port also replaces the JSON BLE protocol (v1) with a compact binary one (v2, §5). **Both apps change with it.** Nothing needs to stay compatible with v1.
 
 ## 1. Why, and what changes
 
-| | Pi Zero W (today) | ESP32-S3 (proposed) |
+| | Pi Zero W (legacy) | ESP32 (recommended) |
 | --- | --- | --- |
 | Runtime | Linux + Node, BlueZ-free raw HCI via `ble-host` | Arduino-ESP32 firmware (FreeRTOS underneath), NimBLE host on the on-chip controller |
 | Protocol | JSON messages, ISO dates, base64, paged lists | **Binary v2.** Stored form equals wire form (§5) |

@@ -6,8 +6,8 @@ Guidance for agents working in this repository.
 
 | Path | What |
 | --- | --- |
-| `trigger/`, `config.example.json` | The device side on a Raspberry Pi Zero W (Node). It is controlled over Bluetooth only; there is no web interface or HTTP API. |
-| `esp32/` | The device side on an ESP32-S3 or ESP32-C3 (C++, Arduino-ESP32 on PlatformIO). The same protocol and behavior as `trigger/`, with an external RTC and Ethernet for a Z CAM. See `docs/esp32-port.md`. |
+| `esp32/` | The recommended device: firmware for an ESP32-S3 or ESP32-C3 (C++, Arduino-ESP32 on PlatformIO), with an external RTC and optional Ethernet for a Z CAM. Controlled over Bluetooth only. See `docs/esp32-port.md`. |
+| `trigger/`, `config.example.json` | The **legacy** device program for a Raspberry Pi Zero W (Node). The same protocol and behavior as `esp32/`. It is the reference the test vectors are generated from. |
 | `docs/ble-protocol.md` | **The BLE protocol (v2, binary). The source of truth for everything the phone and device exchange.** |
 | `docs/test-vectors.json` | Cross-implementation test vectors, generated from the Node reference (`node test/vectors.js --write`). The ESP32 firmware and both apps pass the same file. |
 | `ios/` | The native iOS app (SwiftUI) and `KairosKit`, a UI-free Swift package for the protocol. |
@@ -18,7 +18,7 @@ The iOS app is a standard Xcode project (`ios/Kairos.xcodeproj`), with no projec
 
 The Android app is a Gradle project (`android/`, wrapper included, JDK 17+). Run its unit tests with `cd android && ./gradlew :app:testDebugUnitTest`, and build the debug APK with `./gradlew :app:assembleDebug`.
 
-The ESP32 firmware is a PlatformIO project (`esp32/`). Run its host tests with `cd esp32 && pio test -e native`, and build it with `pio run -e device`. The Node device tests are `npm test`.
+The ESP32 firmware is a PlatformIO project (`esp32/`). Run its host tests with `cd esp32 && pio test -e native`, and build it with `pio run -e device` (ESP32-S3) or `pio run -e device-c3` (ESP32-C3). The tests for the legacy Node device are `npm test`.
 
 ## Keep iOS and Android in sync
 
@@ -38,7 +38,7 @@ This section describes what the apps do. It was written from the iOS app and the
 
 ## 1. Purpose
 
-A phone app that configures and controls **Kairos**, a Raspberry Pi device that wakes a camera and starts and stops recording at scheduled "launch attempt" times. The app talks to the device only over Bluetooth Low Energy (no Wi-Fi or internet needed), so it works in the field.
+A phone app that configures and controls **Kairos**, an ESP32 device (or the legacy Raspberry Pi version) that wakes a camera and starts and stops recording at scheduled "launch attempt" times. The app talks to the device only over Bluetooth Low Energy (no Wi-Fi or internet needed), so it works in the field.
 
 Main jobs:
 1. Find nearby devices and connect.

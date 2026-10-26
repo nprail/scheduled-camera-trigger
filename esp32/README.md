@@ -1,6 +1,6 @@
 # Kairos firmware for the ESP32-S3 and ESP32-C3
 
-The device side of Kairos on an ESP32-S3 or an ESP32-C3, with an external RTC and a W5500 Ethernet module for a Z CAM. It speaks the same Bluetooth protocol as the Raspberry Pi version in [`trigger/`](../trigger/) (protocol v2, [docs/ble-protocol.md](../docs/ble-protocol.md)), so the iPhone and Android apps work with either. The design and the reasons behind it are in [docs/esp32-port.md](../docs/esp32-port.md). Wiring and parts are in [docs/hardware.md](../docs/hardware.md).
+The device side of Kairos on an ESP32-S3 or an ESP32-C3, with an external RTC and a W5500 Ethernet module for a Z CAM. It is the recommended Kairos device. It speaks the same Bluetooth protocol as the legacy Raspberry Pi version in [`trigger/`](../trigger/) (protocol v2, [docs/ble-protocol.md](../docs/ble-protocol.md)), so the iPhone and Android apps work with either. The design and the reasons behind it are in [docs/esp32-port.md](../docs/esp32-port.md). Wiring and parts are in [docs/hardware.md](../docs/hardware.md).
 
 > **Status:** the firmware builds, and its logic is covered by host tests that run the shared protocol vectors. It has **not been run on hardware yet**. The first bring-up on a real board is where the remaining open items in the design doc (the generic camera's trigger pulse, the Z CAM's DHCP behavior, whether the Arduino core's bootloader supports rollback) get settled.
 
@@ -78,7 +78,7 @@ With RST not wired, the firmware does not reset the W5500 before probing it. The
 ## Behavior notes
 
 - **Clock.** The RTC restores the clock at boot. If the RTC is missing or untrusted, nothing is scheduled until a phone sets the clock. Every 10 minutes while idle, the system clock is stepped to the RTC if they differ by a whole second.
-- **Crash recovery** matches the Raspberry Pi version: job state is in memory, so after a reset any attempt whose wake time has passed is `missed`.
+- **Crash recovery** matches the legacy Raspberry Pi version: job state is in memory, so after a reset any attempt whose wake time has passed is `missed`.
 - **Wi-Fi is never started.** The prebuilt Arduino core still contains the Wi-Fi code, but nothing calls it.
 - **One task, no locks.** A slow Z CAM call (up to its 5 s HTTP timeouts) delays the next BLE request or scheduled step by that long at most.
 - **Generic camera trigger pulse** is a single constant, `kTriggerPulseMs` (100 ms), to be settled against real cameras.
