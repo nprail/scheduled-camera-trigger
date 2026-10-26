@@ -169,3 +169,6 @@ config.json
 log.txt
 # docs site build output (docmd builds docs/ into site/docs)
 site/docs/
+
+# PlatformIO build output
+esp32/.pio/

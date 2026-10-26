@@ -6,7 +6,7 @@ import { v4 as uuid } from 'uuid'
  * Schedules wake / record / stop for each launch attempt.
  *
  * Emits:
- *  - 'job'    { name, step: 'wake'|'start'|'stop'|'complete'|'missed', at }
+ *  - 'job'    { name, index, step: 'wake'|'start'|'stop'|'complete'|'missed', at }
  *  - 'change' (any state a status consumer cares about changed)
  *  - 'test'   { step: 'wake'|'start'|'stop'|'sleep'|'done', ok?, error? }
  */
@@ -52,7 +52,7 @@ export class Scheduler extends EventEmitter {
   get next() {
     const now = this.now()
     let best = null
-    for (const job of this.jobs) {
+    for (const [index, job] of this.jobs.entries()) {
       if (job.state === 'complete' || job.state === 'missed') continue
       for (const [type, key] of [
         ['wake', 'wakeUpTime'],
@@ -61,7 +61,7 @@ export class Scheduler extends EventEmitter {
       ]) {
         const at = job.config[key]
         if (at.getTime() > now && (!best || at < best.at)) {
-          best = { type, at, attempt: job.name }
+          best = { type, at, attempt: job.name, index }
         }
       }
     }
@@ -118,7 +118,7 @@ export class Scheduler extends EventEmitter {
     const endAfter = this.config.endAfter * 1000
     const now = this.now()
 
-    this.jobs = this.config.attempts.map((attempt) => {
+    this.jobs = this.config.attempts.map((attempt, index) => {
       const name = attempt.name
       const launchTime = new Date(attempt.time)
       // start recording x seconds before ignition
@@ -140,7 +140,7 @@ export class Scheduler extends EventEmitter {
       // Anything whose wake time has already passed can't run in full.
       if (wakeUpTime.getTime() <= now) {
         job.state = 'missed'
-        this.emit('job', { name, step: 'missed', at: new Date(now) })
+        this.emit('job', { name, index, step: 'missed', at: new Date(now) })
         return job
       }
 
@@ -159,7 +159,7 @@ export class Scheduler extends EventEmitter {
         step('wake', async () => {
           this.logger.log('index', `Start '${name}'`)
           job.state = 'active'
-          this.emit('job', { name, step: 'wake', at: new Date(this.now()) })
+          this.emit('job', { name, index, step: 'wake', at: new Date(this.now()) })
           this.emit('change')
           await this.cam?.wake()
         })
@@ -171,7 +171,7 @@ export class Scheduler extends EventEmitter {
         step('start', async () => {
           await this.cam?.start()
           job.recording = true
-          this.emit('job', { name, step: 'start', at: new Date(this.now()) })
+          this.emit('job', { name, index, step: 'start', at: new Date(this.now()) })
         })
       )
 
@@ -181,13 +181,13 @@ export class Scheduler extends EventEmitter {
         step('stop', async () => {
           await this.cam?.stop()
           job.recording = false
-          this.emit('job', { name, step: 'stop', at: new Date(this.now()) })
+          this.emit('job', { name, index, step: 'stop', at: new Date(this.now()) })
 
           this.logger.log('index', `Complete '${name}'`)
 
           await this.cam?.sleep()
           job.state = 'complete'
-          this.emit('job', { name, step: 'complete', at: new Date(this.now()) })
+          this.emit('job', { name, index, step: 'complete', at: new Date(this.now()) })
         })
       )
 

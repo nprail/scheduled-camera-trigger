@@ -2,16 +2,36 @@ import Foundation
 
 // MARK: - Characteristic values
 
-/// Device Info characteristic (JSON).
-public struct DeviceInfo: Codable, Equatable {
+/// Device Info characteristic (docs/ble-protocol.md, Device Info).
+public struct DeviceInfo: Equatable {
     public var v: Int
+    /// The 6 hex digits of the device id, upper case.
     public var id: String
     public var name: String
     public var cam: String
     public var fw: String
+
+    public init(v: Int, id: String, name: String, cam: String, fw: String) {
+        self.v = v
+        self.id = id
+        self.name = name
+        self.cam = cam
+        self.fw = fw
+    }
+
+    public init?(data: Data) {
+        var r = ByteReader(data)
+        let v = Int(r.u8())
+        let id = r.data(3).map { String(format: "%02X", $0) }.joined()
+        let cam = Int(r.u8())
+        let fw = r.string()
+        let name = r.string()
+        guard r.ok else { return nil }
+        self.init(v: v, id: id, name: name, cam: cam < CameraConfig.cameraTypes.count ? CameraConfig.cameraTypes[cam] : "generic", fw: fw)
+    }
 }
 
-/// The fixed 12-byte Status characteristic.
+/// The fixed 13-byte Status characteristic.
 public struct StatusValue: Equatable {
     public struct Flags: OptionSet, Equatable {
         public let rawValue: UInt8
@@ -19,7 +39,7 @@ public struct StatusValue: Equatable {
         public static let recording = Flags(rawValue: 1 << 0)
         public static let cameraReady = Flags(rawValue: 1 << 1)
         public static let pairingOpen = Flags(rawValue: 1 << 2)
-        public static let clockSet = Flags(rawValue: 1 << 3)
+        public static let clockValid = Flags(rawValue: 1 << 3)
     }
 
     public enum Phase: UInt8 {
@@ -37,21 +57,22 @@ public struct StatusValue: Equatable {
     public var nextEventAt: UInt32
     public var nextEventType: EventType
     public var attemptsRemaining: UInt8
+    /// Index (in the config's attempts) of the attempt that owns the next event.
+    public var nextAttempt: Int?
+
+    public static let length = 13
 
     public init?(data: Data) {
-        let b = [UInt8](data)
-        guard b.count >= 12 else { return nil }
-
-        func u32(_ o: Int) -> UInt32 {
-            UInt32(b[o]) | UInt32(b[o + 1]) << 8 | UInt32(b[o + 2]) << 16 | UInt32(b[o + 3]) << 24
-        }
-
-        flags = Flags(rawValue: b[0])
-        phase = Phase(rawValue: b[1]) ?? .error
-        configRev = u32(2)
-        nextEventAt = u32(6)
-        nextEventType = EventType(rawValue: b[10]) ?? .none
-        attemptsRemaining = b[11]
+        var r = ByteReader(data)
+        let flags = r.u8(), phase = r.u8(), rev = r.u32(), at = r.u32(), type = r.u8(), remaining = r.u8(), next = r.u8()
+        guard r.ok else { return nil }
+        self.flags = Flags(rawValue: flags)
+        self.phase = Phase(rawValue: phase) ?? .error
+        configRev = rev
+        nextEventAt = at
+        nextEventType = EventType(rawValue: type) ?? .none
+        attemptsRemaining = remaining
+        nextAttempt = next == 0xFF ? nil : Int(next)
     }
 
     public var nextEventDate: Date? {
@@ -61,83 +82,56 @@ public struct StatusValue: Equatable {
 
 // MARK: - Responses
 
-public struct HelloResponse: Decodable, Equatable {
+public struct HelloResponse: Equatable {
     public var v: Int
-    public var nonce: String
-    public var authRequired: Bool
     public var paired: Bool
-    public var now: String
+    public var nonce: Data
+    public var nowMs: UInt64
     public var maxMessage: Int
+
+    public var now: Date { Date(timeIntervalSince1970: TimeInterval(nowMs) / 1000) }
 }
 
-public struct AuthResponse: Decodable { public var proof: String }
-
-public struct TimeResponse: Decodable {
-    public var now: String
-    public var offsetMs: Int?
-}
-
-public struct StatusInfo: Codable, Equatable {
-    public struct Next: Codable, Equatable {
-        public var type: String
-        public var at: String
-        public var attempt: String
-
-        public var date: Date? { DeviceDate.parse(at) }
-    }
-
-    public var phase: String
-    public var recording: Bool
-    public var cameraReady: Bool
-    public var configRev: Int
-    public var next: Next?
-}
-
-public struct Job: Codable, Equatable, Identifiable {
-    public var id: String
+/// One scheduled attempt and its state. The times come from the config; the device only owns the state.
+public struct Job: Equatable, Identifiable {
+    public var index: Int
     public var name: String
-    public var camera: String
-    public var wakeUpTime: String
-    public var recordTime: String
-    public var launchTime: String
-    public var stopTime: String
+    public var launchDate: Date
+    /// "pending", "active", "complete" or "missed".
     public var state: String
 
-    public var launchDate: Date? { DeviceDate.parse(launchTime) }
+    public init(index: Int, name: String, launchDate: Date, state: String) {
+        self.index = index
+        self.name = name
+        self.launchDate = launchDate
+        self.state = state
+    }
+
+    public var id: Int { index }
 }
 
-struct JobsPage: Decodable {
-    var jobs: [Job]
-    var total: Int
-    var more: Bool
-}
-
-public struct LogEntry: Codable, Equatable, Identifiable {
+public struct LogEntry: Equatable, Identifiable {
     public var seq: Int
-    public var ts: String
+    /// Unix seconds.
+    public var ts: UInt32
     public var ns: String
     public var msg: String
 
+    public init(seq: Int, ts: UInt32, ns: String, msg: String) {
+        self.seq = seq
+        self.ts = ts
+        self.ns = ns
+        self.msg = msg
+    }
+
     public var id: Int { seq }
-    public var date: Date? { DeviceDate.parse(ts) }
+    public var date: Date? { Date(timeIntervalSince1970: TimeInterval(ts)) }
 }
-
-struct LogsPage: Decodable {
-    var logs: [LogEntry]
-    var last: Int
-    var more: Bool
-}
-
-struct ConfigEnvelope: Codable { var config: CameraConfig }
-struct ConfigSetResponse: Decodable { var configRev: Int }
-struct CameraResponse: Decodable { var recording: Bool }
-struct StartedResponse: Decodable { var started: Bool }
-struct Empty: Codable {}
 
 // MARK: - Config
 
-public struct CameraConfig: Codable, Equatable {
-    public struct Generic: Codable, Equatable {
+public struct CameraConfig: Equatable {
+    public struct Generic: Equatable {
         public var releaseGpioPin: Int?
         public var focusGpioPin: Int?
         public init(releaseGpioPin: Int? = nil, focusGpioPin: Int? = nil) {
@@ -146,27 +140,31 @@ public struct CameraConfig: Codable, Equatable {
         }
     }
 
-    public struct Zcam: Codable, Equatable {
+    public struct Zcam: Equatable {
         public var cameraIp: String?
         public init(cameraIp: String? = nil) { self.cameraIp = cameraIp }
     }
 
-    public struct Attempt: Codable, Equatable, Identifiable {
+    public struct Attempt: Equatable, Identifiable {
         /// Local identity for SwiftUI; not sent to the device.
         public var id = UUID()
         public var name: String
-        public var time: String
-
-        enum CodingKeys: String, CodingKey { case name, time }
+        /// T-0 in Unix seconds.
+        public var time: UInt32
 
         public init(name: String, time: Date) {
             self.name = name
-            self.time = DeviceDate.string(time)
+            self.time = UInt32(max(0, min(time.timeIntervalSince1970, Double(UInt32.max))))
+        }
+
+        public init(name: String, seconds: UInt32) {
+            self.name = name
+            time = seconds
         }
 
         public var date: Date {
-            get { DeviceDate.parse(time) ?? Date() }
-            set { time = DeviceDate.string(newValue) }
+            get { Date(timeIntervalSince1970: TimeInterval(time)) }
+            set { time = UInt32(max(0, min(newValue.timeIntervalSince1970, Double(UInt32.max)))) }
         }
 
         // Identity is local; two attempts are equal if they schedule the same thing.
@@ -175,40 +173,56 @@ public struct CameraConfig: Codable, Equatable {
         }
     }
 
-    // Device-owned (ignored by the device on write).
-    public var deviceId: String?
-    public var configRev: Int?
-
     public var name: String?
     public var cameraType: String
     /// All durations are seconds.
     public var wakeUpTimeout: Double
     public var startBefore: Double
     public var endAfter: Double
-    public var logFile: String
     public var buttonGpioPort: Int?
     public var generic: Generic
     public var zcam: Zcam
     public var attempts: [Attempt]
 
     public static let cameraTypes = ["generic", "zcam"]
+
+    public init(
+        name: String? = nil,
+        cameraType: String = "generic",
+        wakeUpTimeout: Double = 5,
+        startBefore: Double = 20,
+        endAfter: Double = 30,
+        buttonGpioPort: Int? = nil,
+        generic: Generic = Generic(),
+        zcam: Zcam = Zcam(),
+        attempts: [Attempt] = []
+    ) {
+        self.name = name
+        self.cameraType = cameraType
+        self.wakeUpTimeout = wakeUpTimeout
+        self.startBefore = startBefore
+        self.endAfter = endAfter
+        self.buttonGpioPort = buttonGpioPort
+        self.generic = generic
+        self.zcam = zcam
+        self.attempts = attempts
+    }
 }
 
 // MARK: - Events
 
-public struct JobEvent: Decodable, Equatable {
-    public var name: String
+public struct JobEvent: Equatable {
+    /// Index in the config's attempts.
+    public var attempt: Int
     public var step: String
-    public var at: String
+    public var at: Date
 }
 
-public struct TestEvent: Decodable, Equatable {
+public struct TestEvent: Equatable {
     public var step: String
-    public var ok: Bool?
+    public var ok: Bool
     public var error: String?
 }
-
-struct ConfigEvent: Decodable { var configRev: Int }
 
 public enum DeviceEvent: Equatable {
     case job(JobEvent)
@@ -248,16 +262,5 @@ public struct DeviceError: Error, LocalizedError, Equatable {
             return message
         default: return message
         }
-    }
-}
-
-struct ErrorBody: Decodable {
-    var code: String
-    var msg: String
-    var field: String?
-    var retryAfter: Int?
-
-    var asError: DeviceError {
-        DeviceError(code: code, message: msg, field: field, retryAfter: retryAfter)
     }
 }

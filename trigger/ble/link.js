@@ -1,5 +1,6 @@
 import { MAX_MESSAGE, ErrorCode, ProtocolError } from './protocol.js'
 import { fragment, Reassembler } from './framing.js'
+import { decodeRequest, encodeResponse, encodeError, encodeEvent } from './codec.js'
 
 const MAX_QUEUED_EVENTS = 50
 
@@ -64,7 +65,7 @@ export class Link {
       clearTimeout(this.reassemblyTimer)
       this.reassemblyTimer = setTimeout(() => {
         this.reassembler.reset()
-        this.#error(null, ErrorCode.BAD_REQUEST, 'Timed out waiting for the next fragment')
+        this.#error(0, ErrorCode.BAD_REQUEST, 'Timed out waiting for the next fragment')
       }, this.reassemblyTimeoutMs)
     } else {
       clearTimeout(this.reassemblyTimer)
@@ -72,7 +73,7 @@ export class Link {
 
     if (error) {
       const code = error === 'too_large' ? ErrorCode.TOO_LARGE : ErrorCode.BAD_REQUEST
-      this.#error(null, code, error === 'too_large' ? 'Message too large' : 'Bad frame')
+      this.#error(0, code, error === 'too_large' ? 'Message too large' : 'Bad frame')
       return
     }
     if (message) this.#handleMessage(message)
@@ -87,27 +88,21 @@ export class Link {
   #handleMessage(buf) {
     let req
     try {
-      req = JSON.parse(buf.toString('utf8'))
-    } catch {
-      return this.#error(null, ErrorCode.BAD_REQUEST, 'Invalid JSON')
-    }
-    if (!req || !Number.isInteger(req.id) || typeof req.op !== 'string') {
-      return this.#error(
-        Number.isInteger(req?.id) ? req.id : null,
-        ErrorCode.BAD_REQUEST,
-        'id (integer) and op (string) are required'
-      )
+      req = decodeRequest(buf)
+    } catch (err) {
+      // not even the id could be read, or the body is malformed
+      const id = buf.length >= 2 ? buf[1] : 0
+      return this.#error(id, ErrorCode.BAD_REQUEST, err.message)
     }
     if (this.inflight) {
       return this.#error(req.id, ErrorCode.BUSY, 'Another request is in progress')
     }
 
     this.inflight = true
-    this.#run(req)
-      .catch((err) => this.logger?.log('ble', `Link error: ${err?.message ?? err}`))
-      .finally(() => {
-        this.inflight = false
-      })
+    this.#run(req).catch((err) => {
+      this.inflight = false
+      this.logger?.log('ble', `Link error: ${err?.message ?? err}`)
+    })
   }
 
   async #run(req) {
@@ -119,39 +114,40 @@ export class Link {
       )
     })
 
+    let reply
+    let after
     try {
-      const { d, after } = await Promise.race([
-        this.dispatcher.handle(this.session, req.op, req.d),
+      const result = await Promise.race([
+        this.dispatcher.handle(this.session, req.op, req.fields),
         timeout,
       ])
-      this.#enqueue({ id: req.id, ok: true, d }, false)
-      after?.()
+      reply = encodeResponse(req.op, req.id, result.fields)
+      after = result.after
     } catch (err) {
-      if (err instanceof ProtocolError) {
-        this.#error(req.id, err.code, err.message, err.extra)
-      } else {
-        this.#error(req.id, ErrorCode.INTERNAL, err?.message ?? String(err))
-      }
+      const e = err instanceof ProtocolError ? err : new ProtocolError(ErrorCode.INTERNAL, err?.message ?? String(err))
+      reply = encodeError(req.id, e.code, { ...e.extra, message: e.message })
     } finally {
       clearTimeout(timer)
     }
+
+    // the request is finished once its reply is queued: a client may send the next one at once
+    this.inflight = false
+    this.#enqueueBuf(reply, false, req.id)
+    after?.()
   }
 
-  #error(id, code, msg, extra = {}) {
-    this.#enqueue({ id, ok: false, err: { code, msg, ...extra } }, false)
+  #error(id, code, message, extra = {}) {
+    this.#enqueueBuf(encodeError(id, code, { ...extra, message }), false, id)
   }
 
   #enqueue(obj, isEvent) {
-    let buf = Buffer.from(JSON.stringify(obj), 'utf8')
+    this.#enqueueBuf(encodeEvent(obj.ev, obj.d), isEvent)
+  }
+
+  #enqueueBuf(buf, isEvent, id = 0) {
     if (buf.length > MAX_MESSAGE) {
       if (isEvent) return
-      buf = Buffer.from(
-        JSON.stringify({
-          id: obj.id,
-          ok: false,
-          err: { code: ErrorCode.TOO_LARGE, msg: 'Response exceeds maxMessage' },
-        })
-      )
+      buf = encodeError(id, ErrorCode.TOO_LARGE)
     }
 
     if (isEvent) {

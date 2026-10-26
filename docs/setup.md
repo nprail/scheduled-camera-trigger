@@ -1,6 +1,6 @@
 # Setting up a Kairos device
 
-How to run Kairos on a Raspberry Pi Zero W, and how the Bluetooth side of the device works. For the settings in `config.json`, see [CONFIGURATION.md](CONFIGURATION.md).
+How to run Kairos on a Raspberry Pi Zero W, and how the Bluetooth side of the device works. (For the ESP32-S3 version, see [ESP32 version](esp32-port.md).) For the settings in `config.json`, see [configuration.md](configuration.md).
 
 ## Running the device
 

@@ -1,7 +1,7 @@
 import Foundation
 import CryptoKit
 
-/// Challenge/response from docs/ble-protocol.md §5.
+/// Challenge/response from docs/ble-protocol.md, section 5.
 public enum AuthProof {
     private static func mac(secret: Data, label: String, nonce: Data, clientNonce: Data) -> Data {
         var hmac = HMAC<SHA256>(key: SymmetricKey(data: secret))
@@ -13,12 +13,12 @@ public enum AuthProof {
 
     /// Proof the client sends in `auth`.
     public static func client(secret: Data, nonce: Data, clientNonce: Data) -> Data {
-        mac(secret: secret, label: "kairos-auth-v1", nonce: nonce, clientNonce: clientNonce)
+        mac(secret: secret, label: "kairos-auth-v2", nonce: nonce, clientNonce: clientNonce)
     }
 
     /// Proof the device returns, so the client knows it's the real device.
     public static func server(secret: Data, nonce: Data, clientNonce: Data) -> Data {
-        mac(secret: secret, label: "kairos-auth-v1-srv", nonce: nonce, clientNonce: clientNonce)
+        mac(secret: secret, label: "kairos-auth-v2-srv", nonce: nonce, clientNonce: clientNonce)
     }
 
     public static func randomBytes(_ count: Int) -> Data {

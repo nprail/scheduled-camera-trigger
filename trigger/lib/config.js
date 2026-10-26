@@ -16,6 +16,9 @@
 /** Keeps a full config under the 4096-byte BLE message limit. */
 export const MAX_ATTEMPTS = 30
 
+/** Names are limited in bytes (UTF-8), matching the binary protocol. */
+export const MAX_NAME_BYTES = 32
+
 export const DEVICE_OWNED = ['deviceId', 'deviceName', 'bleSecret', 'configRev']
 
 const num = (v) => {
@@ -90,63 +93,64 @@ const isPin = (v) => Number.isInteger(v) && v >= 0 && v <= 40
  */
 export const validateConfig = (c, { now = Date.now() } = {}) => {
   const errors = []
-  const err = (field, msg) => errors.push({ field, msg })
+  // `reason` is one of: required, range, bad_value, past, duplicate, too_soon, too_many
+  const err = (field, msg, reason) => errors.push({ field, msg, reason })
 
   if (c == null || typeof c !== 'object') {
-    return [{ field: 'config', msg: 'must be an object' }]
+    return [{ field: 'config', msg: 'must be an object', reason: 'bad_value' }]
   }
 
-  if (c.name != null && (typeof c.name !== 'string' || c.name.length > 32)) {
-    err('name', 'must be a string of at most 32 characters')
+  if (c.name != null && (typeof c.name !== 'string' || Buffer.byteLength(c.name) > MAX_NAME_BYTES)) {
+    err('name', `must be a string of at most ${MAX_NAME_BYTES} bytes`, 'range')
   }
   if (!['generic', 'zcam'].includes(c.cameraType)) {
-    err('cameraType', "must be 'generic' or 'zcam'")
+    err('cameraType', "must be 'generic' or 'zcam'", 'bad_value')
   }
   if (typeof c.logFile !== 'string' || c.logFile.trim() === '') {
-    err('logFile', 'is required')
+    err('logFile', 'is required', 'required')
   }
   for (const key of ['wakeUpTimeout', 'startBefore', 'endAfter']) {
     const v = c[key]
     if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 3600) {
-      err(key, 'must be a number of seconds between 0 and 3600')
+      err(key, 'must be a number of seconds between 0 and 3600', 'range')
     }
   }
   if (c.buttonGpioPort != null && !isPin(c.buttonGpioPort)) {
-    err('buttonGpioPort', 'must be a GPIO number')
+    err('buttonGpioPort', 'must be a GPIO number', 'bad_value')
   }
 
   if (c.cameraType === 'generic') {
     if (!isPin(c.generic?.releaseGpioPin)) {
-      err('generic.releaseGpioPin', 'is required for generic cameras')
+      err('generic.releaseGpioPin', 'is required for generic cameras', 'required')
     }
     if (c.generic?.focusGpioPin != null && !isPin(c.generic.focusGpioPin)) {
-      err('generic.focusGpioPin', 'must be a GPIO number')
+      err('generic.focusGpioPin', 'must be a GPIO number', 'bad_value')
     }
   }
   if (c.cameraType === 'zcam') {
     if (typeof c.zcam?.cameraIp !== 'string' || c.zcam.cameraIp.trim() === '') {
-      err('zcam.cameraIp', 'is required for zcam cameras')
+      err('zcam.cameraIp', 'is required for zcam cameras', 'required')
     }
   }
 
   if (!Array.isArray(c.attempts)) {
-    err('attempts', 'must be an array')
+    err('attempts', 'must be an array', 'bad_value')
   } else {
     if (c.attempts.length > MAX_ATTEMPTS) {
-      err('attempts', `at most ${MAX_ATTEMPTS} attempts`)
+      err('attempts', `at most ${MAX_ATTEMPTS} attempts`, 'too_many')
     }
     const seen = new Set()
     c.attempts.forEach((a, i) => {
       const f = `attempts[${i}]`
-      if (typeof a?.name !== 'string' || a.name === '' || a.name.length > 32) {
-        err(`${f}.name`, 'must be a string of 1-32 characters')
+      if (typeof a?.name !== 'string' || a.name === '' || Buffer.byteLength(a.name) > MAX_NAME_BYTES) {
+        err(`${f}.name`, `must be a string of 1-${MAX_NAME_BYTES} bytes`, 'range')
       }
       if (!isIsoDate(a?.time)) {
-        err(`${f}.time`, 'is not a valid date')
+        err(`${f}.time`, 'is not a valid date', 'bad_value')
       } else {
         const t = new Date(a.time).getTime()
-        if (t <= now) err(`${f}.time`, 'must be in the future')
-        if (seen.has(t)) err(`${f}.time`, 'duplicates another attempt')
+        if (t <= now) err(`${f}.time`, 'must be in the future', 'past')
+        if (seen.has(t)) err(`${f}.time`, 'duplicates another attempt', 'duplicate')
         seen.add(t)
       }
     })

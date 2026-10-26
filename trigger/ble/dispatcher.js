@@ -1,30 +1,28 @@
 import { ControllerError } from '../controller.js'
-import { publicConfig } from '../lib/config.js'
 import { PROTOCOL_VERSION, MAX_MESSAGE, ErrorCode, ProtocolError } from './protocol.js'
 import { newNonce, clientProof, serverProof, safeEqual } from './auth.js'
-import { serializeJob } from './status.js'
+import { toWireConfig, fromWireConfig, toWireError } from './wire-config.js'
+import { encodeResponse } from './codec.js'
 
-/** Handlers return `{ d, [AFTER]: fn }` to run `fn` after the response is queued. */
+/** Handlers return `{ fields, [AFTER]: fn }` to run `fn` after the response is queued. */
 export const AFTER = Symbol('after')
-
-const b64 = (buf) => buf.toString('base64')
-
-const decodeB64 = (value, bytes, field) => {
-  const buf = typeof value === 'string' ? Buffer.from(value, 'base64') : null
-  if (!buf || buf.length !== bytes) {
-    throw new ProtocolError(ErrorCode.BAD_REQUEST, `${field} must be ${bytes} bytes, base64`)
-  }
-  return buf
-}
 
 const mapControllerError = (err) => {
   if (!(err instanceof ControllerError)) return err
-  const code = {
-    busy: ErrorCode.BUSY,
-    invalid_config: ErrorCode.INVALID_CONFIG,
-  }[err.code] ?? ErrorCode.INTERNAL
-  return new ProtocolError(code, err.message, err.field ? { field: err.field } : {})
+  if (err.code === 'invalid_config') {
+    return new ProtocolError(ErrorCode.INVALID_CONFIG, err.message, toWireError(err.field, err.reason))
+  }
+  const code = err.code === 'busy' ? ErrorCode.BUSY : ErrorCode.INTERNAL
+  return new ProtocolError(code, err.message)
 }
+
+/** A logger entry as a wire log line. */
+export const toLogLine = (l) => ({
+  seq: l.seq,
+  ts: Math.floor(Date.parse(l.timestamp) / 1000),
+  ns: l.namespace,
+  msg: l.message,
+})
 
 export const createDispatcher = ({
   scheduler,
@@ -38,12 +36,6 @@ export const createDispatcher = ({
 }) => {
   const secret = () =>
     scheduler.config?.bleSecret ? Buffer.from(scheduler.config.bleSecret, 'hex') : null
-
-  const requireBool = (v, field) => {
-    if (typeof v !== 'boolean') {
-      throw new ProtocolError(ErrorCode.BAD_REQUEST, `${field} must be a boolean`)
-    }
-  }
 
   const camera = (method) => async () => {
     if (scheduler.locked) throw new ProtocolError(ErrorCode.BUSY, 'Camera is busy')
@@ -62,10 +54,9 @@ export const createDispatcher = ({
         session.nonce = newNonce()
         return {
           v: PROTOCOL_VERSION,
-          nonce: b64(session.nonce),
-          authRequired: true,
           paired: secret() !== null,
-          now: new Date(now()).toISOString(),
+          nonceHex: session.nonce.toString('hex'),
+          nowMs: now(),
           maxMessage: MAX_MESSAGE,
         }
       },
@@ -73,7 +64,7 @@ export const createDispatcher = ({
 
     auth: {
       auth: false,
-      run: async (session, d) => {
+      run: async (session, f) => {
         if (!session.nonce) {
           throw new ProtocolError(ErrorCode.BAD_REQUEST, 'hello required first')
         }
@@ -83,8 +74,8 @@ export const createDispatcher = ({
           })
         }
         const key = secret()
-        const clientNonce = decodeB64(d?.clientNonce, 16, 'clientNonce')
-        const proof = decodeB64(d?.proof, 32, 'proof')
+        const clientNonce = Buffer.from(f.clientNonceHex, 'hex')
+        const proof = Buffer.from(f.proofHex, 'hex')
 
         const ok =
           key !== null && safeEqual(proof, clientProof(key, session.nonce, clientNonce))
@@ -95,18 +86,17 @@ export const createDispatcher = ({
 
         lockout.success()
         session.authed = true
-        return { proof: b64(serverProof(key, session.nonce, clientNonce)) }
+        return { proofHex: serverProof(key, session.nonce, clientNonce).toString('hex') }
       },
     },
 
     'auth.pair': {
       auth: false,
-      run: async (session, d) => {
+      run: async (session, f) => {
         if (!pairing.isOpen) {
           throw new ProtocolError(ErrorCode.PAIRING_CLOSED, 'Press the device button to pair')
         }
-        const key = decodeB64(d?.secret, 16, 'secret')
-        await controller.setSecret(key.toString('hex'))
+        await controller.setSecret(f.secretHex)
         pairing.close()
         lockout.success()
         session.authed = true
@@ -116,51 +106,30 @@ export const createDispatcher = ({
 
     'time.get': {
       auth: false,
-      run: async () => ({ now: new Date(now()).toISOString() }),
+      run: async () => ({ nowMs: now() }),
     },
 
     'time.set': {
-      run: async (session, d) => {
-        const ms = typeof d?.now === 'string' ? Date.parse(d.now) : NaN
-        if (Number.isNaN(ms)) {
-          throw new ProtocolError(ErrorCode.BAD_REQUEST, 'now must be an ISO 8601 date')
-        }
-        const { offsetMs } = await controller.setTime(ms)
-        return { now: new Date(now()).toISOString(), offsetMs }
+      run: async (session, f) => {
+        const { offsetMs } = await controller.setTime(f.nowMs)
+        return { nowMs: now(), offsetMs }
       },
     },
 
-    'status.get': { run: async () => status.toJson() },
-
     'config.get': {
-      run: async () => ({ config: publicConfig(scheduler.config) }),
+      run: async () => ({ config: toWireConfig(scheduler.config) }),
     },
 
     'config.set': {
-      run: async (session, d) => {
-        if (d?.config == null || typeof d.config !== 'object') {
-          throw new ProtocolError(ErrorCode.BAD_REQUEST, 'config is required')
-        }
-        const { configRev } = await controller.save(d.config)
+      run: async (session, f) => {
+        const { configRev } = await controller.save(fromWireConfig(f.config, scheduler.config))
         return { configRev }
       },
     },
 
+    // one state per attempt, in config order; the phone derives the times
     'jobs.get': {
-      run: async (session, d) => {
-        const offset = Number.isInteger(d?.offset) && d.offset > 0 ? d.offset : 0
-        const limit = Math.min(Number.isInteger(d?.limit) ? d.limit : 10, 50)
-        const all = scheduler.jobs
-        const jobs = []
-        let size = 0
-        for (const job of all.slice(offset, offset + limit)) {
-          const entry = serializeJob(job)
-          size += JSON.stringify(entry).length + 1
-          if (size > MAX_MESSAGE - 256) break
-          jobs.push(entry)
-        }
-        return { jobs, total: all.length, more: offset + jobs.length < all.length }
-      },
+      run: async () => ({ states: scheduler.jobs.map((j) => j.state) }),
     },
 
     'camera.wake': { run: camera('wake') },
@@ -171,39 +140,36 @@ export const createDispatcher = ({
     'test.run': {
       run: async () => {
         await controller.test()
-        return { started: true }
+        return {}
       },
     },
 
     'logs.get': {
-      run: async (session, d) => {
-        const after = Number.isInteger(d?.after) ? d.after : 0
-        const limit = Math.min(Number.isInteger(d?.limit) ? d.limit : 20, 100)
-        const candidates = logger.since(after, limit + 1)
-        const logs = []
+      run: async (session, f) => {
+        const limit = Math.min(f.limit || 20, 100)
+        const candidates = logger.since(f.after, limit + 1)
+        const lines = []
         let size = 0
         for (const l of candidates.slice(0, limit)) {
-          const entry = toLogEntry(l)
-          size += JSON.stringify(entry).length + 1
-          if (size > MAX_MESSAGE - 256) break
-          logs.push(entry)
+          const line = toLogLine(l)
+          size += 10 + Buffer.byteLength(line.ns) + Buffer.byteLength(line.msg)
+          if (size > MAX_MESSAGE - 64) break
+          lines.push(line)
         }
-        const last = logs.length ? logs[logs.length - 1].seq : after
-        return { logs, last, more: candidates.length > logs.length }
+        const last = lines.length ? lines[lines.length - 1].seq : f.after
+        return { last, more: candidates.length > lines.length, lines }
       },
     },
 
     'logs.subscribe': {
-      run: async (session, d) => {
-        requireBool(d?.enabled, 'enabled')
-        session.logSub = d.enabled
-        const after = Number.isInteger(d?.after) ? d.after : logger.seq
+      run: async (session, f) => {
+        session.logSub = f.enabled
         return {
-          d: {},
+          fields: {},
           [AFTER]: () => {
             if (!session.logSub) return
-            for (const l of logger.since(after, 100)) {
-              session.push({ ev: 'log', d: toLogEntry(l) })
+            for (const l of logger.since(f.after, 100)) {
+              session.push({ ev: 'log', d: toLogLine(l) })
             }
           },
         }
@@ -212,22 +178,25 @@ export const createDispatcher = ({
   }
 
   /**
-   * @returns {Promise<{ d: object, after?: Function }>}
+   * @param {object} session the connection's state
+   * @param {string|null} op op name, or null for an unknown op code
+   * @param {object} fields decoded request fields
+   * @returns {Promise<{ fields: object, after?: Function }>}
    * @throws {ProtocolError}
    */
-  const handle = async (session, op, d) => {
-    const entry = Object.hasOwn(ops, op) ? ops[op] : undefined
+  const handle = async (session, op, fields) => {
+    const entry = op && Object.hasOwn(ops, op) ? ops[op] : undefined
     if (!entry) throw new ProtocolError(ErrorCode.NOT_SUPPORTED, `Unknown op '${op}'`)
     if (entry.auth !== false && !session.authed) {
       throw new ProtocolError(ErrorCode.UNAUTHORIZED, 'Authentication required')
     }
 
     try {
-      const result = await entry.run(session, d ?? {})
-      if (result && Object.hasOwn(result, 'd') && result[AFTER]) {
-        return { d: result.d, after: result[AFTER] }
+      const result = await entry.run(session, fields ?? {})
+      if (result && Object.hasOwn(result, 'fields') && result[AFTER]) {
+        return { fields: result.fields, after: result[AFTER] }
       }
-      return { d: result }
+      return { fields: result }
     } catch (err) {
       const mapped = mapControllerError(err)
       if (mapped instanceof ProtocolError) throw mapped
@@ -236,12 +205,5 @@ export const createDispatcher = ({
     }
   }
 
-  return { handle }
+  return { handle, encodeResponse }
 }
-
-export const toLogEntry = (l) => ({
-  seq: l.seq,
-  ts: l.timestamp,
-  ns: l.namespace,
-  msg: l.message,
-})

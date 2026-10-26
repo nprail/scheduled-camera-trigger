@@ -3,10 +3,12 @@ import { saveJson } from './lib/utils.js'
 import { normalizeConfig, validateConfig, DEVICE_OWNED } from './lib/config.js'
 
 export class ControllerError extends Error {
-  constructor(code, message, field) {
+  /** `reason`: required, range, bad_value, past, duplicate, too_soon or too_many (for invalid_config). */
+  constructor(code, message, field, reason) {
     super(message)
     this.code = code
     this.field = field
+    this.reason = reason
   }
 }
 
@@ -60,6 +62,7 @@ export const initController = ({
         errors.push({
           field: `attempts[${i}].time`,
           msg: 'is too soon: the camera wake-up time has already passed',
+          reason: 'too_soon',
         })
       }
     })
@@ -68,7 +71,8 @@ export const initController = ({
       throw new ControllerError(
         'invalid_config',
         `${errors[0].field} ${errors[0].msg}`,
-        errors[0].field
+        errors[0].field,
+        errors[0].reason
       )
     }
 

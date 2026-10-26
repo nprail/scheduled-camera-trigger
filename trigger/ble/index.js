@@ -1,8 +1,9 @@
 import { PairingWindow, Lockout } from './auth.js'
-import { createDispatcher, toLogEntry } from './dispatcher.js'
+import { createDispatcher, toLogLine } from './dispatcher.js'
 import { Link } from './link.js'
 import { StatusSource } from './status.js'
 import { PROTOCOL_VERSION } from './protocol.js'
+import { encodeDeviceInfo, truncateUtf8 } from './codec.js'
 import { initButton } from '../lib/button.js'
 
 const STATUS_MIN_INTERVAL_MS = 100
@@ -32,13 +33,18 @@ export const createBle = ({ scheduler, controller, logger, system }) => {
 
   // --- events ---------------------------------------------------------
   scheduler.on('job', (j) =>
-    broadcast({ ev: 'job', d: { name: j.name, step: j.step, at: j.at.toISOString() } })
+    broadcast({
+      ev: 'job',
+      d: { attempt: j.index, step: j.step, at: Math.floor(j.at.getTime() / 1000) },
+    })
   )
-  scheduler.on('test', (d) => broadcast({ ev: 'test', d }))
-  controller.on('config', (d) => broadcast({ ev: 'config', d }))
+  scheduler.on('test', (d) =>
+    broadcast({ ev: 'test', d: { step: d.step, ok: Boolean(d.ok), error: d.error ?? '' } })
+  )
+  controller.on('config', (d) => broadcast({ ev: 'config', d: { configRev: d.configRev } }))
   logger.on('log', (l) =>
     links.forEach((link) => {
-      if (link.session.logSub) link.pushEvent({ ev: 'log', d: toLogEntry(l) })
+      if (link.session.logSub) link.pushEvent({ ev: 'log', d: toLogLine(l) })
     })
   )
 
@@ -68,15 +74,19 @@ export const createBle = ({ scheduler, controller, logger, system }) => {
 
   const deviceInfo = () => {
     const c = scheduler.config
-    return Buffer.from(
-      JSON.stringify({
-        v: PROTOCOL_VERSION,
-        id: c.deviceId,
-        name: c.name ?? '',
-        cam: c.cameraType,
-        fw: process.env.npm_package_version ?? '1.0.0',
-      })
-    )
+    return encodeDeviceInfo({
+      v: PROTOCOL_VERSION,
+      id: c.deviceId,
+      name: c.name ?? '',
+      cam: c.cameraType,
+      fw: process.env.npm_package_version ?? '1.0.0',
+    })
+  }
+
+  /** `{name}-{id}`, or just the id. The name is cut so the id always fits the 29-byte advertised name. */
+  const advertisedName = () => {
+    const c = scheduler.config
+    return c.name ? `${truncateUtf8(c.name, 22)}-${c.deviceId}` : c.deviceId
   }
 
   const start = async () => {
@@ -84,7 +94,7 @@ export const createBle = ({ scheduler, controller, logger, system }) => {
     const { startGattServer } = await import('./gatt.js')
     const requireEncryption = process.env.BLE_REQUIRE_ENCRYPTION !== '0'
     const server = await startGattServer({
-      deviceName: scheduler.config.deviceName,
+      deviceName: advertisedName(),
       deviceInfo,
       readStatus: () => status.toBinary(),
       makeLink,
@@ -113,7 +123,7 @@ export const createBle = ({ scheduler, controller, logger, system }) => {
     }
   }
 
-  return { start, makeLink, dispatcher, pairing, lockout, status, links }
+  return { start, makeLink, dispatcher, pairing, lockout, status, links, deviceInfo, advertisedName }
 }
 
 export const initBle = (deps) => createBle(deps).start()

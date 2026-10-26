@@ -1,6 +1,6 @@
 # ESP32 Port — Design Proposal
 
-**Status:** Draft proposal. Nothing is implemented. · **Target:** ESP32-S3 + W5500 Ethernet + external RTC · **Framework:** Arduino-ESP32 on PlatformIO · **Storage:** NVS only · **Protocol:** new binary BLE protocol v2
+**Status:** Implemented in [`esp32/`](https://github.com/nprail/kairos/tree/main/esp32) (builds, with host tests; not yet run on hardware). See [Implementation notes](#implementation-notes) for where it differs from this proposal. · **Target:** ESP32-S3 + W5500 Ethernet + external RTC · **Framework:** Arduino-ESP32 on PlatformIO · **Storage:** NVS only · **Protocol:** new binary BLE protocol v2
 
 This document describes how to port the device side of Kairos (`trigger/`, currently Node on a Raspberry Pi Zero W) to an ESP32. Because nobody uses the current system yet, the port also replaces the JSON BLE protocol (v1) with a compact binary one (v2, §5). **Both apps change with it.** Nothing needs to stay compatible with v1.
 
@@ -44,7 +44,7 @@ The boot-time and power wins matter in the field: the device can be cold-powered
 
 ### 3.2 Suggested pin map (verify against your board)
 
-The Z CAM and RTC pins are fixed at build time (`build_flags` in `platformio.ini`). The button and `generic` pins stay configurable over BLE, validated against a chip-aware allow-list (§8).
+All pins are constants in `esp32/src/platform/board.h`, not settings. Anyone wiring a different board edits that file and rebuilds. The config still carries the pin fields (the protocol is shared with the Pi), but the device reports its constants and refuses any other value (§19).
 
 | Function | GPIO | Why |
 | --- | --- | --- |
@@ -254,7 +254,7 @@ Mapping from the Node tree:
 | `trigger/ble/status.js` | `protocol/status` | 13-byte little-endian |
 | `trigger/ble/gatt.js`, `link.js` | `platform/ble` | NimBLE-Arduino GATT server, fragment queue, MTU |
 | `trigger/controller.js` | `src/controller` | `save`, `setSecret`, `setTime`, `test` |
-| `trigger/lib/config.js` | `config/` | Same rules, binary form. Pin allow-list (§8) |
+| `trigger/lib/config.js` | `config/` | Same rules, binary form. Fixed pins (§19) |
 | `trigger/lib/scheduler.js` | `scheduler/` | Replace `node-schedule` (§7.2) |
 | `trigger/lib/logger.js` | `platform/log` | 500-line RAM ring with `seq`. No file |
 | `trigger/lib/system.js` | `platform/clock` | `setTime` writes the RTC. `disableWifi` becomes a no-op |
@@ -312,7 +312,7 @@ There is no filesystem. Everything persistent is in NVS, written through `Prefer
 - **First boot** (nothing stored): use in-code defaults: empty `name`, `generic`, timings 5 / 20 / 30 s, no attempts, button and release pins from build flags. The device is immediately pairable and configurable over BLE.
 - **Saving:** validate → one `putBytes` of the new blob → re-plan the scheduler → emit the `config` event. `configRev` increments on every successful save.
 - **If the stored blob fails to decode or validate** (corruption, or a future layout it doesn't know), log it and fall back to the defaults. Keep the secret and bonds.
-- **Validation** is a port of `validateConfig` into the binary form (§5.5 field and reason codes). One deliberate difference: `isPin` allows 0–40 on the Pi. On the S3 (GPIO 0–48 with reserved ranges) use a chip-aware allow-list and reject strapping, USB, flash and PSRAM pins with `invalid_config`.
+- **Validation** is a port of `validateConfig` into the binary form (§5.5 field and reason codes). One deliberate difference: the pins are not configurable on the S3. They are constants in `board.h`, and a config naming other pins is refused with `invalid_config` (reason "not valid").
 - **Logs:** a 500-line RAM ring (about 60 KB worst case at 120-byte messages), each line with a `seq`. It is lost at reset. At boot, log `esp_reset_reason()` as the first line, so a brownout or watchdog reset is visible to the phone afterwards. For crash detail, the `coredump` partition is raw flash, not a filesystem (§13).
 - **Partitions** (a custom `partitions.csv`, selected with `board_build.partitions`). Use an 8 MB flash part (the N8 DevKitC modules have it). A 4 MB part also works with 1.75 MB app slots.
 
@@ -458,3 +458,19 @@ Nothing in the port blocks it, and §8 reserves the flash. The transport is the 
 7. **Flash encryption / secure boot** for deployed units, yes or no? Not available in the prebuilt Arduino core (§4). A yes means switching to Arduino-as-an-IDF-component.
 8. **RTC part:** DS3231 recommended, final choice pending (§3.3).
 9. **Bootloader rollback and core dumps:** confirm whether the pinned Arduino core's prebuilt config enables them (§4, §13, §14). It decides whether OTA is safe to build later.
+
+## 19. Implementation notes
+
+The firmware in `esp32/`, the v2 protocol in [ble-protocol.md](ble-protocol.md), the Node device and both apps follow this document, except for these differences:
+
+- **Platform version.** The firmware pins the pioarduino platform **55.03.311** (Arduino-ESP32 3.3.11) and NimBLE-Arduino **2.5.1**. 55.03.312 needs PlatformIO Core 6.2 or newer.
+- **One task.** Instead of separate `sched` and `cmd` tasks (section 6), one `core` task owns all device state: BLE writes (queued by the radio callbacks), scheduled steps, notifications, the RTC discipline and the button. There are no locks. The cost is that a Z CAM call of up to several seconds delays the next request or step. The watchdog is set to 60 s for that reason.
+- **No `busy` for overlapping requests.** The protocol asks for `busy` when a second request arrives while one runs. With one task, a second request simply waits its turn in the queue. Clients never send overlapping requests.
+- **Test run** is a small state machine stepped by the scheduler tick (wake, 1 s, start, 2 s, stop, sleep, done), so `test.run` returns at once.
+- **Clock discipline** only steps the clock when the system and the RTC differ by two seconds or more, since the RTC has 1 s resolution and is written truncated. Sub-second alignment (section 7.3) is not implemented.
+- **Fixed pins.** There is no allow-list. The button, release and focus pins are the constants `KAIROS_PINS` in `esp32/src/platform/board.h`, next to the W5500 and RTC pins. `config.get` always returns them, `config.set` with other pins answers `invalid_config` (field `buttonPin`, `releasePin` or `focusPin`, reason "not valid"), and a stored config from an earlier build has its pins replaced at boot. To use another board layout, edit the constants and rebuild. The apps still show the pin fields, which now only reflect the wiring.
+- **Storage.** `NvsStorage` keeps `[revision][config layout]` in one NVS key and the secret in another; `Controller` falls back to the defaults if the stored config doesn't decode.
+- **Device id** comes from the Bluetooth MAC (`ESP_MAC_BT`), the last 3 bytes.
+- **Wi-Fi code.** The prebuilt core still links it. Nothing starts it.
+
+Still open until it runs on hardware: the trigger pulse width for generic cameras, the Z CAM's DHCP behavior, the pairing-and-bond flow on both phone platforms, and whether the core's bootloader supports rollback (needed before OTA).

@@ -24,7 +24,7 @@ test('matches the spec example: 60 bytes at MTU 23', () => {
 
 test('round-trips at assorted sizes and MTUs', () => {
   for (const mtu of [23, 64, 185, 517]) {
-    for (const n of [1, 17, 18, 19, 20, 21, 500, 4096]) {
+    for (const n of [1, 17, 18, 19, 20, 21, 500, 2048]) {
       const payload = Buffer.from(Array.from({ length: n }, (_, i) => i % 251))
       assert.deepEqual(roundTrip(payload, mtu - 3), payload, `mtu ${mtu} n ${n}`)
     }
@@ -32,11 +32,11 @@ test('round-trips at assorted sizes and MTUs', () => {
 })
 
 test('fragment index wraps at 128', () => {
-  const payload = Buffer.alloc(4096, 1)
-  const frags = fragment(payload, 20) // > 128 fragments
+  const payload = Buffer.alloc(2048, 1)
+  const frags = fragment(payload, 10) // more than 128 fragments
   assert.ok(frags.length > 128)
   assert.equal(frags[128][0], 0) // wrapped continuation index
-  assert.deepEqual(roundTrip(payload, 20), payload)
+  assert.deepEqual(roundTrip(payload, 10), payload)
 })
 
 test('rejects out-of-order and orphan fragments', () => {

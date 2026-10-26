@@ -36,7 +36,7 @@ Kairos is an open source hardware trigger that starts a camera at a set time. It
 - **Works with your camera.** Trigger any camera with a standard remote trigger port, or a Z CAM over its HTTP API on a wired Ethernet link.
 - **Controlled from your phone.** Native iPhone and Android apps connect over Bluetooth Low Energy. You set the schedule, check the countdown, run a test and watch the log, in the field with no network.
 - **Hard to misuse.** Pair once with a physical button press, so only your phone can control the device.
-- **Small and low power.** It runs on a Raspberry Pi Zero W, with Wi-Fi switched off.
+- **Small and low power.** It runs on a Raspberry Pi Zero W, or on an ESP32-S3 with a real-time clock, with Wi-Fi switched off.
 - **Open.** The device software, both apps and the Bluetooth protocol are MIT licensed and documented in this repository.
 
 ## How it works
@@ -63,7 +63,7 @@ cp config.example.json config.json   # edit this for your camera and pins
 node trigger/index.js
 ```
 
-Install the app on your phone, press the button on the device, then tap **Pair** within two minutes. Full steps, including the Bluetooth and root setup the Pi needs, are in [Setting up a device](docs/SETUP.md).
+Install the app on your phone, press the button on the device, then tap **Pair** within two minutes. Full steps, including the Bluetooth and root setup the Pi needs, are in [Setting up a device](docs/setup.md).
 
 ## The apps
 
@@ -78,13 +78,13 @@ Read it online at [nprail.github.io/kairos/docs](https://nprail.github.io/kairos
 
 | Read | For |
 | --- | --- |
-| [Setting up a device](docs/SETUP.md) | Running Kairos on a Raspberry Pi, Bluetooth setup, pairing |
-| [Hardware](docs/HARDWARE.md) | Parts, GPIO pins, wiring for generic cameras and Z CAMs |
-| [Configuration](docs/CONFIGURATION.md) | Every `config.json` option, and the timeline of an attempt |
+| [Setting up a device](docs/setup.md) | Running Kairos on a Raspberry Pi, Bluetooth setup, pairing |
+| [Hardware](docs/hardware.md) | Parts, GPIO pins, wiring for generic cameras and Z CAMs |
+| [Configuration](docs/configuration.md) | Every `config.json` option, and the timeline of an attempt |
 | [Bluetooth protocol](docs/ble-protocol.md) | The protocol between the phone and the device |
-| [Development](docs/DEVELOPMENT.md) | Repository layout, running the tests, test vectors |
+| [Development](docs/development.md) | Repository layout, running the tests, test vectors |
 | [App specification](AGENTS.md) | What the apps do, and the rules for working in this repository |
-| [ESP32 port](docs/esp32-port.md) | A proposal for an ESP32 version of the device |
+| [ESP32 version](docs/esp32-port.md) | The ESP32-S3 firmware: design, status, and what it changes |
 | [Brand assets](brand/README.md) | The Kairos mark, colors and fonts |
 
 ## License

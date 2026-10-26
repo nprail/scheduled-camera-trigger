@@ -21,11 +21,12 @@ final class AppModel {
 
     var info: DeviceInfo?
     var live: StatusValue?
-    var status: StatusInfo?
     var config: CameraConfig?
     var jobs: [Job] = []
     var logs: [LogEntry] = []
     var clock: ClockSync?
+    /// The Status revision of the config this model last fetched.
+    @ObservationIgnored private var configRev: UInt32?
 
     var testSteps: [String] = []
     var testRunning = false
@@ -121,7 +122,7 @@ final class AppModel {
                 self.currentId = device.id
 
                 let info = try await connection.readDeviceInfo()
-                guard info.v == 1 else {
+                guard info.v == Int(protocolVersion) else {
                     throw DeviceError(
                         code: "unsupported",
                         message: "This device uses protocol v\(info.v). Update the app."
@@ -188,10 +189,11 @@ final class AppModel {
         guard let client, let connection else { return }
 
         clock = try? await client.syncClock()
-        config = try await client.config()
-        status = try await client.status()
-        jobs = try await client.jobs()
         if let data = try? await connection.readStatus() { live = StatusValue(data: data) }
+        let config = try await client.config()
+        self.config = config
+        configRev = live?.configRev
+        jobs = try await client.jobs(for: config)
         link = .ready
 
         await loadLogs()
@@ -227,21 +229,11 @@ final class AppModel {
 
     private func handleStatus(_ data: Data) {
         guard let value = StatusValue(data: data) else { return }
-        let previous = live
-        let configChanged = config?.configRev.map { UInt32($0) != value.configRev } ?? false
         live = value
 
-        // Status notifications can arrive every second while recording; only
-        // re-fetch the richer JSON status when something meaningful changed.
-        let changed = previous.map {
-            $0.phase != value.phase || $0.flags != value.flags || $0.nextEventAt != value.nextEventAt
-        } ?? true
-        guard link == .ready, changed || configChanged else { return }
-
-        Task { [self] in
-            status = try? await client?.status()
-            if configChanged { await refreshSchedule() }
-        }
+        // Status carries everything the screens show; only a new config revision needs a fetch.
+        guard link == .ready, let known = configRev, known != value.configRev else { return }
+        Task { [self] in await refreshSchedule() }
     }
 
     private func handle(_ event: DeviceEvent) {
@@ -253,8 +245,8 @@ final class AppModel {
         case .test(let t):
             if t.step == "done" {
                 testRunning = false
-                testSteps.append(t.ok == true ? "Done" : "Failed: \(t.error ?? "unknown error")")
-                if t.ok != true { banner = t.error ?? "The test failed." }
+                testSteps.append(t.ok ? "Done" : "Failed: \(t.error ?? "unknown error")")
+                if !t.ok { banner = t.error ?? "The test failed." }
             } else {
                 testSteps.append(t.step.capitalized)
             }
@@ -266,13 +258,22 @@ final class AppModel {
     }
 
     private func refreshJobs() async {
-        if let jobs = try? await client?.jobs() { self.jobs = jobs }
-        status = try? await client?.status()
+        guard let config, let jobs = try? await client?.jobs(for: config) else { return }
+        self.jobs = jobs
     }
 
     private func refreshSchedule() async {
-        if let config = try? await client?.config() { self.config = config }
+        if let config = try? await client?.config() {
+            self.config = config
+            configRev = live?.configRev
+        }
         await refreshJobs()
+    }
+
+    /// The name of the attempt that owns the next event.
+    var nextAttemptName: String? {
+        guard let i = live?.nextAttempt, let attempts = config?.attempts, attempts.indices.contains(i) else { return nil }
+        return attempts[i].name
     }
 
     // MARK: Actions
@@ -298,7 +299,7 @@ final class AppModel {
     func camera(_ action: CameraAction) {
         perform { [self] client in
             try await client.camera(action)
-            status = try? await client.status()
+            if let data = try? await connection?.readStatus() { live = StatusValue(data: data) }
         }
     }
 
@@ -348,8 +349,8 @@ final class AppModel {
         currentId = nil
         info = nil
         live = nil
-        status = nil
         config = nil
+        configRev = nil
         jobs = []
         logs = []
         clock = nil

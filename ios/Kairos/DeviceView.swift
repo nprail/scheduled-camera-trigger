@@ -86,7 +86,7 @@ struct DeviceView: View {
                     HStack {
                         VStack(alignment: .leading) {
                             Text(eventTitle(type)).font(BrandFont.display(17, relativeTo: .headline))
-                            Text(model.status?.next?.attempt ?? "")
+                            Text(model.nextAttemptName ?? "")
                                 .font(.caption)
                                 .foregroundStyle(Color.muted)
                         }
@@ -169,11 +169,9 @@ struct DeviceView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(job.name)
-                        if let date = job.launchDate {
-                            Text(date.formatted(date: .abbreviated, time: .standard))
-                                .font(BrandFont.mono(12, relativeTo: .caption1))
-                                .foregroundStyle(Color.muted)
-                        }
+                        Text(job.launchDate.formatted(date: .abbreviated, time: .standard))
+                            .font(BrandFont.mono(12, relativeTo: .caption1))
+                            .foregroundStyle(Color.muted)
                     }
                     Spacer()
                     StateTag(text: job.state.capitalized, active: job.state == "active")

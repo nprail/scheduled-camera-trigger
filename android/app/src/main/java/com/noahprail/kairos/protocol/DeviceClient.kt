@@ -10,18 +10,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.DeserializationStrategy
-import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.boolean
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import java.time.Instant
+
+/** The protocol version this app speaks. */
+const val PROTOCOL_VERSION = 2
 
 /**
  * What the client needs from a BLE link. Implemented over Android's GATT API
@@ -38,22 +30,20 @@ interface DeviceTransport {
     val notifications: Flow<ByteArray>
 }
 
-enum class CameraAction(val op: String) {
-    WAKE("camera.wake"),
-    START("camera.start"),
-    STOP("camera.stop"),
-    SLEEP("camera.sleep"),
-}
+enum class CameraAction {
+    WAKE, START, STOP, SLEEP;
 
-private fun b64(bytes: ByteArray): String = java.util.Base64.getEncoder().encodeToString(bytes)
-private fun unb64(text: String): ByteArray? = try {
-    java.util.Base64.getDecoder().decode(text)
-} catch (_: IllegalArgumentException) {
-    null
+    internal val op: Op
+        get() = when (this) {
+            WAKE -> Op.CAMERA_WAKE
+            START -> Op.CAMERA_START
+            STOP -> Op.CAMERA_STOP
+            SLEEP -> Op.CAMERA_SLEEP
+        }
 }
 
 /**
- * Speaks the request/response protocol (docs/ble-protocol.md §4) over a
+ * Speaks the request/response protocol (docs/ble-protocol.md, section 4) over a
  * [DeviceTransport]. One request is in flight at a time; extra callers wait.
  *
  * Call it from a single dispatcher (the main one in the app).
@@ -65,7 +55,7 @@ class DeviceClient(private val transport: DeviceTransport, scope: CoroutineScope
 
     private val reassembler = Reassembler()
     private var nextId = 1
-    private val pending = mutableMapOf<Int, CompletableDeferred<JsonObject>>()
+    private val pending = mutableMapOf<Int, CompletableDeferred<ByteArray>>()
     private var inFlight: Int? = null
     private val mutex = Mutex()
     private val readJob: kotlinx.coroutines.Job
@@ -104,43 +94,20 @@ class DeviceClient(private val transport: DeviceTransport, scope: CoroutineScope
     }
 
     private fun dispatch(data: ByteArray) {
-        val obj = try {
-            json.parseToJsonElement(data.decodeToString()).jsonObject
-        } catch (_: Exception) {
-            return
-        }
-
-        val ev = obj["ev"]?.jsonPrimitive?.contentOrNull
-        if (ev != null) {
-            decodeEvent(ev, obj)?.let { eventFlow.tryEmit(it) }
-            return
-        }
-
-        val id = obj["id"]?.takeIf { it !is JsonNull }?.jsonPrimitive?.int
-        if (id != null) {
-            resolve(id, Result.success(obj))
-        } else {
-            // error response to a frame the device couldn't attribute (id: null)
-            inFlight?.let { resolve(it, Result.success(obj)) }
+        when (val message = Wire.parse(data)) {
+            is Wire.Message.Event -> Wire.decodeEvent(message.code, message.body)?.let { eventFlow.tryEmit(it) }
+            is Wire.Message.Response ->
+                if (message.id == 0 && message.status != 0) {
+                    // an error the device could not attribute to a request (id 0)
+                    inFlight?.let { resolve(it, Result.success(data)) }
+                } else {
+                    resolve(message.id, Result.success(data))
+                }
+            null -> Unit
         }
     }
 
-    private fun decodeEvent(name: String, obj: JsonObject): DeviceEvent? {
-        val d = obj["d"] ?: return null
-        return try {
-            when (name) {
-                "job" -> DeviceEvent.Job(json.decodeFromJsonElement(JobEvent.serializer(), d))
-                "test" -> DeviceEvent.Test(json.decodeFromJsonElement(TestEvent.serializer(), d))
-                "log" -> DeviceEvent.Log(json.decodeFromJsonElement(LogEntry.serializer(), d))
-                "config" -> DeviceEvent.Config(json.decodeFromJsonElement(ConfigEvent.serializer(), d).configRev)
-                else -> null
-            }
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun resolve(id: Int, result: Result<JsonObject>) {
+    private fun resolve(id: Int, result: Result<ByteArray>) {
         val deferred = pending.remove(id) ?: return
         if (inFlight == id) inFlight = null
         result.onSuccess { deferred.complete(it) }.onFailure { deferred.completeExceptionally(it) }
@@ -154,25 +121,18 @@ class DeviceClient(private val transport: DeviceTransport, scope: CoroutineScope
 
     // region Sending
 
-    /** Send one request and decode its `d` payload. */
-    internal suspend fun <R> call(
-        op: String,
-        params: JsonElement,
-        result: DeserializationStrategy<R>,
-        timeoutMs: Long = 10_000,
-    ): R = mutex.withLock {
-        val id = nextId++
+    /** Send one request and return the body of its response. Throws the device's error for a non-zero status. */
+    internal suspend fun call(op: Op, body: ByteArray = ByteArray(0), timeoutMs: Long = 10_000): ByteArray = mutex.withLock {
+        val id = nextId
+        nextId = if (nextId >= 255) 1 else nextId + 1 // ids are one byte; 0 is reserved for unattributable errors
 
-        val body = json.encodeToString(
-            JsonObject.serializer(),
-            JsonObject(mapOf("id" to json.encodeToJsonElement(Int.serializer(), id), "op" to json.encodeToJsonElement(String.serializer(), op), "d" to params)),
-        ).toByteArray(Charsets.UTF_8)
-        if (body.size > minOf(maxMessage, Framing.MAX_MESSAGE)) {
+        val message = Wire.request(op, id, body)
+        if (message.size > minOf(maxMessage, Framing.MAX_MESSAGE)) {
             throw DeviceError("too_large", "Request is too large for the device.")
         }
-        val frames = Framing.fragments(body, maxOf(transport.maxWriteLength, 20))
+        val frames = Framing.fragments(message, maxOf(transport.maxWriteLength, 20))
 
-        val deferred = CompletableDeferred<JsonObject>()
+        val deferred = CompletableDeferred<ByteArray>()
         pending[id] = deferred
         inFlight = id
 
@@ -188,28 +148,22 @@ class DeviceClient(private val transport: DeviceTransport, scope: CoroutineScope
             if (inFlight == id) inFlight = null
         }
 
-        if (response["ok"]?.jsonPrimitive?.boolean != true) {
-            val err = response["err"]
-            throw err?.let { json.decodeFromJsonElement(ErrorBody.serializer(), it).asError() }
-                ?: DeviceError("internal", "Malformed response.")
-        }
-        json.decodeFromJsonElement(result, response["d"] ?: JsonObject(emptyMap()))
+        val parsed = Wire.parse(response) as? Wire.Message.Response ?: throw DeviceError("internal", "Malformed response.")
+        if (parsed.status != 0) throw Wire.deviceError(parsed.status, parsed.body)
+        parsed.body
     }
-
-    private suspend fun <R> call(op: String, result: DeserializationStrategy<R>, timeoutMs: Long = 10_000): R =
-        call(op, JsonObject(emptyMap()), result, timeoutMs)
-
-    private fun <T> encode(serializer: kotlinx.serialization.SerializationStrategy<T>, value: T): JsonElement =
-        json.encodeToJsonElement(serializer, value)
 
     // endregion
 
     // region Session
 
     suspend fun hello(): HelloResponse {
-        val response = call("hello", HelloResponse.serializer())
-        if (response.v != 1) {
-            throw DeviceError("unsupported", "This device speaks protocol v${response.v}; this app supports v1.")
+        val response = Wire.hello(call(Op.HELLO))
+        if (response.v != PROTOCOL_VERSION) {
+            throw DeviceError(
+                "unsupported",
+                "This device speaks protocol v${response.v}; this app supports v$PROTOCOL_VERSION. Update the app.",
+            )
         }
         maxMessage = response.maxMessage
         return response
@@ -217,104 +171,58 @@ class DeviceClient(private val transport: DeviceTransport, scope: CoroutineScope
 
     /** Prove knowledge of [secret] and verify the device does too. */
     suspend fun authenticate(secret: ByteArray, hello: HelloResponse) {
-        val nonce = unb64(hello.nonce) ?: throw DeviceError("bad_request", "Bad nonce from device.")
         val clientNonce = AuthProof.randomBytes(16)
-        val proof = AuthProof.client(secret, nonce, clientNonce)
+        val proof = AuthProof.client(secret, hello.nonce, clientNonce)
+        val reply = call(Op.AUTH, ByteWriter().bytes(clientNonce).bytes(proof).toByteArray())
 
-        val reply = call(
-            "auth",
-            JsonObject(
-                mapOf(
-                    "clientNonce" to json.encodeToJsonElement(String.serializer(), b64(clientNonce)),
-                    "proof" to json.encodeToJsonElement(String.serializer(), b64(proof)),
-                ),
-            ),
-            AuthResponse.serializer(),
-        )
-
-        val expected = AuthProof.server(secret, nonce, clientNonce)
-        if (!expected.contentEquals(unb64(reply.proof) ?: ByteArray(0))) {
+        val expected = AuthProof.server(secret, hello.nonce, clientNonce)
+        if (reply.size < 32 || !expected.contentEquals(reply.copyOf(32))) {
             throw DeviceError("unauthorized", "The device could not prove it holds the pairing key.")
         }
     }
 
     /** Store a new shared secret on the device. Only works during the pairing window. */
     suspend fun pair(secret: ByteArray) {
-        call(
-            "auth.pair",
-            JsonObject(mapOf("secret" to json.encodeToJsonElement(String.serializer(), b64(secret)))),
-            Empty.serializer(),
-        )
+        call(Op.AUTH_PAIR, secret)
     }
 
     // endregion
 
     // region Operations
 
-    suspend fun status(): StatusInfo = call("status.get", StatusInfo.serializer())
-
-    suspend fun config(): CameraConfig = call("config.get", ConfigEnvelope.serializer()).config
+    suspend fun config(): CameraConfig = Wire.decodeConfig(call(Op.CONFIG_GET))
 
     /** Replace the device config. Returns the new `configRev`. */
     suspend fun setConfig(config: CameraConfig): Int =
-        call("config.set", encode(ConfigEnvelope.serializer(), ConfigEnvelope(config)), ConfigSetResponse.serializer()).configRev
+        ByteReader(call(Op.CONFIG_SET, Wire.encodeConfig(config))).u32().toInt()
 
-    suspend fun jobs(): List<com.noahprail.kairos.protocol.Job> {
-        val all = mutableListOf<com.noahprail.kairos.protocol.Job>()
-        while (true) {
-            val page = call(
-                "jobs.get",
-                JsonObject(
-                    mapOf(
-                        "offset" to json.encodeToJsonElement(Int.serializer(), all.size),
-                        "limit" to json.encodeToJsonElement(Int.serializer(), 10),
-                    ),
-                ),
-                JobsPage.serializer(),
-            )
-            all += page.jobs
-            if (!page.more || page.jobs.isEmpty()) break
+    /** The state of each attempt in [config], in order. The launch times come from the config. */
+    suspend fun jobs(config: CameraConfig): List<Job> {
+        val states = Wire.jobStates(call(Op.JOBS_GET))
+        return config.attempts.zip(states).mapIndexed { index, (attempt, state) ->
+            Job(index, attempt.name, attempt.instant, state)
         }
-        return all
     }
 
     suspend fun camera(action: CameraAction) {
-        call(action.op, CameraResponse.serializer(), timeoutMs = 20_000)
+        call(action.op, timeoutMs = 20_000)
     }
 
     suspend fun runTest() {
-        call("test.run", StartedResponse.serializer())
+        call(Op.TEST_RUN)
     }
 
     data class LogPage(val entries: List<LogEntry>, val last: Int, val more: Boolean)
 
-    suspend fun logs(after: Int = 0, limit: Int = 20): LogPage {
-        val page = call(
-            "logs.get",
-            JsonObject(
-                mapOf(
-                    "after" to json.encodeToJsonElement(Int.serializer(), after),
-                    "limit" to json.encodeToJsonElement(Int.serializer(), limit),
-                ),
-            ),
-            LogsPage.serializer(),
-        )
-        return LogPage(page.logs, page.last, page.more)
-    }
+    suspend fun logs(after: Int = 0, limit: Int = 20): LogPage =
+        Wire.logs(call(Op.LOGS_GET, ByteWriter().u32(maxOf(0, after).toLong()).u8(limit.coerceIn(1, 100)).toByteArray()))
 
     /** Start (or stop) streaming log lines as log events, replaying anything after [after]. */
-    suspend fun subscribeLogs(enabled: Boolean, after: Int? = null) {
-        val params = buildMap<String, JsonElement> {
-            put("enabled", json.encodeToJsonElement(Boolean.serializer(), enabled))
-            if (after != null) put("after", json.encodeToJsonElement(Int.serializer(), after))
-        }
-        call("logs.subscribe", JsonObject(params), Empty.serializer())
+    suspend fun subscribeLogs(enabled: Boolean, after: Int = 0) {
+        call(Op.LOGS_SUBSCRIBE, ByteWriter().u8(if (enabled) 1 else 0).u32(maxOf(0, after).toLong()).toByteArray())
     }
 
-    suspend fun deviceTime(): Instant {
-        val reply = call("time.get", TimeResponse.serializer())
-        return DeviceDate.parse(reply.now) ?: Instant.now()
-    }
+    suspend fun deviceTime(): Instant = Instant.ofEpochMilli(Wire.timeGet(call(Op.TIME_GET)))
 
     /**
      * Compare clocks (compensating for round-trip delay) and set the device
@@ -333,11 +241,7 @@ class DeviceClient(private val transport: DeviceTransport, scope: CoroutineScope
         return try {
             // the write takes about half a round trip to arrive
             val target = Instant.now().plusMillis((halfTrip * 1000).toLong())
-            call(
-                "time.set",
-                JsonObject(mapOf("now" to json.encodeToJsonElement(String.serializer(), DeviceDate.string(target)))),
-                TimeResponse.serializer(),
-            )
+            call(Op.TIME_SET, ByteWriter().u64(target.toEpochMilli()).toByteArray())
             ClockSync(offset, applied = true)
         } catch (e: DeviceError) {
             if (e.code == "busy") ClockSync(offset, applied = false) else throw e
@@ -345,12 +249,4 @@ class DeviceClient(private val transport: DeviceTransport, scope: CoroutineScope
     }
 
     // endregion
-
-    companion object {
-        internal val json = Json {
-            ignoreUnknownKeys = true
-            explicitNulls = false
-            encodeDefaults = true
-        }
-    }
 }

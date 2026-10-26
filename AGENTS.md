@@ -6,9 +6,10 @@ Guidance for agents working in this repository.
 
 | Path | What |
 | --- | --- |
-| `trigger/`, `config.example.json` | The device side (Node, Raspberry Pi Zero W). It is controlled over Bluetooth only; there is no web interface or HTTP API. |
-| `docs/ble-protocol.md` | **The BLE protocol (v1). The source of truth for everything the phone and device exchange.** |
-| `docs/test-vectors.json` | Cross-implementation test vectors, generated from the Node reference (`node test/vectors.js --write`). |
+| `trigger/`, `config.example.json` | The device side on a Raspberry Pi Zero W (Node). It is controlled over Bluetooth only; there is no web interface or HTTP API. |
+| `esp32/` | The device side on an ESP32-S3 (C++, Arduino-ESP32 on PlatformIO). The same protocol and behavior as `trigger/`, with an external RTC and Ethernet for a Z CAM. See `docs/esp32-port.md`. |
+| `docs/ble-protocol.md` | **The BLE protocol (v2, binary). The source of truth for everything the phone and device exchange.** |
+| `docs/test-vectors.json` | Cross-implementation test vectors, generated from the Node reference (`node test/vectors.js --write`). The ESP32 firmware and both apps pass the same file. |
 | `ios/` | The native iOS app (SwiftUI) and `KairosKit`, a UI-free Swift package for the protocol. |
 | `brand/` | Kairos brand assets for the apps: the mark (SVG) and the two fonts. The design system itself is the "Kairos" artifact. |
 | `android/` | The native Android app (Kotlin, Jetpack Compose, Material 3). The protocol code is in `app/src/main/java/com/noahprail/kairos/protocol/`. |
@@ -16,6 +17,8 @@ Guidance for agents working in this repository.
 The iOS app is a standard Xcode project (`ios/Kairos.xcodeproj`), with no project generator. Run the kit's tests with `cd ios/KairosKit && swift test`.
 
 The Android app is a Gradle project (`android/`, wrapper included, JDK 17+). Run its unit tests with `cd android && ./gradlew :app:testDebugUnitTest`, and build the debug APK with `./gradlew :app:assembleDebug`.
+
+The ESP32 firmware is a PlatformIO project (`esp32/`). Run its host tests with `cd esp32 && pio test -e native`, and build it with `pio run -e device`. The Node device tests are `npm test`.
 
 ## Keep iOS and Android in sync
 
@@ -66,15 +69,16 @@ On Android, use the same split: a protocol module, a `ViewModel` (or equivalent)
 
 Read `docs/ble-protocol.md` for the full detail. What the app depends on:
 
-- One GATT service (`6b610001-6169-4f72-8f73-b3e1c5a97d24`) with four characteristics: Device Info (read, JSON), Status (read and notify, a fixed 12-byte value), Command (write), Response (notify).
-- Requests are JSON, `{id, op, d}`, split into fragments to fit the ATT write size. Responses and unsolicited events arrive on Response and are reassembled. **One request is in flight at a time; extra callers wait their turn.** Each request has a timeout (10 s by default, 20 s for camera actions); a timeout fails the request.
-- The Status value is parsed directly from bytes: flags (recording, camera ready, pairing open, clock set), phase (idle, awake, recording, test, error), config revision, next event time (Unix seconds, 0 for none), next event type (none, wake, start, stop), attempts remaining. Integers are little-endian.
-- Dates on the wire are ISO 8601 UTC with milliseconds. Parse with or without the fractional part.
+- One GATT service (`6b610001-6169-4f72-8f73-b3e1c5a97d24`) with four characteristics: Device Info (read, binary), Status (read and notify, a fixed 13-byte value), Command (write), Response (notify).
+- Messages are a compact **binary** format (little-endian): a request is `[op][id][body]`, a response `[0x80][id][status][body]`, an event `[0x81][event][body]`. Each message is split into fragments to fit the ATT write size. Responses and unsolicited events arrive on Response and are reassembled. **One request is in flight at a time; extra callers wait their turn.** Each request has a timeout (10 s by default, 20 s for camera actions); a timeout fails the request.
+- The Status value is parsed directly from bytes: flags (recording, camera ready, pairing open, clock valid), phase (idle, awake, recording, test, error), config revision, next event time (Unix seconds, 0 for none), next event type (none, wake, start, stop), attempts remaining, and the index of the attempt that owns the next event. It carries everything the screens show, so there is no separate status request.
+- Attempt times are Unix **seconds**; the clock operations use Unix **milliseconds**. Strings are length-prefixed, with names limited to 32 **bytes** of UTF-8. The config is one fixed binary layout (at most about 1.2 KB), the same bytes the device stores.
 - Events pushed by the device: `job`, `config`, `test`, `log`.
-- Operations used: `hello`, `auth`, `auth.pair`, `status.get`, `config.get`, `config.set`, `jobs.get` (paged), `camera.wake|start|stop|sleep`, `test.run`, `logs.get` (paged), `logs.subscribe`, `time.get`, `time.set`.
-- Only protocol version **1** is supported. A different version in Device Info or `hello` is an error ("unsupported"), with a message telling the user to update the app.
+- Operations used: `hello`, `auth`, `auth.pair`, `config.get`, `config.set`, `jobs.get` (the state of each attempt, in config order; the app computes the times itself), `camera.wake|start|stop|sleep`, `test.run`, `logs.get` (paged), `logs.subscribe`, `time.get`, `time.set`.
+- Errors are codes with structured detail (`invalid_config` carries a field, an attempt index and a reason). The device sends no message text, so the app builds it (section 9).
+- Only protocol version **2** is supported. A different version in Device Info or `hello` is an error ("unsupported"), with a message telling the user to update the app.
 
-**Test vectors:** `docs/test-vectors.json` covers framing, HMAC proofs and status decoding. The Android protocol module must pass the same vectors (see `ios/KairosKit/Tests/` for how the iOS tests use them).
+**Test vectors:** `docs/test-vectors.json` covers framing, HMAC proofs, Status, Device Info, the config layout, every message and every error. The Android protocol module must pass the same vectors (see `ios/KairosKit/Tests/` for how the iOS tests use them).
 
 ## 4. Connection state machine
 
@@ -83,7 +87,7 @@ States: **disconnected → connecting(name) → needsPairing(reason?) → ready*
 Connect sequence, after the user taps a device:
 1. State becomes `connecting`; scanning stops; any banner is cleared.
 2. Connect, discover the service, subscribe to Status and Response. Time out after **15 s** ("Could not connect to the device.").
-3. Read Device Info. If `v != 1`, fail with the unsupported-version error.
+3. Read Device Info. If `v != 2`, fail with the unsupported-version error.
 4. Create the client and start listening for events and Status notifications.
 5. Send `hello`.
 6. If the device is paired **and** this phone has a stored key for it: run the auth handshake (section 5).
@@ -94,8 +98,8 @@ Connect sequence, after the user taps a device:
 
 **Becoming ready**, in order:
 1. Sync the clock (best effort; a failure doesn't block).
-2. Fetch config, status and all jobs.
-3. Read the Status characteristic for live values.
+2. Read the Status characteristic for live values.
+3. Fetch the config, then the state of each attempt (`jobs.get`).
 4. State becomes `ready`.
 5. Load logs (section 8) and subscribe to live log lines.
 
@@ -194,11 +198,11 @@ Sections:
 4. **Device**: **Name** (optional text) and **Button pin** (optional integer GPIO).
 
 Behavior:
-- Empty text fields for optional values are sent as null or absent. Non-numeric text in a pin field becomes empty.
+- Empty text fields for optional values are sent as "none". Non-numeric text in a pin field becomes empty. The camera IP must be an IPv4 address (like `192.168.1.50`); anything else is refused in the app before it is sent, as `zcam.cameraIp: must be an IPv4 address like 192.168.1.50`. Names are limited to 32 bytes of UTF-8.
 - Attempt identity is local only. Equality for "is the draft changed" compares name and time, not the local ID. Local IDs are never sent to the device.
-- Fields the device owns (`deviceId`, `configRev`) are ignored on write.
-- **Save** sends `config.set` with the whole config. On success, refresh the config, jobs and status, then close the editor. On failure, show an alert "Couldn't save" with the error text, and keep the editor open. Validation errors (`invalid_config`) read "{field}: {message}".
-- The device also pushes `config` events (for example after another phone changes the schedule). When one arrives, refresh config, jobs and status.
+- The device's own fields (`deviceId`, `configRev`) are not part of the config the app sends. Attempt times are whole seconds.
+- **Save** sends `config.set` with the whole config. On success, refresh the config and jobs, then close the editor. On failure, show an alert "Couldn't save" with the error text, and keep the editor open. Validation errors (`invalid_config`) read "{field}: {message}", built from the error's field and reason (section 9).
+- The device also pushes `config` events (for example after another phone changes the schedule). When one arrives, refresh config and jobs.
 
 ### 6.6 Logs screen
 
@@ -212,9 +216,9 @@ A dismissible banner at the top of every screen, with a warning icon and the mes
 
 ## 7. Live updates
 
-- **Status notifications** (up to once a second while recording) update the live Status values immediately (phase, flags, next event, countdown). Only re-fetch the richer JSON status (`status.get`) when the phase, flags or next event time **changed**, or when the config revision differs from the one held locally. If the config revision changed, also refresh config and jobs.
-- **`job` events:** re-fetch jobs and status.
-- **`config` events:** re-fetch config, jobs and status.
+- **Status notifications** (up to once a second while recording) update the live Status values immediately (phase, flags, next event, next attempt, countdown). The only thing to fetch is the config, when the Status config revision differs from the one held locally; then also refresh jobs.
+- **`job` events:** re-fetch the job states.
+- **`config` events:** re-fetch config and jobs.
 - **`test` events:** drive the Run test progress (section 6.4). A step named `done` ends the run.
 - **`log` events:** append to the log (section 6.6).
 
@@ -237,12 +241,17 @@ Show `DeviceError` messages to the user as friendly text. Mappings in the iOS ap
 | `unauthorized` | "The device rejected the pairing key. Re-pair using the device's button." |
 | `locked_out` | "Too many failed attempts. Try again in N s." (N from `retryAfter`; omit when absent) |
 | `pairing_closed` | "Press the button on the device, then try again within 2 minutes." |
-| `invalid_config` | "{field}: {message}" (message alone if no field) |
+| `invalid_config` | "{field}: {reason}", for example "attempts[2].time: must be in the future" (the reason alone if the field is unknown) |
+| `bad_request` | "The device could not understand the request." |
+| `not_supported` | "The device does not support that." |
+| `too_large` | "The request is too large for the device." |
 | `disconnected` | "The device disconnected." |
 | `timeout` | "The device did not respond in time." |
 | `not_found` | "The device is no longer in range." |
 | `unsupported` | "This device uses protocol vN. Update the app." |
-| anything else | The device's message text |
+| `internal` | The device's detail text, or "The device had an internal error." |
+
+The `invalid_config` field names are `name`, `cameraType`, `wakeUpTimeout`, `startBefore`, `endAfter`, `buttonGpioPort`, `generic.releaseGpioPin`, `generic.focusGpioPin`, `zcam.cameraIp`, `attempts`, `attempts[i].name` and `attempts[i].time`. The reasons read: "is required", "is out of range", "is not valid", "must be in the future", "duplicates another attempt", "is too soon: the camera wake-up time has already passed", and "has too many attempts (at most 30)".
 
 ## 10. Details worth matching exactly
 

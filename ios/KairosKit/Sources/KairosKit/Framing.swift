@@ -5,7 +5,7 @@ import Foundation
 ///     First fragment:        [0x80 | idx] [u16 BE total length] [payload…]
 ///     Continuation fragment: [idx]                              [payload…]
 public enum Framing {
-    public static let maxMessage = 4096
+    public static let maxMessage = 2048
 
     /// Split `payload` into fragments of at most `maxFragment` bytes each.
     public static func fragments(for payload: Data, maxFragment: Int) -> [Data] {

@@ -31,7 +31,7 @@ Wi-Fi is off: the device is controlled over Bluetooth, and a Z CAM is wired over
 
 ## GPIO pins
 
-Pins are BCM GPIO numbers, set in `config.json` (see [Configuration](CONFIGURATION.md)) and editable from the apps. The example config uses these:
+Pins are BCM GPIO numbers, set in `config.json` (see [Configuration](configuration.md)) and editable from the apps. The example config uses these:
 
 | Function | Config option | Example | Direction |
 | --- | --- | --- | --- |
@@ -75,7 +75,7 @@ Wire the button between the pin set in `buttonGpioPort` and 3.3 V. The software 
 gpio=17=pd
 ```
 
-Use the same pin number as `buttonGpioPort`. Pressing the button opens a 2-minute window in which a phone can pair (see [Setting up a device](SETUP.md)).
+Use the same pin number as `buttonGpioPort`. Pressing the button opens a 2-minute window in which a phone can pair (see [Setting up a device](setup.md)).
 
 ## Power and clock
 
@@ -84,7 +84,7 @@ Use the same pin number as `buttonGpioPort`. Pressing the button opens a 2-minut
 
 ## Assembly
 
-1. Flash Raspberry Pi OS to the microSD card, and set up the device software ([Setting up a device](SETUP.md)).
+1. Flash Raspberry Pi OS to the microSD card, and set up the device software ([Setting up a device](setup.md)).
 2. Wire the button to the pin you chose for `buttonGpioPort`.
 3. Wire the optocoupler stage for the release line (and the focus line, if you use it), then connect it to the camera's remote trigger port. Or connect the USB Ethernet adapter and the cable for a Z CAM.
 4. Set the pins or the camera address in `config.json` or from the app.
@@ -95,6 +95,29 @@ Use the same pin number as `buttonGpioPort`. Pressing the button opens a 2-minut
 - Keep the Pi's pins away from any line that can carry more than 3.3 V.
 - Test with the camera before you rely on it, and test again if you change cables or settings.
 - A recording stopped by a power loss or reboot is not resumed. After a restart, any attempt whose wake-up time has passed is marked missed.
+
+## ESP32-S3 version
+
+The firmware in [`esp32/`](https://github.com/nprail/kairos/tree/main/esp32) runs the same protocol on an ESP32-S3, so the apps work with either device. The differences in hardware:
+
+| | Raspberry Pi Zero W | ESP32-S3 |
+| --- | --- | --- |
+| Clock | None: the phone sets it on every connection | **DS3231 RTC** on I2C with a coin cell: the clock survives power loss |
+| Z CAM link | USB Ethernet adapter | **W5500 module** on SPI, with DHCP from the camera (and a static fallback) |
+| Boot | 30 to 60 s | under 2 s |
+| Power | about 1 W | about 100 to 150 mW (measure it) |
+
+Pins (constants in `esp32/src/platform/board.h`; verify against your board):
+
+| Function | GPIO |
+| --- | --- |
+| W5500 SCLK / MOSI / MISO / CS | 12 / 11 / 13 / 10 |
+| W5500 INT / RST | 14 / 9 |
+| RTC SDA / SCL | 8 / 18 |
+| Pairing button | 4 (active high, internal pull-down) |
+| Camera release / focus | 5 / 6 |
+
+The pins are fixed in the firmware, not set from the phone: the device refuses a config that names other pins. To change them, edit the constants in `board.h` and rebuild (see `esp32/README.md`). The same optocoupler stage as for the Pi (see [Generic camera](#generic-camera-remote-trigger-port)) isolates the camera, and a pull-down on each driver input keeps the camera lines quiet while the chip boots. Use a CR2032 in the RTC only if its charging circuit is disabled (many cheap DS3231 modules charge the cell). The ESP32 version runs from an external battery pack. Flash it with PlatformIO, and see `esp32/README.md` for the details and the things still to be confirmed on real hardware.
 
 ## Status of this document
 

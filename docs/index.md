@@ -4,14 +4,14 @@ Kairos is an open source hardware, time-based camera trigger. It wakes a camera 
 
 ## Get started
 
-- [Setting up a device](SETUP.md): run Kairos on a Raspberry Pi, set up Bluetooth, and pair a phone.
-- [Hardware](HARDWARE.md): parts, GPIO pins, and wiring for remote trigger ports and Z CAMs.
-- [Configuration](CONFIGURATION.md): every `config.json` option, and the timeline of an attempt.
+- [Setting up a device](setup.md): run Kairos on a Raspberry Pi, set up Bluetooth, and pair a phone.
+- [Hardware](hardware.md): parts, GPIO pins, and wiring for remote trigger ports and Z CAMs.
+- [Configuration](configuration.md): every `config.json` option, and the timeline of an attempt.
 
 ## Reference
 
 - [Bluetooth protocol](ble-protocol.md): how the phone and the device talk to each other.
-- [Development](DEVELOPMENT.md): repository layout, running the tests, and the test vectors.
+- [Development](development.md): repository layout, running the tests, and the test vectors.
 
 ## Proposals
 

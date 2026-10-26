@@ -21,7 +21,6 @@ import com.noahprail.kairos.protocol.DeviceEvent
 import com.noahprail.kairos.protocol.DeviceInfo
 import com.noahprail.kairos.protocol.Job
 import com.noahprail.kairos.protocol.LogEntry
-import com.noahprail.kairos.protocol.StatusInfo
 import com.noahprail.kairos.protocol.StatusValue
 import com.noahprail.kairos.protocol.describe
 import kotlinx.coroutines.CancellationException
@@ -47,11 +46,13 @@ class AppModel(application: Application) : AndroidViewModel(application) {
 
     var info by mutableStateOf<DeviceInfo?>(null)
     var live by mutableStateOf<StatusValue?>(null)
-    var status by mutableStateOf<StatusInfo?>(null)
     var config by mutableStateOf<CameraConfig?>(null)
     var jobs by mutableStateOf<List<Job>>(emptyList())
     var logs by mutableStateOf<List<LogEntry>>(emptyList())
     var clock by mutableStateOf<ClockSync?>(null)
+
+    /** The Status revision of the config this model last fetched. */
+    private var configRev: Long? = null
 
     var testSteps by mutableStateOf<List<String>>(emptyList())
     var testRunning by mutableStateOf(false)
@@ -215,10 +216,11 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         val connection = connection ?: return
 
         clock = runCatching { client.syncClock() }.getOrNull()
-        config = client.config()
-        status = client.status()
-        jobs = client.jobs()
         runCatching { connection.readStatus() }.getOrNull()?.let { live = StatusValue.parse(it) }
+        val fetched = client.config()
+        config = fetched
+        configRev = live?.configRev
+        jobs = client.jobs(fetched)
         link = Link.Ready
 
         loadLogs()
@@ -251,21 +253,12 @@ class AppModel(application: Application) : AndroidViewModel(application) {
 
     private fun handleStatus(data: ByteArray) {
         val value = StatusValue.parse(data) ?: return
-        val previous = live
-        val configChanged = config?.configRev?.let { it.toLong() != value.configRev } ?: false
         live = value
 
-        // Status notifications can arrive every second while recording; only
-        // re-fetch the richer JSON status when something meaningful changed.
-        val changed = previous?.let {
-            it.phase != value.phase || it.flags != value.flags || it.nextEventAt != value.nextEventAt
-        } ?: true
-        if (link != Link.Ready || !(changed || configChanged)) return
-
-        viewModelScope.launch {
-            status = runCatching { client?.status() }.getOrNull()
-            if (configChanged) refreshSchedule()
-        }
+        // Status carries everything the screens show; only a new config revision needs a fetch.
+        val known = configRev ?: return
+        if (link != Link.Ready || known == value.configRev) return
+        viewModelScope.launch { refreshSchedule() }
     }
 
     private fun handle(event: DeviceEvent) {
@@ -276,8 +269,8 @@ class AppModel(application: Application) : AndroidViewModel(application) {
                 val t = event.event
                 if (t.step == "done") {
                     testRunning = false
-                    testSteps += if (t.ok == true) "Done" else "Failed: ${t.error ?: "unknown error"}"
-                    if (t.ok != true) banner = t.error ?: "The test failed."
+                    testSteps += if (t.ok) "Done" else "Failed: ${t.error ?: "unknown error"}"
+                    if (!t.ok) banner = t.error ?: "The test failed."
                 } else {
                     testSteps += t.step.replaceFirstChar { it.uppercase() }
                 }
@@ -290,14 +283,21 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun refreshJobs() {
-        runCatching { client?.jobs() }.getOrNull()?.let { jobs = it }
-        status = runCatching { client?.status() }.getOrNull()
+        val current = config ?: return
+        runCatching { client?.jobs(current) }.getOrNull()?.let { jobs = it }
     }
 
     private suspend fun refreshSchedule() {
-        runCatching { client?.config() }.getOrNull()?.let { config = it }
+        runCatching { client?.config() }.getOrNull()?.let {
+            config = it
+            configRev = live?.configRev
+        }
         refreshJobs()
     }
+
+    /** The name of the attempt that owns the next event. */
+    val nextAttemptName: String?
+        get() = live?.nextAttempt?.let { config?.attempts?.getOrNull(it)?.name }
 
     // endregion
 
@@ -332,7 +332,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     fun camera(action: CameraAction) {
         perform { client ->
             client.camera(action)
-            status = runCatching { client.status() }.getOrNull()
+            runCatching { connection?.readStatus() }.getOrNull()?.let { live = StatusValue.parse(it) }
         }
     }
 
@@ -381,7 +381,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         currentId = null
         info = null
         live = null
-        status = null
+        configRev = null
         config = null
         jobs = emptyList()
         logs = emptyList()

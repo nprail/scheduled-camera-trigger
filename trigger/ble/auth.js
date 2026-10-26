@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto'
 
-const CLIENT_LABEL = 'kairos-auth-v1'
-const SERVER_LABEL = 'kairos-auth-v1-srv'
+const CLIENT_LABEL = 'kairos-auth-v2'
+const SERVER_LABEL = 'kairos-auth-v2-srv'
 
 const mac = (secret, label, nonce, clientNonce) =>
   createHmac('sha256', secret)

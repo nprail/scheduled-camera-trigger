@@ -198,7 +198,7 @@ private fun NextSection(model: AppModel) {
             }
             ListItem(
                 headlineContent = { Text(eventTitle(live.nextEventType), style = MaterialTheme.typography.titleMedium) },
-                supportingContent = model.status?.next?.attempt?.let { { Text(it) } },
+                supportingContent = model.nextAttemptName?.let { { Text(it) } },
                 trailingContent = {
                     Text(countdown(date, now), style = BrandText.timecodeLarge)
                 },
@@ -298,7 +298,7 @@ private fun ScheduleSection(model: AppModel, onEdit: () -> Unit) {
         model.jobs.forEach { job ->
             ListItem(
                 headlineContent = { Text(job.name) },
-                supportingContent = job.launchDate?.let { { Text(it.formatDateTime(), style = BrandText.timecode.copy(fontSize = 12.sp)) } },
+                supportingContent = { Text(job.launchDate.formatDateTime(), style = BrandText.timecode.copy(fontSize = 12.sp)) },
                 trailingContent = { StatePill(job.state) },
                 colors = transparent(),
             )

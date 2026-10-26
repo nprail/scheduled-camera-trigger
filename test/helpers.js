@@ -9,6 +9,7 @@ import { initController } from '../trigger/controller.js'
 import { createBle } from '../trigger/ble/index.js'
 import { BaseCamera } from '../trigger/cameras/base.js'
 import { fragment, Reassembler } from '../trigger/ble/framing.js'
+import { encodeRequest, decodeResponse, decodeEvent, isEvent } from '../trigger/ble/codec.js'
 
 export class FakeCamera extends BaseCamera {
   calls = []
@@ -81,7 +82,7 @@ export const makeDevice = async (overrides = {}) => {
            readConfig: async () => JSON.parse(await readFile(configFile, 'utf8')) }
 }
 
-/** A central talking to a Link over the real framing, with a chosen MTU. */
+/** A central talking to a Link over the real framing and binary codec, with a chosen MTU. */
 export class TestClient {
   constructor(ble, { mtu = 23 } = {}) {
     this.mtu = mtu
@@ -91,6 +92,7 @@ export class TestClient {
     this.reasm = new Reassembler()
     this.nextId = 1
     this.subscribed = true
+    this.ops = new Map() // request id -> op, to pick the response layout
 
     this.link = ble.makeLink({
       notify: (frag, done) => {
@@ -108,8 +110,14 @@ export class TestClient {
     const { message, error } = this.reasm.push(frag)
     if (error) throw new Error(`client framing error ${error}`)
     if (!message) return
-    const msg = JSON.parse(message.toString())
-    if (msg.ev) this.events.push(msg)
+    let msg
+    if (isEvent(message)) {
+      msg = decodeEvent(message)
+      this.events.push(msg)
+    } else {
+      const id = message[1]
+      msg = decodeResponse(this.ops.get(id) ?? 'hello', message)
+    }
     this.waiters.slice().forEach((w) => w(msg))
   }
 
@@ -126,14 +134,24 @@ export class TestClient {
   /** Send raw framed bytes (for malformed-input tests). */
   writeRaw(buf) { this.link.onWrite(buf) }
 
-  writeMessage(obj) {
-    for (const f of fragment(Buffer.from(JSON.stringify(obj)), this.mtu - 3)) this.link.onWrite(f)
+  /** Send an already-built message body through the real framing. */
+  send(buf) {
+    for (const f of fragment(buf, this.mtu - 3)) this.link.onWrite(f)
   }
 
-  /** Send a request, resolve with the full response envelope. */
-  request(op, d, id = this.nextId++) {
+  /** Send a request, resolve with the decoded response: { id, ok: true, fields } or { id, ok: false, code, detail }. */
+  request(op, fields = {}, id = this.nextId++) {
+    this.ops.set(id, op)
     const p = this.#waitFor((m) => m.id === id)
-    this.writeMessage({ id, op, d })
+    this.send(encodeRequest(op, id, fields))
+    return p
+  }
+
+  /** Send a raw request message and resolve with the response to `id`. */
+  requestRaw(buf, id, op = 'hello') {
+    this.ops.set(id, op)
+    const p = this.#waitFor((m) => m.id === id)
+    this.send(buf)
     return p
   }
 
@@ -141,12 +159,12 @@ export class TestClient {
 
   /** hello + auth with a known secret (hex). */
   async authenticate(secretHex) {
-    const hello = await this.request('hello', {})
-    const nonce = Buffer.from(hello.d.nonce, 'base64')
+    const hello = await this.request('hello')
+    const nonce = Buffer.from(hello.fields.nonceHex, 'hex')
     const clientNonce = randomBytes(16)
     const key = Buffer.from(secretHex, 'hex')
-    const proof = createHmac('sha256', key).update('kairos-auth-v1').update(nonce).update(clientNonce).digest()
-    const res = await this.request('auth', { clientNonce: clientNonce.toString('base64'), proof: proof.toString('base64') })
+    const proof = createHmac('sha256', key).update('kairos-auth-v2').update(nonce).update(clientNonce).digest()
+    const res = await this.request('auth', { clientNonceHex: clientNonce.toString('hex'), proofHex: proof.toString('hex') })
     return { hello, res, nonce, clientNonce, key }
   }
 }

@@ -30,6 +30,34 @@ jobs:
 
       - run: npm test
 
+  esp32:
+    name: ESP32 (PlatformIO)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      # the platform, toolchain and libraries are large: keep them between runs
+      - uses: actions/cache@v6
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('esp32/platformio.ini') }}
+
+      # the pioarduino platform in platformio.ini needs PlatformIO Core 6.1.19 or newer
+      - run: pip install platformio==6.1.19
+
+      - name: Host tests (protocol, config, scheduler, cameras)
+        working-directory: esp32
+        run: pio test -e native
+
+      - name: Build the firmware
+        working-directory: esp32
+        run: pio run -e device
+
   ios:
     name: iOS (Swift)
     runs-on: macos-15

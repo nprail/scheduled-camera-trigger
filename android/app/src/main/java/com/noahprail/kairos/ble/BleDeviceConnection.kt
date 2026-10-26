@@ -153,7 +153,7 @@ class BleDeviceConnection(
     suspend fun readDeviceInfo(): DeviceInfo {
         val data = readCharacteristic(infoChar)
         return try {
-            DeviceClient.json.decodeFromString(DeviceInfo.serializer(), data.decodeToString())
+            DeviceInfo.parse(data) ?: throw DeviceError("bad_request", "The device sent unreadable identity data.")
         } catch (_: Exception) {
             throw DeviceError("bad_request", "The device sent unreadable identity data.")
         }

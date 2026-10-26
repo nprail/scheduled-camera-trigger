@@ -98,11 +98,10 @@ public final class BLEDeviceConnection: NSObject, DeviceTransport, CBPeripheralD
     @MainActor
     public func readDeviceInfo() async throws -> DeviceInfo {
         let data = try await read(infoChar)
-        do {
-            return try JSONDecoder().decode(DeviceInfo.self, from: data)
-        } catch {
+        guard let info = DeviceInfo(data: data) else {
             throw DeviceError(code: "bad_request", message: "The device sent unreadable identity data.")
         }
+        return info
     }
 
     @MainActor

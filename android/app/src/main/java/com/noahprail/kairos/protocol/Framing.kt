@@ -7,7 +7,7 @@ package com.noahprail.kairos.protocol
  *     Continuation fragment: [idx]                              [payload…]
  */
 object Framing {
-    const val MAX_MESSAGE = 4096
+    const val MAX_MESSAGE = 2048
 
     /** Split [payload] into fragments of at most [maxFragment] bytes each. */
     fun fragments(payload: ByteArray, maxFragment: Int): List<ByteArray> {

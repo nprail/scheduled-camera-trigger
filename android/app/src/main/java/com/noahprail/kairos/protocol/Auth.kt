@@ -4,7 +4,7 @@ import java.security.SecureRandom
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
-/** Challenge/response from docs/ble-protocol.md §5. */
+/** Challenge/response from docs/ble-protocol.md, section 5. */
 object AuthProof {
     private val random = SecureRandom()
 
@@ -19,11 +19,11 @@ object AuthProof {
 
     /** Proof the client sends in `auth`. */
     fun client(secret: ByteArray, nonce: ByteArray, clientNonce: ByteArray): ByteArray =
-        mac(secret, "kairos-auth-v1", nonce, clientNonce)
+        mac(secret, "kairos-auth-v2", nonce, clientNonce)
 
     /** Proof the device returns, so the client knows it's the real device. */
     fun server(secret: ByteArray, nonce: ByteArray, clientNonce: ByteArray): ByteArray =
-        mac(secret, "kairos-auth-v1-srv", nonce, clientNonce)
+        mac(secret, "kairos-auth-v2-srv", nonce, clientNonce)
 
     fun randomBytes(count: Int): ByteArray = ByteArray(count).also { random.nextBytes(it) }
 }

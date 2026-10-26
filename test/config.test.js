@@ -51,6 +51,31 @@ test('generic requires a release pin', () => {
   assert.deepEqual(validateConfig(c, { now: NOW }).map((e) => e.field), ['generic.releaseGpioPin'])
 })
 
+test('validation errors carry a machine-readable reason', () => {
+  const reasons = (c) => Object.fromEntries(validateConfig(normalizeConfig(c), { now: NOW }).map((e) => [e.field, e.reason]))
+  const r = reasons(baseConfig(NOW, {
+    cameraType: 'zcam', zcam: {}, endAfter: 9999,
+    attempts: [
+      { name: 'a', time: new Date(NOW - 1000).toISOString() },
+      { name: 'b', time: new Date(NOW + 5000).toISOString() },
+      { name: 'c', time: new Date(NOW + 5000).toISOString() },
+      { name: 'x'.repeat(33), time: new Date(NOW + 9000).toISOString() },
+    ],
+  }))
+  assert.equal(r['zcam.cameraIp'], 'required')
+  assert.equal(r.endAfter, 'range')
+  assert.equal(r['attempts[0].time'], 'past')
+  assert.equal(r['attempts[2].time'], 'duplicate')
+  assert.equal(r['attempts[3].name'], 'range')
+  assert.equal(reasons(baseConfig(NOW, { attempts: Array.from({ length: 31 }, (_, i) => ({ name: 'n', time: new Date(NOW + (i + 1) * 3600000).toISOString() })) })).attempts, 'too_many')
+})
+
+test('names are limited in UTF-8 bytes, not characters', () => {
+  const name = '🚀'.repeat(9) // 9 characters, 36 bytes
+  const errs = validateConfig(normalizeConfig(baseConfig(NOW, { name })), { now: NOW })
+  assert.deepEqual(errs.map((e) => e.field), ['name'])
+})
+
 test('publicConfig strips the secret', () => {
   const c = publicConfig({ ...baseConfig(NOW), bleSecret: 'aa', deviceName: 'x' })
   assert.equal(c.bleSecret, undefined)

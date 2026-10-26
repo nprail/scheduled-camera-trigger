@@ -11,12 +11,21 @@ public protocol DeviceTransport: AnyObject {
     var notifications: AsyncStream<Data> { get }
 }
 
-public enum CameraAction: String {
-    case wake = "camera.wake"
-    case start = "camera.start"
-    case stop = "camera.stop"
-    case sleep = "camera.sleep"
+public enum CameraAction {
+    case wake, start, stop, sleep
+
+    var op: Op {
+        switch self {
+        case .wake: return .cameraWake
+        case .start: return .cameraStart
+        case .stop: return .cameraStop
+        case .sleep: return .cameraSleep
+        }
+    }
 }
+
+/// The protocol version this app speaks.
+public let protocolVersion: UInt8 = 2
 
 public struct ClockSync: Equatable {
     /// Device clock minus phone clock, seconds (round-trip compensated).
@@ -30,23 +39,7 @@ public struct ClockSync: Equatable {
     }
 }
 
-private struct Request<P: Encodable>: Encodable {
-    let id: Int
-    let op: String
-    let d: P
-}
-
-private struct Head: Decodable {
-    let id: Int?
-    let ok: Bool?
-    let ev: String?
-    let err: ErrorBody?
-}
-
-private struct ResponseEnvelope<T: Decodable>: Decodable { let d: T }
-private struct EventEnvelope<T: Decodable>: Decodable { let d: T }
-
-/// Speaks the request/response protocol (docs/ble-protocol.md §4) over a
+/// Speaks the request/response protocol (docs/ble-protocol.md, section 4) over a
 /// `DeviceTransport`. One request is in flight at a time; extra callers wait.
 @MainActor
 public final class DeviceClient {
@@ -62,8 +55,6 @@ public final class DeviceClient {
     private var busy = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
     private var readTask: Task<Void, Never>?
-    private let decoder = JSONDecoder()
-    private let encoder = JSONEncoder()
 
     public private(set) var maxMessage = Framing.maxMessage
 
@@ -105,34 +96,18 @@ public final class DeviceClient {
     }
 
     private func dispatch(_ data: Data) {
-        guard let head = try? decoder.decode(Head.self, from: data) else { return }
-
-        if let ev = head.ev {
-            if let event = decodeEvent(named: ev, from: data) { eventSink.yield(event) }
-            return
-        }
-
-        if let id = head.id {
-            resolve(id, .success(data))
-        } else if let id = inFlight {
-            // error response to a frame the device couldn't attribute (id: null)
-            resolve(id, .success(data))
-        }
-    }
-
-    private func decodeEvent(named name: String, from data: Data) -> DeviceEvent? {
-        switch name {
-        case "job":
-            return (try? decoder.decode(EventEnvelope<JobEvent>.self, from: data)).map { .job($0.d) }
-        case "test":
-            return (try? decoder.decode(EventEnvelope<TestEvent>.self, from: data)).map { .test($0.d) }
-        case "log":
-            return (try? decoder.decode(EventEnvelope<LogEntry>.self, from: data)).map { .log($0.d) }
-        case "config":
-            return (try? decoder.decode(EventEnvelope<ConfigEvent>.self, from: data))
-                .map { .config(revision: $0.d.configRev) }
-        default:
-            return nil
+        switch Wire.parse(data) {
+        case .event(let code, let body)?:
+            if let event = Wire.decodeEvent(code: code, body: body) { eventSink.yield(event) }
+        case .response(let id, let status, _)?:
+            if id == 0, status != 0 {
+                // an error the device could not attribute to a request (id 0)
+                if let current = inFlight { resolve(current, .success(data)) }
+            } else {
+                resolve(Int(id), .success(data))
+            }
+        case nil:
+            break
         }
     }
 
@@ -165,24 +140,20 @@ public final class DeviceClient {
         }
     }
 
-    /// Send one request and decode its `d` payload.
-    func call<P: Encodable, R: Decodable>(
-        _ op: String,
-        _ params: P,
-        as type: R.Type = R.self,
-        timeout: TimeInterval = 10
-    ) async throws -> R {
+    /// Send one request and return the body of its response. Throws the device's error for a non-zero status.
+    @discardableResult
+    func call(_ op: Op, body: Data = Data(), timeout: TimeInterval = 10) async throws -> Data {
         await acquire()
         defer { release() }
 
         let id = nextId
-        nextId += 1
+        nextId = nextId >= 255 ? 1 : nextId + 1  // ids are one byte; 0 is reserved for unattributable errors
 
-        let body = try encoder.encode(Request(id: id, op: op, d: params))
-        guard body.count <= min(maxMessage, Framing.maxMessage) else {
+        let message = Wire.request(op, id: UInt8(id), body: body)
+        guard message.count <= min(maxMessage, Framing.maxMessage) else {
             throw DeviceError(code: "too_large", message: "Request is too large for the device.")
         }
-        let frames = Framing.fragments(for: body, maxFragment: max(transport.maxWriteLength, 20))
+        let frames = Framing.fragments(for: message, maxFragment: max(transport.maxWriteLength, 20))
 
         let data: Data = try await withCheckedThrowingContinuation { continuation in
             pending[id] = continuation
@@ -202,27 +173,22 @@ public final class DeviceClient {
             }
         }
 
-        let head = try decoder.decode(Head.self, from: data)
-        guard head.ok == true else {
-            throw head.err?.asError ?? DeviceError(code: "internal", message: "Malformed response.")
+        guard case .response(_, let status, let responseBody)? = Wire.parse(data) else {
+            throw DeviceError(code: "internal", message: "Malformed response.")
         }
-        return try decoder.decode(ResponseEnvelope<R>.self, from: data).d
-    }
-
-    func call<R: Decodable>(
-        _ op: String,
-        as type: R.Type = R.self,
-        timeout: TimeInterval = 10
-    ) async throws -> R {
-        try await call(op, Empty(), as: type, timeout: timeout)
+        if status != 0 { throw Wire.deviceError(status: status, body: responseBody) }
+        return responseBody
     }
 
     // MARK: - Session
 
     public func hello() async throws -> HelloResponse {
-        let response: HelloResponse = try await call("hello")
-        guard response.v == 1 else {
-            throw DeviceError(code: "unsupported", message: "This device speaks protocol v\(response.v); this app supports v1.")
+        let response = try Wire.hello(try await call(.hello))
+        guard response.v == Int(protocolVersion) else {
+            throw DeviceError(
+                code: "unsupported",
+                message: "This device speaks protocol v\(response.v); this app supports v\(protocolVersion). Update the app."
+            )
         }
         maxMessage = response.maxMessage
         return response
@@ -230,80 +196,71 @@ public final class DeviceClient {
 
     /// Prove knowledge of `secret` and verify the device does too.
     public func authenticate(secret: Data, hello: HelloResponse) async throws {
-        guard let nonce = Data(base64Encoded: hello.nonce) else {
-            throw DeviceError(code: "bad_request", message: "Bad nonce from device.")
-        }
         let clientNonce = AuthProof.randomBytes(16)
-        let proof = AuthProof.client(secret: secret, nonce: nonce, clientNonce: clientNonce)
+        let proof = AuthProof.client(secret: secret, nonce: hello.nonce, clientNonce: clientNonce)
 
-        struct Params: Encodable { let clientNonce: String; let proof: String }
-        let reply: AuthResponse = try await call(
-            "auth",
-            Params(clientNonce: clientNonce.base64EncodedString(), proof: proof.base64EncodedString())
-        )
+        var w = ByteWriter()
+        w.data(clientNonce)
+        w.data(proof)
+        let reply = try await call(.auth, body: Data(w.bytes))
 
-        let expected = AuthProof.server(secret: secret, nonce: nonce, clientNonce: clientNonce)
-        guard Data(base64Encoded: reply.proof) == expected else {
+        let expected = AuthProof.server(secret: secret, nonce: hello.nonce, clientNonce: clientNonce)
+        guard reply.count >= 32, reply.prefix(32) == expected else {
             throw DeviceError(code: "unauthorized", message: "The device could not prove it holds the pairing key.")
         }
     }
 
     /// Store a new shared secret on the device. Only works during the pairing window.
     public func pair(secret: Data) async throws {
-        struct Params: Encodable { let secret: String }
-        let _: Empty = try await call("auth.pair", Params(secret: secret.base64EncodedString()))
+        try await call(.authPair, body: secret)
     }
 
     // MARK: - Operations
 
-    public func status() async throws -> StatusInfo { try await call("status.get") }
-
     public func config() async throws -> CameraConfig {
-        let envelope: ConfigEnvelope = try await call("config.get")
-        return envelope.config
+        try Wire.decodeConfig(try await call(.configGet))
     }
 
     /// Replace the device config. Returns the new `configRev`.
     @discardableResult
     public func setConfig(_ config: CameraConfig) async throws -> Int {
-        let reply: ConfigSetResponse = try await call("config.set", ConfigEnvelope(config: config))
-        return reply.configRev
+        var r = ByteReader(try await call(.configSet, body: try Wire.encodeConfig(config)))
+        return Int(r.u32())
     }
 
-    public func jobs() async throws -> [Job] {
-        struct Params: Encodable { let offset: Int; let limit: Int }
-        var all: [Job] = []
-        while true {
-            let page: JobsPage = try await call("jobs.get", Params(offset: all.count, limit: 10))
-            all.append(contentsOf: page.jobs)
-            if !page.more || page.jobs.isEmpty { break }
+    /// The state of each attempt in `config`, in order. The launch times come from the config.
+    public func jobs(for config: CameraConfig) async throws -> [Job] {
+        let states = try Wire.jobStates(try await call(.jobsGet))
+        return zip(config.attempts.indices, states).map { index, state in
+            Job(index: index, name: config.attempts[index].name, launchDate: config.attempts[index].date, state: state)
         }
-        return all
     }
 
     public func camera(_ action: CameraAction) async throws {
-        let _: CameraResponse = try await call(action.rawValue, timeout: 20)
+        try await call(action.op, timeout: 20)
     }
 
     public func runTest() async throws {
-        let _: StartedResponse = try await call("test.run")
+        try await call(.testRun)
     }
 
     public func logs(after: Int = 0, limit: Int = 20) async throws -> (entries: [LogEntry], last: Int, more: Bool) {
-        struct Params: Encodable { let after: Int; let limit: Int }
-        let page: LogsPage = try await call("logs.get", Params(after: after, limit: limit))
-        return (page.logs, page.last, page.more)
+        var w = ByteWriter()
+        w.u32(UInt32(max(0, after)))
+        w.u8(UInt8(min(max(limit, 1), 100)))
+        return try Wire.logs(try await call(.logsGet, body: Data(w.bytes)))
     }
 
     /// Start (or stop) streaming log lines as `.log` events, replaying anything after `after`.
-    public func subscribeLogs(_ enabled: Bool, after: Int? = nil) async throws {
-        struct Params: Encodable { let enabled: Bool; let after: Int? }
-        let _: Empty = try await call("logs.subscribe", Params(enabled: enabled, after: after))
+    public func subscribeLogs(_ enabled: Bool, after: Int = 0) async throws {
+        var w = ByteWriter()
+        w.u8(enabled ? 1 : 0)
+        w.u32(UInt32(max(0, after)))
+        try await call(.logsSubscribe, body: Data(w.bytes))
     }
 
     public func deviceTime() async throws -> Date {
-        let reply: TimeResponse = try await call("time.get")
-        return DeviceDate.parse(reply.now) ?? Date()
+        Date(timeIntervalSince1970: TimeInterval(try Wire.timeGet(try await call(.timeGet))) / 1000)
     }
 
     /// Compare clocks (compensating for round-trip delay) and set the device
@@ -318,11 +275,12 @@ public final class DeviceClient {
 
         guard abs(offset) > threshold else { return ClockSync(offset: offset, applied: false) }
 
-        struct Params: Encodable { let now: String }
         do {
             // the write takes about half a round trip to arrive
             let target = Date().addingTimeInterval(halfTrip)
-            let _: TimeResponse = try await call("time.set", Params(now: DeviceDate.string(target)))
+            var w = ByteWriter()
+            w.u64(UInt64(max(0, target.timeIntervalSince1970 * 1000)))
+            try await call(.timeSet, body: Data(w.bytes))
             return ClockSync(offset: offset, applied: true)
         } catch let error as DeviceError where error.code == "busy" {
             return ClockSync(offset: offset, applied: false)

@@ -5,8 +5,6 @@ import { UUID } from './protocol.js'
 
 const { BleManager, AdvertisingDataBuilder, HciErrors, AttErrors } = NodeBleHost
 
-// Complete local name must fit the 31-byte scan response (2 bytes of header).
-const MAX_ADV_NAME = 29
 
 /**
  * Thin ble-host wrapper: GATT table + advertising. All protocol logic lives
@@ -82,10 +80,8 @@ export const startGattServer = ({
         .addFlags(['leGeneralDiscoverableMode', 'brEdrNotSupported'])
         .add128BitServiceUUIDs(true, [UUID.service])
         .build()
-      const complete = Buffer.byteLength(deviceName) <= MAX_ADV_NAME
-      const scanRsp = new AdvertisingDataBuilder()
-        .addLocalName(complete, deviceName.slice(0, MAX_ADV_NAME))
-        .build()
+      // the caller already limits the name to 29 bytes (22 of name, '-', 6 of id)
+      const scanRsp = new AdvertisingDataBuilder().addLocalName(true, deviceName).build()
       manager.setAdvertisingData(adv)
       manager.setScanResponseData(scanRsp)
 
