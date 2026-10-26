@@ -58,11 +58,11 @@ std::unique_ptr<Camera> makeCamera(const Config& c) {
     eth.setCameraIp(c.cameraIp);
     return std::unique_ptr<Camera>(new ZCamCamera(eth, rlog, c.cameraIp));
   }
-  return std::unique_ptr<Camera>(new GenericCamera(gpio, rlog, c.releasePin, c.focusPin));
+  return std::unique_ptr<Camera>(new GenericCamera(gpio, rlog, KAIROS_RELEASE_PIN, KAIROS_FOCUS_PIN));
 }
 
 Scheduler scheduler(clk, rlog, makeCamera, &hooks);
-Controller controller(clk, storage, rlog, scheduler, KAIROS_PINS);
+Controller controller(clk, storage, rlog, scheduler);
 Dispatcher dispatcher(controller, rng);
 
 const char* resetReason() {
@@ -91,12 +91,11 @@ Bytes deviceInfoBytes() {
   return encodeDeviceInfo(d);
 }
 
-/// Name, button and camera address can change with a config save.
+/// Name and camera address can change with a config save.
 void applyConfig() {
   const Config& c = controller.currentConfig();
   ble.setDeviceInfo(deviceInfoBytes());
   ble.setAdvertisedName(advertisedName(c.name, deviceId()));
-  button.bind(c.buttonPin == kNoPin ? -1 : c.buttonPin);
   if (c.cameraType == CameraType::ZCam) eth.setCameraIp(c.cameraIp);
 }
 
@@ -184,7 +183,7 @@ void setup() {
   Serial.begin(115200);
 
   // the camera lines must be inactive from the first instant: no accidental shutter
-  for (uint8_t pin : {KAIROS_PINS.release, KAIROS_PINS.focus}) {
+  for (uint8_t pin : {KAIROS_RELEASE_PIN, KAIROS_FOCUS_PIN}) {
     if (pin == kNoPin) continue;
     digitalWrite(pin, LOW);
     pinMode(pin, OUTPUT);
@@ -209,6 +208,7 @@ void setup() {
   const Config& c = controller.currentConfig();
   ble.begin(advertisedName(c.name, deviceId()), deviceInfoBytes(), bleEvents);
   applyConfig();
+  button.bind(KAIROS_BUTTON_PIN);
   eth.begin();  // Wi-Fi is never started
 
   // camera calls can block for several seconds (HTTP timeouts), so give the core task a long watchdog

@@ -147,17 +147,14 @@ A full replacement, atomic: validate, store, then re-plan. On any error the old 
 | `wakeUpTimeout` | u16 | seconds, 0–3600 |
 | `startBefore` | u16 | seconds, 0–3600 |
 | `endAfter` | u16 | seconds, 0–3600 |
-| `buttonPin` | pin | pairing button; optional |
-| `releasePin` | pin | required for `generic` |
-| `focusPin` | pin | optional |
 | `cameraIp` | IPv4 | required for `zcam` |
 | `name` | string | ≤ 32 bytes, may be empty |
 | `count` | u8 | number of attempts, ≤ 30 |
 | `attempts[count]` | `time u32` + `name` string | `time` is the T‑0 in Unix seconds; `name` is 1–32 bytes |
 
-A config is at most about 1.2 KB. `deviceId` and `configRev` belong to the device and are not part of the layout: the id is in Device Info and the revision is in Status.
+GPIO pins are not part of the protocol: they describe how a device is wired, so each device keeps them itself (`config.json` on the Pi, constants in the firmware on the ESP32) and a phone neither reads nor sets them. A config is at most about 1.2 KB. `deviceId` and `configRev` belong to the device and are not part of the layout: the id is in Device Info and the revision is in Status.
 
-Validation rules: `cameraType` must be 0 or 1; `generic` needs `releasePin` and `zcam` needs a non-zero `cameraIp`; pins must be valid GPIO numbers for the device (the ESP32 firmware has fixed pins: it reports them in `config.get` and answers `invalid_config` with reason 3 for any other value); every attempt `time` must be unique and in the future, and so must its camera wake-up time (`time − startBefore − wakeUpTimeout`).
+Validation rules: `cameraType` must be 0 or 1; `zcam` needs a non-zero `cameraIp`; every attempt `time` must be unique and in the future, and so must its camera wake-up time (`time − startBefore − wakeUpTimeout`).
 
 #### `jobs.get`
 
@@ -198,7 +195,7 @@ A response with `status ≠ 0` carries an error code and its detail in the body.
 | 8 | `pairing_closed` | — |
 | 9 | `internal` | an optional string with detail |
 
-`invalid_config` **fields**: 1 `name`, 2 `cameraType`, 3 `wakeUpTimeout`, 4 `startBefore`, 5 `endAfter`, 6 `buttonPin`, 7 `releasePin`, 8 `focusPin`, 9 `cameraIp`, 10 `attempts` (the list), 11 `attempts[i].name`, 12 `attempts[i].time`.
+`invalid_config` **fields**: 1 `name`, 2 `cameraType`, 3 `wakeUpTimeout`, 4 `startBefore`, 5 `endAfter`, 9 `cameraIp` (6 to 8 are unused), 10 `attempts` (the list), 11 `attempts[i].name`, 12 `attempts[i].time`.
 **Reasons**: 1 required, 2 out of range, 3 bad value, 4 in the past, 5 duplicate, 6 too soon (the wake-up time has already passed), 7 too many.
 
 The apps build their error text from these codes, so the device carries no message strings.

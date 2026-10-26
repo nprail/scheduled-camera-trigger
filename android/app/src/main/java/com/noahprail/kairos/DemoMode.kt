@@ -62,8 +62,6 @@ fun AppModel.applyDemo(scene: String, screen: String = "main") {
                 name = "Pad Cam",
                 cameraType = if (generic) "generic" else "zcam",
                 wakeUpTimeout = 120.0, startBefore = 60.0, endAfter = 300.0,
-                buttonGpioPort = 17,
-                generic = CameraConfig.Generic(releaseGpioPin = 23, focusGpioPin = 24),
                 zcam = CameraConfig.Zcam(cameraIp = "192.168.1.50"),
                 attempts = listOf(
                     CameraConfig.Attempt.create("Sunday 10:00", now.plusSeconds(5400)),

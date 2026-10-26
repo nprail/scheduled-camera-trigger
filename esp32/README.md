@@ -45,16 +45,16 @@ Every pin is a constant in [src/platform/board.h](src/platform/board.h). The val
 | Pairing button | 4 |
 | Camera release / focus | 5 / 6 |
 
-**The pins are not configurable at run time.** The device always reports these pins in its config, and refuses a `config.set` that names others (`invalid_config`, field `buttonPin`, `releasePin` or `focusPin`, reason "not valid"). The pin fields in the app therefore only show the wiring.
-
-To use different pins, edit the constants in `src/platform/board.h` and rebuild and flash:
+**The pins are not configurable at run time, and not part of the protocol.** The apps and the BLE config carry no pins. To use different pins, edit the constants in `src/platform/board.h`, rebuild and flash:
 
 ```cpp
-constexpr kairos::Pins KAIROS_PINS = {4, 5, 6};  // button, release, focus (use kairos::kNoPin for no focus line)
-constexpr int KAIROS_RTC_SDA = 8;                 // and the W5500 and RTC pins above it
+constexpr uint8_t KAIROS_BUTTON_PIN = 4;
+constexpr uint8_t KAIROS_RELEASE_PIN = 5;
+constexpr uint8_t KAIROS_FOCUS_PIN = 6;  // or kairos::kNoPin: wake then pulses the release line
+constexpr int KAIROS_RTC_SDA = 8;        // and the W5500 and RTC pins above it
 ```
 
-Avoid the strapping pins (0, 3, 45, 46), USB (19, 20) and flash/PSRAM (26 to 37). The build stops if the button shares a pin with a camera line. A config saved by an earlier build with other pins is loaded with the constants instead.
+Avoid the strapping pins (0, 3, 45, 46), USB (19, 20) and flash/PSRAM (26 to 37). The build stops if the button shares a pin with a camera line. 
 
 ## Behavior notes
 

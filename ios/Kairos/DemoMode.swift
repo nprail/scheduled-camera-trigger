@@ -48,8 +48,6 @@ extension AppModel {
                 name: "Pad Cam",
                 cameraType: scene == "generic" ? "generic" : "zcam",
                 wakeUpTimeout: 120, startBefore: 60, endAfter: 300,
-                buttonGpioPort: 17,
-                generic: .init(releaseGpioPin: 23, focusGpioPin: 24),
                 zcam: .init(cameraIp: "192.168.1.50"),
                 attempts: [
                     .init(name: "Sunday 10:00", time: now.addingTimeInterval(5400)),

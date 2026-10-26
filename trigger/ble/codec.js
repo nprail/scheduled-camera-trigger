@@ -99,8 +99,6 @@ class Reader {
   get left() { return this.buf.length - this.pos }
 }
 
-const pinOut = (w, v) => w.u8(v == null ? NONE : v)
-const pinIn = (r) => { const v = r.u8(); return v === NONE ? null : v }
 
 // --- Config ------------------------------------------------------------
 
@@ -116,16 +114,13 @@ const ipToBytes = (ip) => {
   return parts.every((p) => p <= 255) ? parts : [0, 0, 0, 0]
 }
 
-/** Wire config: { cameraType, wakeUpTimeout, startBefore, endAfter, buttonPin, releasePin, focusPin, cameraIp, name, attempts: [{ time, name }] } */
+/** Wire config: { cameraType, wakeUpTimeout, startBefore, endAfter, cameraIp, name, attempts: [{ time, name }] } */
 export const encodeConfig = (c) => {
   if (!(c.cameraType in CAMERA_TYPE)) throw bad('unknown cameraType')
   if ((c.attempts?.length ?? 0) > MAX_ATTEMPTS) throw bad('too many attempts')
   const w = new Writer()
   w.u8(CONFIG_LAYOUT).u8(CAMERA_TYPE[c.cameraType])
   w.u16(c.wakeUpTimeout).u16(c.startBefore).u16(c.endAfter)
-  pinOut(w, c.buttonPin)
-  pinOut(w, c.releasePin)
-  pinOut(w, c.focusPin)
   for (const b of ipToBytes(c.cameraIp)) w.u8(b)
   w.str(c.name ?? '', MAX_NAME)
   w.u8(c.attempts.length)
@@ -144,9 +139,6 @@ export const decodeConfig = (buf) => {
     wakeUpTimeout: r.u16(),
     startBefore: r.u16(),
     endAfter: r.u16(),
-    buttonPin: pinIn(r),
-    releasePin: pinIn(r),
-    focusPin: pinIn(r),
   }
   const ip = [r.u8(), r.u8(), r.u8(), r.u8()]
   config.cameraIp = ip.every((b) => b === 0) ? null : ip.join('.')

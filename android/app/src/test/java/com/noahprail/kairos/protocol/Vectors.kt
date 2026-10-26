@@ -48,8 +48,6 @@ fun configFrom(j: JsonObject): CameraConfig = CameraConfig(
     wakeUpTimeout = j.int("wakeUpTimeout").toDouble(),
     startBefore = j.int("startBefore").toDouble(),
     endAfter = j.int("endAfter").toDouble(),
-    buttonGpioPort = j.optInt("buttonPin"),
-    generic = CameraConfig.Generic(j.optInt("releasePin"), j.optInt("focusPin")),
     zcam = CameraConfig.Zcam(j.optStr("cameraIp")),
     attempts = j.arr("attempts").map { CameraConfig.Attempt(it.jsonObject.str("name"), it.jsonObject.long("time")) },
 )

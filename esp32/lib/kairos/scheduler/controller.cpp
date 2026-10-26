@@ -21,10 +21,6 @@ void Controller::begin() {
     config_ = Config();
     rev_ = 1;
   }
-  // the pins are the board's, whatever an older firmware stored
-  config_.buttonPin = pins_.button;
-  config_.releasePin = pins_.release;
-  config_.focusPin = pins_.focus;
   hasSecret_ = storage_.loadSecret(secret_);
   scheduler_.initialize(config_);
 }
@@ -59,7 +55,7 @@ SaveResult Controller::saveConfig(const Config& c) {
     r.status = SaveStatus::Busy;
     return r;
   }
-  if (auto err = validateConfig(c, clock_.nowMs(), &pins_)) {
+  if (auto err = validateConfig(c, clock_.nowMs())) {
     r.status = SaveStatus::Invalid;
     r.error = *err;
     return r;

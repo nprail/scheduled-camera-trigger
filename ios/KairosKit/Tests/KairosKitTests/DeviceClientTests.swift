@@ -107,7 +107,7 @@ final class DeviceClientTests: XCTestCase {
         device.respond = { _, id, _ in [fail(id, 6, [12, 3, 4])] } // attempts[3].time is in the past
         let client = DeviceClient(transport: device)
         do {
-            _ = try await client.setConfig(CameraConfig(generic: .init(releaseGpioPin: 5)))
+            _ = try await client.setConfig(CameraConfig())
             XCTFail("expected failure")
         } catch let error as DeviceError {
             XCTAssertEqual(error.code, "invalid_config")

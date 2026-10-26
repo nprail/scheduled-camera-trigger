@@ -134,7 +134,7 @@ final class WireTests: XCTestCase {
     }
 
     func testConfigEncodingChecksLimitsBeforeSending() {
-        var c = CameraConfig(generic: .init(releaseGpioPin: 5))
+        var c = CameraConfig()
         c.name = String(repeating: "x", count: 33)
         XCTAssertThrowsError(try Wire.encodeConfig(c)) { XCTAssertEqual(($0 as? DeviceError)?.field, "name") }
 
@@ -151,7 +151,7 @@ final class WireTests: XCTestCase {
     }
 
     func testNamesAreCountedInBytes() {
-        let c = CameraConfig(name: String(repeating: "🚀", count: 9), generic: .init(releaseGpioPin: 5)) // 36 bytes
+        let c = CameraConfig(name: String(repeating: "🚀", count: 9)) // 36 bytes
         XCTAssertThrowsError(try Wire.encodeConfig(c))
     }
 

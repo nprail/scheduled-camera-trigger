@@ -7,15 +7,15 @@ export const toWireConfig = (c) => ({
   wakeUpTimeout: c.wakeUpTimeout,
   startBefore: c.startBefore,
   endAfter: c.endAfter,
-  buttonPin: c.buttonGpioPort ?? null,
-  releasePin: c.generic?.releaseGpioPin ?? null,
-  focusPin: c.generic?.focusGpioPin ?? null,
   cameraIp: c.zcam?.cameraIp || null,
   name: c.name ?? '',
   attempts: c.attempts.map((a) => ({ time: Math.floor(Date.parse(a.time) / 1000), name: a.name })),
 })
 
-/** wire config -> device config. Fields the wire doesn't carry (logFile) come from `current`. */
+/**
+ * wire config -> device config. Fields the wire doesn't carry come from `current`: the log file and the GPIO
+ * pins, which are wiring and live only in config.json.
+ */
 export const fromWireConfig = (w, current = {}) => {
   const c = {
     name: w.name,
@@ -24,13 +24,11 @@ export const fromWireConfig = (w, current = {}) => {
     startBefore: w.startBefore,
     endAfter: w.endAfter,
     logFile: current.logFile ?? 'log.txt',
-    generic: {},
+    generic: { ...current.generic },
     zcam: {},
     attempts: w.attempts.map((a) => ({ name: a.name, time: new Date(a.time * 1000).toISOString() })),
   }
-  if (w.buttonPin != null) c.buttonGpioPort = w.buttonPin
-  if (w.releasePin != null) c.generic.releaseGpioPin = w.releasePin
-  if (w.focusPin != null) c.generic.focusGpioPin = w.focusPin
+  if (current.buttonGpioPort != null) c.buttonGpioPort = current.buttonGpioPort
   if (w.cameraIp != null) c.zcam.cameraIp = w.cameraIp
   return c
 }
@@ -41,9 +39,6 @@ const FIELD_BY_PATH = {
   wakeUpTimeout: FIELD.wakeUpTimeout,
   startBefore: FIELD.startBefore,
   endAfter: FIELD.endAfter,
-  buttonGpioPort: FIELD.buttonPin,
-  'generic.releaseGpioPin': FIELD.releasePin,
-  'generic.focusGpioPin': FIELD.focusPin,
   'zcam.cameraIp': FIELD.cameraIp,
   attempts: FIELD.attempts,
 }

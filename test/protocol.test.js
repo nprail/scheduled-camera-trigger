@@ -52,7 +52,7 @@ test('everything but the open ops needs auth', async () => {
   const c = new TestClient(dev.ble)
   const withFields = {
     'time.set': { nowMs: 1 },
-    'config.set': { config: { cameraType: 'generic', wakeUpTimeout: 1, startBefore: 1, endAfter: 1, buttonPin: null, releasePin: 1, focusPin: null, cameraIp: null, name: '', attempts: [] } },
+    'config.set': { config: { cameraType: 'generic', wakeUpTimeout: 1, startBefore: 1, endAfter: 1, cameraIp: null, name: '', attempts: [] } },
     'logs.get': { after: 0, limit: 1 },
   }
   for (const op of ['config.get', 'jobs.get', 'camera.start', 'test.run', 'logs.get', 'time.set', 'config.set']) {
@@ -159,8 +159,7 @@ test('config.get returns the wire config; config.set replaces, saves and resched
   const cfg = got.fields.config
   assert.equal(cfg.name, 'Test')
   assert.equal(cfg.cameraType, 'generic')
-  assert.equal(cfg.releasePin, 25)
-  assert.equal(cfg.focusPin, null)
+  assert.equal('releasePin' in cfg, false) // the pins are wiring, not part of the protocol
   assert.equal(cfg.attempts.length, 1)
 
   const t1 = secs(dev.clock.now + 7_200_000)
@@ -189,15 +188,16 @@ test('config.get returns the wire config; config.set replaces, saves and resched
   assert.equal(status(dev).configRev, 2)
 })
 
-test('config.set round-trips pins, the camera ip and unicode names', async () => {
+test('config.set round-trips the camera ip and unicode names, and keeps the pins from config.json', async () => {
   const { dev, client } = await paired()
   const cfg = {
     cameraType: 'zcam', wakeUpTimeout: 7, startBefore: 8, endAfter: 9,
-    buttonPin: 17, releasePin: null, focusPin: null, cameraIp: '192.168.1.50', name: 'Café 🚀',
+    cameraIp: '192.168.1.50', name: 'Café 🚀',
     attempts: [{ name: 'Lançamento', time: secs(dev.clock.now + 7_200_000) }],
   }
   assert.equal((await client.request('config.set', { config: cfg })).ok, true)
   assert.deepEqual((await client.request('config.get')).fields.config, cfg)
+  assert.equal((await dev.readConfig()).generic.releaseGpioPin, 25)
 })
 
 test('a config with too many attempts or an unknown layout is a bad_request', async () => {
@@ -230,9 +230,6 @@ test('config.set validation errors name the field and leave state untouched', as
     config: { ...cfg, attempts: [{ name: 'a', time: secs(dev.clock.now) + 7200 }, { name: 'b', time: secs(dev.clock.now) + 7200 }] },
   })
   assert.deepEqual(dup.detail, { field: FIELD.attemptTime, index: 1, reason: REASON.duplicate })
-
-  const noPin = await client.request('config.set', { config: { ...cfg, releasePin: null } })
-  assert.deepEqual(noPin.detail, { field: FIELD.releasePin, index: 0, reason: REASON.required })
 
   const noIp = await client.request('config.set', { config: { ...cfg, cameraType: 'zcam', cameraIp: null } })
   assert.deepEqual(noIp.detail, { field: FIELD.cameraIp, index: 0, reason: REASON.required })

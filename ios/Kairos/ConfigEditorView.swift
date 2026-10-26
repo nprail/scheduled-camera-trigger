@@ -118,22 +118,7 @@ struct ConfigEditorView: View {
                 Text("Z CAM (network)").tag("zcam")
             }
             .kairosRow()
-            if config.wrappedValue.cameraType == "generic" {
-                LabeledContent("Release pin") {
-                    TextField("GPIO", text: intText(config.generic.releaseGpioPin))
-                        .font(BrandFont.mono(15, relativeTo: .body))
-                        .keyboardType(.numberPad)
-                        .multilineTextAlignment(.trailing)
-                }
-                .kairosRow()
-                LabeledContent("Focus pin") {
-                    TextField("Optional", text: intText(config.generic.focusGpioPin))
-                        .font(BrandFont.mono(15, relativeTo: .body))
-                        .keyboardType(.numberPad)
-                        .multilineTextAlignment(.trailing)
-                }
-                .kairosRow()
-            } else {
+            if config.wrappedValue.cameraType == "zcam" {
                 LabeledContent("Camera IP") {
                     TextField("192.168.1.50", text: optionalText(config.zcam.cameraIp))
                         .font(BrandFont.mono(15, relativeTo: .body))
@@ -153,13 +138,6 @@ struct ConfigEditorView: View {
         Section {
             LabeledContent("Name") {
                 TextField("Optional", text: optionalText(config.name))
-                    .multilineTextAlignment(.trailing)
-            }
-            .kairosRow()
-            LabeledContent("Button pin") {
-                TextField("Optional", text: intText(config.buttonGpioPort))
-                    .font(BrandFont.mono(15, relativeTo: .body))
-                    .keyboardType(.numberPad)
                     .multilineTextAlignment(.trailing)
             }
             .kairosRow()
@@ -195,13 +173,6 @@ struct ConfigEditorView: View {
     }
 
     // MARK: Text bindings
-
-    private func intText(_ binding: Binding<Int?>) -> Binding<String> {
-        Binding(
-            get: { binding.wrappedValue.map(String.init) ?? "" },
-            set: { binding.wrappedValue = Int($0.trimmingCharacters(in: .whitespaces)) }
-        )
-    }
 
     private func optionalText(_ binding: Binding<String?>) -> Binding<String> {
         Binding(

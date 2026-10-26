@@ -24,17 +24,13 @@ struct Config {
   uint16_t wakeUpTimeout = 5;  // seconds before recording starts
   uint16_t startBefore = 20;   // seconds before T-0
   uint16_t endAfter = 30;      // seconds after T-0
-  uint8_t buttonPin = kNoPin;
-  uint8_t releasePin = kNoPin;
-  uint8_t focusPin = kNoPin;
   uint8_t cameraIp[4] = {0, 0, 0, 0};
   std::string name;
   std::vector<Attempt> attempts;
 
   bool operator==(const Config& o) const {
     return cameraType == o.cameraType && wakeUpTimeout == o.wakeUpTimeout && startBefore == o.startBefore &&
-           endAfter == o.endAfter && buttonPin == o.buttonPin && releasePin == o.releasePin &&
-           focusPin == o.focusPin && std::memcmp(cameraIp, o.cameraIp, 4) == 0 && name == o.name &&
+           endAfter == o.endAfter && std::memcmp(cameraIp, o.cameraIp, 4) == 0 && name == o.name &&
            attempts == o.attempts;
   }
   bool hasIp() const { return cameraIp[0] | cameraIp[1] | cameraIp[2] | cameraIp[3]; }
@@ -53,17 +49,8 @@ struct ValidationError {
   Reason reason = Reason::None;
 };
 
-/// The GPIOs the board is wired for. They are constants in the firmware (src/platform/board.h), not part of what a
-/// phone can change: a config that names different pins is refused. `kNoPin` means the line is not wired.
-struct Pins {
-  uint8_t button = kNoPin;
-  uint8_t release = kNoPin;
-  uint8_t focus = kNoPin;
-};
-
 /// Returns the first problem, or nothing. `nowMs` is the device clock (Unix ms). Attempt times must be
 /// unique and in the future, and so must the camera wake-up time (`time - startBefore - wakeUpTimeout`).
-/// With `pins`, the pins in the config must be exactly the board's.
-std::optional<ValidationError> validateConfig(const Config& c, uint64_t nowMs, const Pins* pins = nullptr);
+std::optional<ValidationError> validateConfig(const Config& c, uint64_t nowMs);
 
 }  // namespace kairos

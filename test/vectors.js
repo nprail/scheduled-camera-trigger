@@ -18,7 +18,7 @@ const bytes = (start, n) => Buffer.from(Array.from({ length: n }, (_, i) => (sta
 const configs = () => {
   const generic = {
     cameraType: 'generic', wakeUpTimeout: 5, startBefore: 20, endAfter: 30,
-    buttonPin: 17, releasePin: 25, focusPin: 23, cameraIp: null, name: 'Pad Cam',
+    cameraIp: null, name: 'Pad Cam',
     attempts: [
       { time: 1793554740, name: 'Attempt 1' },
       { time: 1793641140, name: 'Attempt 2' },
@@ -26,17 +26,17 @@ const configs = () => {
   }
   const zcam = {
     cameraType: 'zcam', wakeUpTimeout: 600, startBefore: 3600, endAfter: 0,
-    buttonPin: null, releasePin: null, focusPin: null, cameraIp: '192.168.1.50', name: '',
+    cameraIp: '192.168.1.50', name: '',
     attempts: [],
   }
   const unicode = {
     cameraType: 'generic', wakeUpTimeout: 0, startBefore: 1, endAfter: 2,
-    buttonPin: null, releasePin: 5, focusPin: null, cameraIp: null, name: 'Café 🚀',
+    cameraIp: null, name: 'Café 🚀',
     attempts: [{ time: 4294967295, name: 'Lançamento' }],
   }
   const full = {
     cameraType: 'zcam', wakeUpTimeout: 5, startBefore: 20, endAfter: 30,
-    buttonPin: 4, releasePin: null, focusPin: null, cameraIp: '10.0.0.7', name: 'x'.repeat(32),
+    cameraIp: '10.0.0.7', name: 'x'.repeat(32),
     attempts: Array.from({ length: 30 }, (_, i) => ({ time: 1793554740 + i * 3600, name: `Attempt ${i + 1}`.padEnd(32, '.') })),
   }
   return [

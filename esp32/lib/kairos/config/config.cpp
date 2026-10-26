@@ -8,7 +8,6 @@ Bytes encodeConfig(const Config& c) {
   Writer w;
   w.u8(kConfigLayout).u8(static_cast<uint8_t>(c.cameraType));
   w.u16(c.wakeUpTimeout).u16(c.startBefore).u16(c.endAfter);
-  w.u8(c.buttonPin).u8(c.releasePin).u8(c.focusPin);
   w.raw(c.cameraIp, 4);
   w.str(c.name, kMaxName);
   size_t count = c.attempts.size() > kMaxAttempts ? kMaxAttempts : c.attempts.size();
@@ -27,9 +26,6 @@ bool decodeConfig(const uint8_t* data, size_t len, Config& out) {
   c.wakeUpTimeout = r.u16();
   c.startBefore = r.u16();
   c.endAfter = r.u16();
-  c.buttonPin = r.u8();
-  c.releasePin = r.u8();
-  c.focusPin = r.u8();
   r.raw(c.cameraIp, 4);
   c.name = r.str();
   uint8_t count = r.u8();
@@ -57,20 +53,12 @@ static std::optional<ValidationError> fail(Field f, Reason r, uint8_t index = 0)
   return e;
 }
 
-std::optional<ValidationError> validateConfig(const Config& c, uint64_t nowMs, const Pins* pins) {
+std::optional<ValidationError> validateConfig(const Config& c, uint64_t nowMs) {
   if (c.name.size() > kMaxName) return fail(Field::Name, Reason::Range);
   if (c.wakeUpTimeout > 3600) return fail(Field::WakeUpTimeout, Reason::Range);
   if (c.startBefore > 3600) return fail(Field::StartBefore, Reason::Range);
   if (c.endAfter > 3600) return fail(Field::EndAfter, Reason::Range);
-  if (pins) {
-    if (c.buttonPin != pins->button) return fail(Field::ButtonPin, Reason::BadValue);
-    if (c.releasePin != pins->release) return fail(Field::ReleasePin, Reason::BadValue);
-    if (c.focusPin != pins->focus) return fail(Field::FocusPin, Reason::BadValue);
-  }
-
-  if (c.cameraType == CameraType::Generic) {
-    if (c.releasePin == kNoPin) return fail(Field::ReleasePin, Reason::Required);
-  } else if (!c.hasIp()) {
+  if (c.cameraType == CameraType::ZCam && !c.hasIp()) {
     return fail(Field::CameraIp, Reason::Required);
   }
 

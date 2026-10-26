@@ -127,13 +127,9 @@ data class CameraConfig(
     val wakeUpTimeout: Double = 5.0,
     val startBefore: Double = 20.0,
     val endAfter: Double = 30.0,
-    val buttonGpioPort: Int? = null,
-    val generic: Generic = Generic(),
     val zcam: Zcam = Zcam(),
     val attempts: List<Attempt> = emptyList(),
 ) {
-    data class Generic(val releaseGpioPin: Int? = null, val focusGpioPin: Int? = null)
-
     data class Zcam(val cameraIp: String? = null)
 
     data class Attempt(

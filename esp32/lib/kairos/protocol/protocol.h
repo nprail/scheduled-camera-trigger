@@ -53,7 +53,7 @@ enum class Err : uint8_t {
 /// invalid_config fields (0 = unspecified).
 enum class Field : uint8_t {
   None = 0, Name = 1, CameraType = 2, WakeUpTimeout = 3, StartBefore = 4, EndAfter = 5,
-  ButtonPin = 6, ReleasePin = 7, FocusPin = 8, CameraIp = 9, Attempts = 10, AttemptName = 11, AttemptTime = 12,
+  CameraIp = 9, Attempts = 10, AttemptName = 11, AttemptTime = 12,
 };
 
 enum class Reason : uint8_t { None = 0, Required = 1, Range = 2, BadValue = 3, Past = 4, Duplicate = 5, TooSoon = 6, TooMany = 7 };

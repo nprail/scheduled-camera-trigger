@@ -358,14 +358,7 @@ private fun CameraSection(config: CameraConfig, enabled: Boolean, onChange: (Cam
                 }
             }
 
-            if (config.cameraType == "generic") {
-                IntField("Release pin", "GPIO", config.generic.releaseGpioPin, enabled) {
-                    onChange(config.copy(generic = config.generic.copy(releaseGpioPin = it)))
-                }
-                IntField("Focus pin", "Optional", config.generic.focusGpioPin, enabled) {
-                    onChange(config.copy(generic = config.generic.copy(focusGpioPin = it)))
-                }
-            } else {
+            if (config.cameraType == "zcam") {
                 OutlinedTextField(
                     value = config.zcam.cameraIp ?: "",
                     onValueChange = { onChange(config.copy(zcam = config.zcam.copy(cameraIp = it.ifEmpty { null }))) },
@@ -394,24 +387,8 @@ private fun GeneralSection(config: CameraConfig, enabled: Boolean, onChange: (Ca
                 enabled = enabled,
                 modifier = Modifier.fillMaxWidth(),
             )
-            IntField("Button pin", "Optional", config.buttonGpioPort, enabled) { onChange(config.copy(buttonGpioPort = it)) }
         }
     }
-}
-
-/** An optional integer field: empty or non-numeric text becomes null. */
-@Composable
-private fun IntField(label: String, placeholder: String, value: Int?, enabled: Boolean, onChange: (Int?) -> Unit) {
-    OutlinedTextField(
-        value = value?.toString() ?: "",
-        onValueChange = { onChange(it.trim().toIntOrNull()) },
-        label = { Text(label) },
-        placeholder = { Text(placeholder) },
-        singleLine = true,
-        enabled = enabled,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = Modifier.fillMaxWidth(),
-    )
 }
 
 // endregion

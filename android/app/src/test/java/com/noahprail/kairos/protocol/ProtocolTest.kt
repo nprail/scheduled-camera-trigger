@@ -163,7 +163,7 @@ class WireTest {
 
     @Test
     fun configEncodingChecksLimitsBeforeSending() {
-        val base = CameraConfig(generic = CameraConfig.Generic(releaseGpioPin = 5))
+        val base = CameraConfig()
         assertEquals("name", assertThrows(DeviceError::class.java) { Wire.encodeConfig(base.copy(name = "x".repeat(33))) }.field)
         assertEquals("zcam.cameraIp", assertThrows(DeviceError::class.java) { Wire.encodeConfig(base.copy(zcam = CameraConfig.Zcam("192.168.1"))) }.field)
         assertThrows(DeviceError::class.java) { Wire.encodeConfig(base.copy(zcam = CameraConfig.Zcam("300.1.1.1"))) }
@@ -174,7 +174,7 @@ class WireTest {
 
     @Test
     fun namesAreCountedInBytes() {
-        val c = CameraConfig(name = "\uD83D\uDE80".repeat(9), generic = CameraConfig.Generic(releaseGpioPin = 5)) // 9 characters, 36 bytes
+        val c = CameraConfig(name = "\uD83D\uDE80".repeat(9)) // 9 characters, 36 bytes
         assertThrows(DeviceError::class.java) { Wire.encodeConfig(c) }
     }
 

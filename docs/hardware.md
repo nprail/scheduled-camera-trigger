@@ -31,7 +31,7 @@ Wi-Fi is off: the device is controlled over Bluetooth, and a Z CAM is wired over
 
 ## GPIO pins
 
-Pins are BCM GPIO numbers, set in `config.json` (see [Configuration](configuration.md)) and editable from the apps. The example config uses these:
+Pins are BCM GPIO numbers, set in `config.json` (see [Configuration](configuration.md)). The apps do not change them. The example config uses these:
 
 | Function | Config option | Example | Direction |
 | --- | --- | --- | --- |
@@ -87,7 +87,7 @@ Use the same pin number as `buttonGpioPort`. Pressing the button opens a 2-minut
 1. Flash Raspberry Pi OS to the microSD card, and set up the device software ([Setting up a device](setup.md)).
 2. Wire the button to the pin you chose for `buttonGpioPort`.
 3. Wire the optocoupler stage for the release line (and the focus line, if you use it), then connect it to the camera's remote trigger port. Or connect the USB Ethernet adapter and the cable for a Z CAM.
-4. Set the pins or the camera address in `config.json` or from the app.
+4. Set the pins in `config.json`, and the camera address in `config.json` or from the app.
 5. Power on, pair with the button, and run **Run test** from the app before every attempt.
 
 ## Safety
@@ -117,7 +117,7 @@ Pins (constants in `esp32/src/platform/board.h`; verify against your board):
 | Pairing button | 4 (active high, internal pull-down) |
 | Camera release / focus | 5 / 6 |
 
-The pins are fixed in the firmware, not set from the phone: the device refuses a config that names other pins. To change them, edit the constants in `board.h` and rebuild (see `esp32/README.md`). The same optocoupler stage as for the Pi (see [Generic camera](#generic-camera-remote-trigger-port)) isolates the camera, and a pull-down on each driver input keeps the camera lines quiet while the chip boots. Use a CR2032 in the RTC only if its charging circuit is disabled (many cheap DS3231 modules charge the cell). The ESP32 version runs from an external battery pack. Flash it with PlatformIO, and see `esp32/README.md` for the details and the things still to be confirmed on real hardware.
+The pins are fixed in the firmware and are not part of the protocol, so no phone can change them. To change them, edit the constants in `board.h` and rebuild (see `esp32/README.md`). The same optocoupler stage as for the Pi (see [Generic camera](#generic-camera-remote-trigger-port)) isolates the camera, and a pull-down on each driver input keeps the camera lines quiet while the chip boots. Use a CR2032 in the RTC only if its charging circuit is disabled (many cheap DS3231 modules charge the cell). The ESP32 version runs from an external battery pack. Flash it with PlatformIO, and see `esp32/README.md` for the details and the things still to be confirmed on real hardware.
 
 ## Status of this document
 

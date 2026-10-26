@@ -44,7 +44,7 @@ The boot-time and power wins matter in the field: the device can be cold-powered
 
 ### 3.2 Suggested pin map (verify against your board)
 
-All pins are constants in `esp32/src/platform/board.h`, not settings. Anyone wiring a different board edits that file and rebuilds. The config still carries the pin fields (the protocol is shared with the Pi), but the device reports its constants and refuses any other value (§19).
+All pins are constants in `esp32/src/platform/board.h`, not settings. Anyone wiring a different board edits that file and rebuilds. They are not part of the BLE protocol (§19).
 
 | Function | GPIO | Why |
 | --- | --- | --- |
@@ -169,7 +169,7 @@ A **log line** is `seq u32`, `ts u32` (Unix seconds), `ns` (`u8` length + ASCII,
 | 8 | `pairing_closed` | — |
 | 9 | `internal` | optional `u8` length + UTF-8 text |
 
-`invalid_config` fields: 1 `name`, 2 `cameraType`, 3 `wakeUpTimeout`, 4 `startBefore`, 5 `endAfter`, 6 `buttonPin`, 7 `releasePin`, 8 `focusPin`, 9 `cameraIp`, 10 `attempts` (the list), 11 `attempts[i].name`, 12 `attempts[i].time`. Reasons: 1 required, 2 out of range, 3 bad value, 4 in the past, 5 duplicate, 6 too soon (the wake-up time has passed), 7 too many. The apps keep showing "{field}: {message}", built from these enums.
+`invalid_config` fields: 1 `name`, 2 `cameraType`, 3 `wakeUpTimeout`, 4 `startBefore`, 5 `endAfter`, 9 `cameraIp` (6 to 8 are unused), 10 `attempts` (the list), 11 `attempts[i].name`, 12 `attempts[i].time`. Reasons: 1 required, 2 out of range, 3 bad value, 4 in the past, 5 duplicate, 6 too soon (the wake-up time has passed), 7 too many. The apps keep showing "{field}: {message}", built from these enums.
 
 ### 5.4 Status characteristic (13 bytes)
 
@@ -198,9 +198,6 @@ This is both the `config.get`/`config.set` body and the stored blob (§8).
 | `wakeUpTimeout` | u16 | seconds |
 | `startBefore` | u16 | seconds |
 | `endAfter` | u16 | seconds |
-| `buttonPin` | u8 | `0xFF` none |
-| `releasePin` | u8 | `0xFF` none (required when `generic`) |
-| `focusPin` | u8 | `0xFF` none |
 | `cameraIp` | 4 bytes | IPv4 (required when `zcam`) |
 | `name` | u8 length + UTF-8 | ≤ 32 bytes |
 | `count` | u8 | ≤ 30 |
@@ -309,7 +306,7 @@ There is no filesystem. Everything persistent is in NVS, written through `Prefer
 | NimBLE store | BLE bonds | small | Managed by the BLE stack |
 
 - **Device identity:** `deviceId` is derived from the last 3 bytes of the factory MAC (6 uppercase hex, the format the apps parse). It is not stored, and it is stable across erases. Keep the BLE address as the default **public** address (derived from the same MAC), never a random one, because phone bonds are tied to it.
-- **First boot** (nothing stored): use in-code defaults: empty `name`, `generic`, timings 5 / 20 / 30 s, no attempts, button and release pins from build flags. The device is immediately pairable and configurable over BLE.
+- **First boot** (nothing stored): use in-code defaults: empty `name`, `generic`, timings 5 / 20 / 30 s, no attempts. The device is immediately pairable and configurable over BLE.
 - **Saving:** validate → one `putBytes` of the new blob → re-plan the scheduler → emit the `config` event. `configRev` increments on every successful save.
 - **If the stored blob fails to decode or validate** (corruption, or a future layout it doesn't know), log it and fall back to the defaults. Keep the secret and bonds.
 - **Validation** is a port of `validateConfig` into the binary form (§5.5 field and reason codes). One deliberate difference: the pins are not configurable on the S3. They are constants in `board.h`, and a config naming other pins is refused with `invalid_config` (reason "not valid").
@@ -468,7 +465,7 @@ The firmware in `esp32/`, the v2 protocol in [ble-protocol.md](ble-protocol.md),
 - **No `busy` for overlapping requests.** The protocol asks for `busy` when a second request arrives while one runs. With one task, a second request simply waits its turn in the queue. Clients never send overlapping requests.
 - **Test run** is a small state machine stepped by the scheduler tick (wake, 1 s, start, 2 s, stop, sleep, done), so `test.run` returns at once.
 - **Clock discipline** only steps the clock when the system and the RTC differ by two seconds or more, since the RTC has 1 s resolution and is written truncated. Sub-second alignment (section 7.3) is not implemented.
-- **Fixed pins.** There is no allow-list. The button, release and focus pins are the constants `KAIROS_PINS` in `esp32/src/platform/board.h`, next to the W5500 and RTC pins. `config.get` always returns them, `config.set` with other pins answers `invalid_config` (field `buttonPin`, `releasePin` or `focusPin`, reason "not valid"), and a stored config from an earlier build has its pins replaced at boot. To use another board layout, edit the constants and rebuild. The apps still show the pin fields, which now only reflect the wiring.
+- **Fixed pins, not in the protocol.** The button, release and focus pins are the constants `KAIROS_BUTTON_PIN`, `KAIROS_RELEASE_PIN` and `KAIROS_FOCUS_PIN` in `esp32/src/platform/board.h`, next to the W5500 and RTC pins. The config layout and the apps carry no pins, so there is no allow-list or pin validation. To use another board layout, edit the constants and rebuild.
 - **Storage.** `NvsStorage` keeps `[revision][config layout]` in one NVS key and the secret in another; `Controller` falls back to the defaults if the stored config doesn't decode.
 - **Device id** comes from the Bluetooth MAC (`ESP_MAC_BT`), the last 3 bytes.
 - **Wi-Fi code.** The prebuilt core still links it. Nothing starts it.

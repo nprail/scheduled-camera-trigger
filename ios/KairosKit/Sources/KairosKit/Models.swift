@@ -131,15 +131,6 @@ public struct LogEntry: Equatable, Identifiable {
 // MARK: - Config
 
 public struct CameraConfig: Equatable {
-    public struct Generic: Equatable {
-        public var releaseGpioPin: Int?
-        public var focusGpioPin: Int?
-        public init(releaseGpioPin: Int? = nil, focusGpioPin: Int? = nil) {
-            self.releaseGpioPin = releaseGpioPin
-            self.focusGpioPin = focusGpioPin
-        }
-    }
-
     public struct Zcam: Equatable {
         public var cameraIp: String?
         public init(cameraIp: String? = nil) { self.cameraIp = cameraIp }
@@ -179,8 +170,6 @@ public struct CameraConfig: Equatable {
     public var wakeUpTimeout: Double
     public var startBefore: Double
     public var endAfter: Double
-    public var buttonGpioPort: Int?
-    public var generic: Generic
     public var zcam: Zcam
     public var attempts: [Attempt]
 
@@ -192,8 +181,6 @@ public struct CameraConfig: Equatable {
         wakeUpTimeout: Double = 5,
         startBefore: Double = 20,
         endAfter: Double = 30,
-        buttonGpioPort: Int? = nil,
-        generic: Generic = Generic(),
         zcam: Zcam = Zcam(),
         attempts: [Attempt] = []
     ) {
@@ -202,8 +189,6 @@ public struct CameraConfig: Equatable {
         self.wakeUpTimeout = wakeUpTimeout
         self.startBefore = startBefore
         self.endAfter = endAfter
-        self.buttonGpioPort = buttonGpioPort
-        self.generic = generic
         self.zcam = zcam
         self.attempts = attempts
     }

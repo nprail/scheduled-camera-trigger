@@ -121,7 +121,7 @@ class DeviceClientTest {
         val device = FakeDevice()
         device.respond = { req -> listOf(fail(req.id, 6, byteArrayOf(12, 3, 4))) } // attempts[3].time is in the past
         try {
-            client(device).setConfig(CameraConfig(generic = CameraConfig.Generic(releaseGpioPin = 5)))
+            client(device).setConfig(CameraConfig())
             fail("expected failure")
         } catch (e: DeviceError) {
             assertEquals("invalid_config", e.code)

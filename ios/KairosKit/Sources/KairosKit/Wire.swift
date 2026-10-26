@@ -111,7 +111,6 @@ enum Wire {
     static let configLayout: UInt8 = 1
     static let maxAttempts = 30
     static let maxNameBytes = 32
-    static let noPin: UInt8 = 0xFF
 
     private static func invalid(_ field: String, _ message: String) -> DeviceError {
         DeviceError(code: "invalid_config", message: message, field: field)
@@ -126,11 +125,6 @@ enum Wire {
         guard c.attempts.count <= maxAttempts else { throw invalid("attempts", "has too many attempts (at most \(maxAttempts))") }
 
         func seconds(_ v: Double) -> UInt16 { UInt16(max(0, min(v.rounded(), 65535))) }
-        func pin(_ p: Int?, _ field: String) throws -> UInt8 {
-            guard let p else { return noPin }
-            guard (0 ..< 255).contains(p) else { throw invalid(field, "is not a GPIO number") }
-            return UInt8(p)
-        }
 
         var w = ByteWriter()
         w.u8(configLayout)
@@ -138,9 +132,6 @@ enum Wire {
         w.u16(seconds(c.wakeUpTimeout))
         w.u16(seconds(c.startBefore))
         w.u16(seconds(c.endAfter))
-        w.u8(try pin(c.buttonGpioPort, "buttonGpioPort"))
-        w.u8(try pin(c.generic.releaseGpioPin, "generic.releaseGpioPin"))
-        w.u8(try pin(c.generic.focusGpioPin, "generic.focusGpioPin"))
         for octet in try ipBytes(c.zcam.cameraIp) { w.u8(octet) }
         w.string(name)
         w.u8(UInt8(c.attempts.count))
@@ -169,8 +160,6 @@ enum Wire {
         guard r.u8() == configLayout else { throw DeviceError(code: "bad_request", message: "The device sent a config this app does not understand.") }
         let typeIndex = Int(r.u8())
         let wake = r.u16(), start = r.u16(), end = r.u16()
-        func pin(_ v: UInt8) -> Int? { v == noPin ? nil : Int(v) }
-        let button = pin(r.u8()), release = pin(r.u8()), focus = pin(r.u8())
         let ip = [r.u8(), r.u8(), r.u8(), r.u8()]
         let name = r.string()
         let count = Int(r.u8())
@@ -186,8 +175,6 @@ enum Wire {
             name: name.isEmpty ? nil : name,
             cameraType: CameraConfig.cameraTypes[typeIndex],
             wakeUpTimeout: Double(wake), startBefore: Double(start), endAfter: Double(end),
-            buttonGpioPort: button,
-            generic: .init(releaseGpioPin: release, focusGpioPin: focus),
             zcam: .init(cameraIp: ip.allSatisfy { $0 == 0 } ? nil : ip.map(String.init).joined(separator: ".")),
             attempts: attempts
         )
@@ -225,9 +212,6 @@ enum Wire {
         case 3: return "wakeUpTimeout"
         case 4: return "startBefore"
         case 5: return "endAfter"
-        case 6: return "buttonGpioPort"
-        case 7: return "generic.releaseGpioPin"
-        case 8: return "generic.focusGpioPin"
         case 9: return "zcam.cameraIp"
         case 10: return "attempts"
         case 11: return "attempts[\(index)].name"

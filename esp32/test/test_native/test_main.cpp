@@ -31,10 +31,6 @@ static Config configFromJson(const Json& j) {
   c.wakeUpTimeout = static_cast<uint16_t>(j["wakeUpTimeout"].n);
   c.startBefore = static_cast<uint16_t>(j["startBefore"].n);
   c.endAfter = static_cast<uint16_t>(j["endAfter"].n);
-  auto pin = [&](const char* k) { return j[k].isNull() ? kNoPin : static_cast<uint8_t>(j[k].n); };
-  c.buttonPin = pin("buttonPin");
-  c.releasePin = pin("releasePin");
-  c.focusPin = pin("focusPin");
   if (!j["cameraIp"].isNull()) {
     unsigned a, b, cc, d;
     std::sscanf(j["cameraIp"].s.c_str(), "%u.%u.%u.%u", &a, &b, &cc, &d);
@@ -161,7 +157,7 @@ struct Device {
   RamLog log{clock};
   Recorder recorder;
   Scheduler scheduler{clock, log, [this](const Config&) { return std::unique_ptr<Camera>(new FakeCamera(&cameraCalls)); }, &recorder};
-  Controller controller{clock, storage, log, scheduler, Pins{4, 5, 6}};
+  Controller controller{clock, storage, log, scheduler};
   FakeRandom random;
   Dispatcher dispatcher{controller, random};
 
@@ -171,9 +167,6 @@ struct Device {
   /// A valid config with one attempt an hour from now.
   Config config() {
     Config c;
-    c.buttonPin = 4;
-    c.releasePin = 5;
-    c.focusPin = 6;
     c.name = "Test";
     c.attempts.push_back(Attempt{kNowSec + 3600, "Attempt 1"});
     return c;
@@ -355,7 +348,6 @@ void test_vectors_config() {
   TEST_ASSERT_FALSE(decodeConfig(wrongLayout.data(), wrongLayout.size(), c));
   TEST_ASSERT_FALSE(decodeConfig(ok.data(), ok.size() - 1, c));
   Config big;
-  big.releasePin = 5;
   Bytes tooMany = encodeConfig(big);
   tooMany.back() = 31;
   TEST_ASSERT_FALSE(decodeConfig(tooMany.data(), tooMany.size(), c));
@@ -699,14 +691,6 @@ void test_config_set_validation_names_the_field_and_changes_nothing() {
   dup.attempts = {Attempt{kNowSec + 7200, "a"}, Attempt{kNowSec + 7200, "b"}};
   ASSERT_INVALID(c.op(0x08, configBody(dup)), Field::AttemptTime, 1, Reason::Duplicate);
 
-  Config noPin = base;
-  noPin.releasePin = kNoPin;
-  ASSERT_INVALID(c.op(0x08, configBody(noPin)), Field::ReleasePin, 0, Reason::BadValue);  // the pins are the board's
-
-  Config reserved = base;
-  reserved.releasePin = 26;  // not the board's release pin
-  ASSERT_INVALID(c.op(0x08, configBody(reserved)), Field::ReleasePin, 0, Reason::BadValue);
-
   Config noIp = base;
   noIp.cameraType = CameraType::ZCam;
   ASSERT_INVALID(c.op(0x08, configBody(noIp)), Field::CameraIp, 0, Reason::Required);
@@ -882,17 +866,6 @@ void test_a_missed_attempt_is_announced_once() {
   TEST_ASSERT_EQUAL_UINT(events, d.recorder.events.size());
 }
 
-void test_a_config_with_other_pins_is_refused() {
-  Device d;
-  d.begin();
-  Config c = d.config();
-  c.releasePin = 25;
-  SaveResult r = d.controller.saveConfig(c);
-  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SaveStatus::Invalid), static_cast<uint8_t>(r.status));
-  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(Field::ReleasePin), static_cast<uint8_t>(r.error.field));
-  TEST_ASSERT_EQUAL_UINT8(5, d.controller.currentConfig().releasePin);
-}
-
 void test_run_test_streams_progress_and_finishes_idle() {
   Device d;
   d.begin();
@@ -1043,8 +1016,6 @@ void test_defaults_when_nothing_is_stored() {
   d.begin();
   const Config& c = d.controller.currentConfig();
   TEST_ASSERT_TRUE(c.cameraType == CameraType::Generic);
-  TEST_ASSERT_EQUAL_UINT8(4, c.buttonPin);
-  TEST_ASSERT_EQUAL_UINT8(5, c.releasePin);
   TEST_ASSERT_EQUAL_UINT16(5, c.wakeUpTimeout);
   TEST_ASSERT_EQUAL_UINT16(20, c.startBefore);
   TEST_ASSERT_EQUAL_UINT16(30, c.endAfter);
@@ -1115,40 +1086,8 @@ void test_a_camera_that_is_not_ready_is_an_error_phase() {
 // ---------------------------------------------------------------------------
 // config helpers and cameras
 
-void test_config_pins_must_be_the_boards() {
-  Pins pins{4, 5, 6};
-  Config c;
-  c.buttonPin = 4;
-  c.releasePin = 5;
-  c.focusPin = 6;
-  TEST_ASSERT_FALSE(validateConfig(c, kNow, &pins).has_value());
-  c.releasePin = 25;
-  auto e = validateConfig(c, kNow, &pins);
-  TEST_ASSERT_TRUE(e.has_value());
-  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(Field::ReleasePin), static_cast<uint8_t>(e->field));
-  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(Reason::BadValue), static_cast<uint8_t>(e->reason));
-  c.releasePin = 5;
-  c.buttonPin = kNoPin;
-  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(Field::ButtonPin), static_cast<uint8_t>(validateConfig(c, kNow, &pins)->field));
-}
-
-void test_the_pins_stored_by_an_older_firmware_are_replaced() {
-  Device d;
-  Config old = d.config();
-  old.buttonPin = 17;
-  old.releasePin = 25;
-  d.storage.hasConfig = true;
-  d.storage.rev = 3;
-  d.storage.blob = encodeConfig(old);
-  d.begin();
-  TEST_ASSERT_EQUAL_UINT8(4, d.controller.currentConfig().buttonPin);
-  TEST_ASSERT_EQUAL_UINT8(5, d.controller.currentConfig().releasePin);
-  TEST_ASSERT_EQUAL_UINT8(6, d.controller.currentConfig().focusPin);
-}
-
 void test_names_are_limited_in_bytes() {
   Config c;
-  c.releasePin = 25;
   c.name = std::string(33, 'a');
   auto e = validateConfig(c, kNow);
   TEST_ASSERT_TRUE(e.has_value());
@@ -1353,7 +1292,6 @@ int main(int, char**) {
   RUN_TEST(test_nothing_is_armed_until_the_clock_is_valid);
   RUN_TEST(test_a_completed_attempt_stays_complete_when_the_schedule_is_replanned);
   RUN_TEST(test_a_missed_attempt_is_announced_once);
-  RUN_TEST(test_a_config_with_other_pins_is_refused);
   RUN_TEST(test_run_test_streams_progress_and_finishes_idle);
   RUN_TEST(test_logs_get_pages_by_seq_and_subscribe_replays);
   RUN_TEST(test_long_log_lines_are_cut);
@@ -1371,8 +1309,6 @@ int main(int, char**) {
   RUN_TEST(test_a_config_change_is_announced);
   RUN_TEST(test_a_camera_that_is_not_ready_is_an_error_phase);
 
-  RUN_TEST(test_config_pins_must_be_the_boards);
-  RUN_TEST(test_the_pins_stored_by_an_older_firmware_are_replaced);
   RUN_TEST(test_names_are_limited_in_bytes);
   RUN_TEST(test_advertised_names_keep_the_id);
   RUN_TEST(test_device_ids);

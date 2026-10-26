@@ -64,7 +64,7 @@ export const CAMERA_TYPE = { generic: 0, zcam: 1 }
 /** invalid_config field ids and reasons (docs/ble-protocol.md, Errors). */
 export const FIELD = {
   name: 1, cameraType: 2, wakeUpTimeout: 3, startBefore: 4, endAfter: 5,
-  buttonPin: 6, releasePin: 7, focusPin: 8, cameraIp: 9,
+  cameraIp: 9,
   attempts: 10, attemptName: 11, attemptTime: 12,
 }
 export const REASON = {

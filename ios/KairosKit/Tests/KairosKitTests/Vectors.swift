@@ -55,8 +55,6 @@ func configFrom(_ j: [String: Any]) -> CameraConfig {
         wakeUpTimeout: Double(j.int("wakeUpTimeout")),
         startBefore: Double(j.int("startBefore")),
         endAfter: Double(j.int("endAfter")),
-        buttonGpioPort: j.optInt("buttonPin"),
-        generic: .init(releaseGpioPin: j.optInt("releasePin"), focusGpioPin: j.optInt("focusPin")),
         zcam: .init(cameraIp: j.optStr("cameraIp")),
         attempts: j.array("attempts").map { .init(name: $0.str("name"), seconds: UInt32($0.int("time"))) }
     )

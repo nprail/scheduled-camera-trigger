@@ -1,7 +1,7 @@
 // Board wiring for the ESP32-S3 DevKitC-1 (verify against your board).
 //
-// The GPIO pins are constants, not settings: a phone cannot change them (the device refuses a config that
-// names other pins). To wire a different board, edit the numbers below and rebuild. Keep clear of the strapping
+// The GPIO pins are constants, not settings: they are not part of the protocol and no phone can change them.
+// To wire a different board, edit the numbers below and rebuild. Keep clear of the strapping
 // pins (0, 3, 45, 46), USB (19, 20) and flash/PSRAM (26 to 37). `kNoPin` (0xFF) means "not wired".
 #pragma once
 #include <stdint.h>
@@ -21,10 +21,12 @@ constexpr int KAIROS_RTC_SDA = 8;
 constexpr int KAIROS_RTC_SCL = 18;
 
 // Pairing button (active high, internal pull-down) and the generic camera's lines.
-// Focus may be kairos::kNoPin: wake then pulses the release line.
-constexpr kairos::Pins KAIROS_PINS = {4, 5, 6};
+// The focus pin may be kairos::kNoPin: wake then pulses the release line.
+constexpr uint8_t KAIROS_BUTTON_PIN = 4;
+constexpr uint8_t KAIROS_RELEASE_PIN = 5;
+constexpr uint8_t KAIROS_FOCUS_PIN = 6;
 
-static_assert(KAIROS_PINS.button != KAIROS_PINS.release && KAIROS_PINS.button != KAIROS_PINS.focus,
+static_assert(KAIROS_BUTTON_PIN != KAIROS_RELEASE_PIN && KAIROS_BUTTON_PIN != KAIROS_FOCUS_PIN,
               "the button and the camera lines must be different pins");
 
 #ifndef FW_VERSION

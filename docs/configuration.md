@@ -9,9 +9,9 @@ The device reads its settings from `config.json` (see [config.example.json](http
 | `name` | Friendly device name, up to 32 characters (optional). The Bluetooth name is `{name}-{deviceId}`. |
 | `cameraType` | Type of camera being triggered: `generic` or `zcam`. |
 | `logFile` | File path to store logs at. |
-| `buttonGpioPort` | GPIO pin connected to a button. Pressing it opens a 2-minute Bluetooth pairing window (optional). |
-| `generic.releaseGpioPin` | GPIO pin connected to the camera's shutter release pin (required for `generic`). |
-| `generic.focusGpioPin` | GPIO pin connected to the camera's focus pin (optional). |
+| `buttonGpioPort` (config.json only) | GPIO pin connected to a button. Pressing it opens a 2-minute Bluetooth pairing window (optional). |
+| `generic.releaseGpioPin` (config.json only) | GPIO pin connected to the camera's shutter release pin (required for `generic`). |
+| `generic.focusGpioPin` (config.json only) | GPIO pin connected to the camera's focus pin (optional). |
 | `zcam.cameraIp` | IP address of the Z CAM (required for `zcam`). |
 | `wakeUpTimeout` | Seconds before the recording starts to wake up the camera (0 to 3600). |
 | `startBefore` | Seconds before T-0 to start recording (0 to 3600). |
@@ -31,5 +31,7 @@ Each attempt has one moment that matters, T-0. The three timings place everythin
 ```
 
 ## Older configs
+
+The three GPIO pins describe how the device is wired, so they are set in `config.json` only. The Bluetooth protocol and the apps do not carry them, and saving a schedule from a phone leaves them as they are.
 
 Older configs (plain date strings for `attempts`, `genericReleaseGpioPin`, `zcamCameraIp`, …) are read as this shape automatically. The file is rewritten in the new shape the next time the config is saved.

@@ -11,8 +11,8 @@ namespace kairos {
 
 class Controller : public DeviceApi {
  public:
-  Controller(Clock& clock, Storage& storage, RamLog& log, Scheduler& scheduler, Pins pins = Pins())
-      : clock_(clock), storage_(storage), log_(log), scheduler_(scheduler), pins_(pins) {}
+  Controller(Clock& clock, Storage& storage, RamLog& log, Scheduler& scheduler)
+      : clock_(clock), storage_(storage), log_(log), scheduler_(scheduler) {}
 
   /// Load the config and secret from storage (or use the defaults) and plan the schedule.
   void begin();
@@ -51,7 +51,6 @@ class Controller : public DeviceApi {
   Storage& storage_;
   RamLog& log_;
   Scheduler& scheduler_;
-  Pins pins_;  // the board's wiring: always what config_ holds
   Config config_;
   uint32_t rev_ = 1;
   uint8_t secret_[kSecretLen] = {0};

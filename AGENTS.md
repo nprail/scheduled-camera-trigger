@@ -193,9 +193,10 @@ Sections:
    - Stop recording: "N s after T-0" (`endAfter`)
 3. **Camera**:
    - **Type** picker: "Remote trigger (GPIO)" (`generic`) or "Z CAM (network)" (`zcam`).
-   - For `generic`: **Release pin** (integer GPIO) and **Focus pin** (optional integer GPIO).
    - For `zcam`: **Camera IP**, with the placeholder `192.168.1.50`, no auto-capitalization or autocorrect.
-4. **Device**: **Name** (optional text) and **Button pin** (optional integer GPIO).
+4. **Device**: **Name** (optional text).
+
+There are no pin fields: GPIO pins are wiring, kept on the device (`config.json` on the Pi, constants in the ESP32 firmware) and not part of the protocol.
 
 Behavior:
 - Empty text fields for optional values are sent as "none". Non-numeric text in a pin field becomes empty. The camera IP must be an IPv4 address (like `192.168.1.50`); anything else is refused in the app before it is sent, as `zcam.cameraIp: must be an IPv4 address like 192.168.1.50`. Names are limited to 32 bytes of UTF-8.
@@ -251,7 +252,7 @@ Show `DeviceError` messages to the user as friendly text. Mappings in the iOS ap
 | `unsupported` | "This device uses protocol vN. Update the app." |
 | `internal` | The device's detail text, or "The device had an internal error." |
 
-The `invalid_config` field names are `name`, `cameraType`, `wakeUpTimeout`, `startBefore`, `endAfter`, `buttonGpioPort`, `generic.releaseGpioPin`, `generic.focusGpioPin`, `zcam.cameraIp`, `attempts`, `attempts[i].name` and `attempts[i].time`. The reasons read: "is required", "is out of range", "is not valid", "must be in the future", "duplicates another attempt", "is too soon: the camera wake-up time has already passed", and "has too many attempts (at most 30)".
+The `invalid_config` field names are `name`, `cameraType`, `wakeUpTimeout`, `startBefore`, `endAfter`, `zcam.cameraIp`, `attempts`, `attempts[i].name` and `attempts[i].time`. The reasons read: "is required", "is out of range", "is not valid", "must be in the future", "duplicates another attempt", "is too soon: the camera wake-up time has already passed", and "has too many attempts (at most 30)".
 
 ## 10. Details worth matching exactly
 

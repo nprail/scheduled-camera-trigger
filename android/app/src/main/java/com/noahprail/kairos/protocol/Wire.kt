@@ -77,7 +77,6 @@ internal object Wire {
     const val CONFIG_LAYOUT = 1
     const val MAX_ATTEMPTS = 30
     const val MAX_NAME_BYTES = 32
-    private const val NO_PIN = 0xFF
 
     /** `[op][id][body]` */
     fun request(op: Op, id: Int, body: ByteArray = ByteArray(0)): ByteArray =
@@ -110,18 +109,10 @@ internal object Wire {
         if (c.attempts.size > MAX_ATTEMPTS) throw invalid("attempts", "has too many attempts (at most $MAX_ATTEMPTS)")
 
         fun seconds(v: Double) = Math.round(v).coerceIn(0, 65535).toInt()
-        fun pin(p: Int?, field: String): Int {
-            if (p == null) return NO_PIN
-            if (p !in 0..254) throw invalid(field, "is not a GPIO number")
-            return p
-        }
 
         val w = ByteWriter()
         w.u8(CONFIG_LAYOUT).u8(type)
         w.u16(seconds(c.wakeUpTimeout)).u16(seconds(c.startBefore)).u16(seconds(c.endAfter))
-        w.u8(pin(c.buttonGpioPort, "buttonGpioPort"))
-        w.u8(pin(c.generic.releaseGpioPin, "generic.releaseGpioPin"))
-        w.u8(pin(c.generic.focusGpioPin, "generic.focusGpioPin"))
         for (octet in ipBytes(c.zcam.cameraIp)) w.u8(octet)
         w.string(name)
         w.u8(c.attempts.size)
@@ -152,10 +143,6 @@ internal object Wire {
         val wake = r.u16()
         val start = r.u16()
         val end = r.u16()
-        fun pin(v: Int) = if (v == NO_PIN) null else v
-        val button = pin(r.u8())
-        val release = pin(r.u8())
-        val focus = pin(r.u8())
         val ip = listOf(r.u8(), r.u8(), r.u8(), r.u8())
         val name = r.string()
         val count = r.u8()
@@ -171,8 +158,6 @@ internal object Wire {
             wakeUpTimeout = wake.toDouble(),
             startBefore = start.toDouble(),
             endAfter = end.toDouble(),
-            buttonGpioPort = button,
-            generic = CameraConfig.Generic(release, focus),
             zcam = CameraConfig.Zcam(if (ip.all { it == 0 }) null else ip.joinToString(".")),
             attempts = attempts,
         )
@@ -215,9 +200,6 @@ internal object Wire {
         3 -> "wakeUpTimeout"
         4 -> "startBefore"
         5 -> "endAfter"
-        6 -> "buttonGpioPort"
-        7 -> "generic.releaseGpioPin"
-        8 -> "generic.focusGpioPin"
         9 -> "zcam.cameraIp"
         10 -> "attempts"
         11 -> "attempts[$index].name"
