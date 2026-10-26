@@ -36,7 +36,7 @@ Kairos is an open source hardware trigger that starts a camera at a set time. It
 - **Works with your camera.** Trigger any camera with a standard remote trigger port, or a Z CAM over its HTTP API on a wired Ethernet link.
 - **Controlled from your phone.** Native iPhone and Android apps connect over Bluetooth Low Energy. You set the schedule, check the countdown, run a test and watch the log, in the field with no network.
 - **Hard to misuse.** Pair once with a physical button press, so only your phone can control the device.
-- **Small and low power.** It runs on a Raspberry Pi Zero W, or on an ESP32-S3 with a real-time clock, with Wi-Fi switched off.
+- **Small and low power.** It runs on a Raspberry Pi Zero W, or on an ESP32-S3 or ESP32-C3 with a real-time clock, with Wi-Fi switched off.
 - **Open.** The device software, both apps and the Bluetooth protocol are MIT licensed and documented in this repository.
 
 ## How it works

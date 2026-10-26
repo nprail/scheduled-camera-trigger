@@ -98,7 +98,7 @@ Use the same pin number as `buttonGpioPort`. Pressing the button opens a 2-minut
 
 ## ESP32-S3 version
 
-The firmware in [`esp32/`](https://github.com/nprail/kairos/tree/main/esp32) runs the same protocol on an ESP32-S3, so the apps work with either device. The differences in hardware:
+The firmware in [`esp32/`](https://github.com/nprail/kairos/tree/main/esp32) runs the same protocol on an ESP32-S3 or an ESP32-C3, so the apps work with either device. The differences in hardware:
 
 | | Raspberry Pi Zero W | ESP32-S3 |
 | --- | --- | --- |
@@ -119,7 +119,7 @@ Pins (constants in `esp32/src/platform/board.h`; verify against your board):
 | Pairing button | 4 (active high, internal pull-down) |
 | Camera release / focus | 5 / 6 |
 
-The pins are fixed in the firmware and are not part of the protocol, so no phone can change them. To change them, edit the constants in `board.h` and rebuild (see `esp32/README.md`). The same optocoupler stage as for the Pi (see [Generic camera](#generic-camera-remote-trigger-port)) isolates the camera, and a pull-down on each driver input keeps the camera lines quiet while the chip boots. Use a CR2032 in the RTC only if its charging circuit is disabled (many cheap DS3231 modules charge the cell). The ESP32 version runs from an external battery pack. Flash it with PlatformIO, and see `esp32/README.md` for the details and the things still to be confirmed on real hardware.
+The ESP32-C3 has far fewer usable pins and uses a separate set (no W5500 INT/RST, no focus line): see `esp32/README.md`. The pins are fixed in the firmware and are not part of the protocol, so no phone can change them. To change them, edit the constants in `board.h` and rebuild (see `esp32/README.md`). The same optocoupler stage as for the Pi (see [Generic camera](#generic-camera-remote-trigger-port)) isolates the camera, and a pull-down on each driver input keeps the camera lines quiet while the chip boots. Use a CR2032 in the RTC only if its charging circuit is disabled (many cheap DS3231 modules charge the cell). The ESP32 version runs from an external battery pack. Flash it with PlatformIO, and see `esp32/README.md` for the details and the things still to be confirmed on real hardware.
 
 ## Status of this document
 

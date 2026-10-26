@@ -9,7 +9,7 @@
 | [`android/`](https://github.com/nprail/kairos/blob/main/android/README.md) | The Android app (Kotlin, Jetpack Compose, Material 3). |
 | [`docs/ble-protocol.md`](ble-protocol.md) | The Bluetooth protocol between the phone and the device. |
 | [`docs/test-vectors.json`](https://github.com/nprail/kairos/blob/main/docs/test-vectors.json) | Test vectors that the device and both apps are checked against. |
-| [`esp32/`](https://github.com/nprail/kairos/tree/main/esp32) | The device side on an ESP32-S3 (C++, PlatformIO). Design in [esp32-port.md](esp32-port.md). |
+| [`esp32/`](https://github.com/nprail/kairos/tree/main/esp32) | The device side on an ESP32-S3 or ESP32-C3 (C++, PlatformIO). Design in [esp32-port.md](esp32-port.md). |
 | [`docs/hardware.md`](hardware.md) | Parts, GPIO pins and wiring. |
 | [`site/`](https://github.com/nprail/kairos/blob/main/site/README.md) | The one-page marketing website (Tailwind). The docs are built into `site/docs/`. |
 | [`docmd/`](https://github.com/nprail/kairos/tree/main/docmd) | Config for the [docmd](https://docmd.io) build that turns `docs/` into the documentation site. |

@@ -1,0 +1,9 @@
+# Name,     Type, SubType, Offset,   Size,     Flags
+# The same layout as partitions.csv for 4 MB flash (the usual size on an ESP32-C3 board): smaller app slots, and the
+# coredump partition before the 4 MB boundary. NVS is at the same frozen offset and size.
+nvs,        data, nvs,     0x9000,   0x8000,
+otadata,    data, ota,     0x11000,  0x2000,
+phy_init,   data, phy,     0x13000,  0x1000,
+app0,       app,  ota_0,   0x20000,  0x1D0000,
+app1,       app,  ota_1,   0x1F0000, 0x1D0000,
+coredump,   data, coredump,0x3C0000, 0x10000,

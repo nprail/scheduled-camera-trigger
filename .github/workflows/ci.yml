@@ -54,9 +54,13 @@ jobs:
         working-directory: esp32
         run: pio test -e native
 
-      - name: Build the firmware
+      - name: Build the firmware (ESP32-S3)
         working-directory: esp32
         run: pio run -e device
+
+      - name: Build the firmware (ESP32-C3)
+        working-directory: esp32
+        run: pio run -e device-c3
 
   ios:
     name: iOS (Swift)

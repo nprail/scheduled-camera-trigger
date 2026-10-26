@@ -37,11 +37,13 @@ void EthNet::onEvent(arduino_event_id_t event) {
 bool EthNet::probe() {
   pinMode(KAIROS_W5500_CS, OUTPUT);
   digitalWrite(KAIROS_W5500_CS, HIGH);
-  pinMode(KAIROS_W5500_RST, OUTPUT);
-  digitalWrite(KAIROS_W5500_RST, LOW);
-  delay(2);
-  digitalWrite(KAIROS_W5500_RST, HIGH);
-  delay(60);  // the chip's PLL needs about 50 ms after a reset
+  if (KAIROS_W5500_RST >= 0) {
+    pinMode(KAIROS_W5500_RST, OUTPUT);
+    digitalWrite(KAIROS_W5500_RST, LOW);
+    delay(2);
+    digitalWrite(KAIROS_W5500_RST, HIGH);
+  }
+  delay(60);  // the chip's PLL needs about 50 ms after a reset or power-up
 
   // VERSIONR is at 0x0039 in the common register block; a read is address, control byte 0x00, then the data
   SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));

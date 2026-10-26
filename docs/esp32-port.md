@@ -1,6 +1,6 @@
 # ESP32 Port — Design Proposal
 
-**Status:** Implemented in [`esp32/`](https://github.com/nprail/kairos/tree/main/esp32) (builds, with host tests; not yet run on hardware). See [Implementation notes](#implementation-notes) for where it differs from this proposal. · **Target:** ESP32-S3 + W5500 Ethernet + external RTC · **Framework:** Arduino-ESP32 on PlatformIO · **Storage:** NVS only · **Protocol:** new binary BLE protocol v2
+**Status:** Implemented in [`esp32/`](https://github.com/nprail/kairos/tree/main/esp32) (builds, with host tests; not yet run on hardware). See [Implementation notes](#implementation-notes) for where it differs from this proposal. · **Target:** ESP32-S3 (and ESP32-C3, see §19) + W5500 Ethernet + external RTC · **Framework:** Arduino-ESP32 on PlatformIO · **Storage:** NVS only · **Protocol:** new binary BLE protocol v2
 
 This document describes how to port the device side of Kairos (`trigger/`, currently Node on a Raspberry Pi Zero W) to an ESP32. Because nobody uses the current system yet, the port also replaces the JSON BLE protocol (v1) with a compact binary one (v2, §5). **Both apps change with it.** Nothing needs to stay compatible with v1.
 
@@ -467,6 +467,7 @@ The firmware in `esp32/`, the v2 protocol in [ble-protocol.md](ble-protocol.md),
 - **Clock discipline** only steps the clock when the system and the RTC differ by two seconds or more, since the RTC has 1 s resolution and is written truncated. Sub-second alignment (section 7.3) is not implemented.
 - **Fixed pins, not in the protocol.** The button, release and focus pins are the constants `KAIROS_BUTTON_PIN`, `KAIROS_RELEASE_PIN` and `KAIROS_FOCUS_PIN` in `esp32/src/platform/board.h`, next to the W5500 and RTC pins. The config layout and the apps carry no pins, so there is no allow-list or pin validation. To use another board layout, edit the constants and rebuild.
 - **Storage.** `NvsStorage` keeps `[revision][config layout]` in one NVS key and the secret in another; `Controller` falls back to the defaults if the stored config doesn't decode.
+- **ESP32-C3.** The same firmware builds for an ESP32-C3 (`pio run -e device-c3`). `board.h` picks the pins by chip (the C3 only has eight usable GPIOs, so the W5500 INT/RST and the focus line are not wired), the `core` task runs on core 0 because the C3 has one core, and `partitions_4mb.csv` fits the usual 4 MB flash. Not run on hardware.
 - **Device id** comes from the Bluetooth MAC (`ESP_MAC_BT`), the last 3 bytes.
 - **Wi-Fi code.** The prebuilt core still links it. Nothing starts it.
 

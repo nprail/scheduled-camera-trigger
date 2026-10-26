@@ -219,7 +219,7 @@ void setup() {
   esp_task_wdt_config_t wdt = {.timeout_ms = 60000, .idle_core_mask = 0, .trigger_panic = true};
   esp_task_wdt_reconfigure(&wdt);
 
-  xTaskCreatePinnedToCore(coreTask, "core", 10240, nullptr, 5, nullptr, 1);
+  xTaskCreatePinnedToCore(coreTask, "core", 10240, nullptr, 5, nullptr, portNUM_PROCESSORS > 1 ? 1 : 0);  // the C3 has one core
 }
 
 void loop() { vTaskDelete(nullptr); }

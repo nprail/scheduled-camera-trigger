@@ -1,6 +1,6 @@
-# Kairos firmware for the ESP32-S3
+# Kairos firmware for the ESP32-S3 and ESP32-C3
 
-The device side of Kairos on an ESP32-S3, with an external RTC and a W5500 Ethernet module for a Z CAM. It speaks the same Bluetooth protocol as the Raspberry Pi version in [`trigger/`](../trigger/) (protocol v2, [docs/ble-protocol.md](../docs/ble-protocol.md)), so the iPhone and Android apps work with either. The design and the reasons behind it are in [docs/esp32-port.md](../docs/esp32-port.md). Wiring and parts are in [docs/hardware.md](../docs/hardware.md).
+The device side of Kairos on an ESP32-S3 or an ESP32-C3, with an external RTC and a W5500 Ethernet module for a Z CAM. It speaks the same Bluetooth protocol as the Raspberry Pi version in [`trigger/`](../trigger/) (protocol v2, [docs/ble-protocol.md](../docs/ble-protocol.md)), so the iPhone and Android apps work with either. The design and the reasons behind it are in [docs/esp32-port.md](../docs/esp32-port.md). Wiring and parts are in [docs/hardware.md](../docs/hardware.md).
 
 > **Status:** the firmware builds, and its logic is covered by host tests that run the shared protocol vectors. It has **not been run on hardware yet**. The first bring-up on a real board is where the remaining open items in the design doc (the generic camera's trigger pulse, the Z CAM's DHCP behavior, whether the Arduino core's bootloader supports rollback) get settled.
 
@@ -11,12 +11,13 @@ You need [PlatformIO](https://platformio.org) Core 6.1.19 or newer.
 ```sh
 cd esp32
 pio test -e native            # host unit tests: protocol, config, scheduler, cameras (no hardware)
-pio run -e device             # build the firmware
+pio run -e device             # build the firmware for an ESP32-S3
 pio run -e device -t upload   # flash over USB
+pio run -e device-c3          # build it for an ESP32-C3 (add -t upload to flash)
 pio device monitor            # serial log
 ```
 
-The `device` environment uses the pioarduino platform (Arduino-ESP32 core 3.3.x) and NimBLE-Arduino, both pinned in [platformio.ini](platformio.ini). The first build downloads the toolchain.
+The `device` (ESP32-S3) and `device-c3` (ESP32-C3) environments build the same firmware. They differ only in the pins ([src/platform/board.h](src/platform/board.h), chosen by the chip) and the partition table: the C3 uses [partitions_4mb.csv](partitions_4mb.csv) for the usual 4 MB flash, with the same frozen `nvs` partition. Both use the pioarduino platform (Arduino-ESP32 core 3.3.x) and NimBLE-Arduino, both pinned in [platformio.ini](platformio.ini). The first build downloads the toolchain.
 
 **Flashing keeps the pairing and the schedule.** They live in NVS, which `upload` doesn't touch. Don't run `pio run -t erase` (or any "erase all flash" option) unless you want a factory reset, and never change the `nvs` partition in [partitions.csv](partitions.csv). After a factory reset, a phone that still holds the old bond must forget the device once in its Bluetooth settings.
 
@@ -37,7 +38,7 @@ The `device` environment uses the pioarduino platform (Arduino-ESP32 core 3.3.x)
 
 The W5500 Ethernet module is optional: it is only needed to control a Z CAM. A `generic` (remote trigger) setup works without it. At boot the firmware reads the chip's version register; if the module does not answer, Ethernet is never started and Device Info reports only the `generic` camera type, so the apps hide the Z CAM option.
 
-Every pin is a constant in [src/platform/board.h](src/platform/board.h). The values below are for an ESP32-S3-DevKitC-1 (verify them against your board):
+Every pin is a constant in [src/platform/board.h](src/platform/board.h). The values below are for an ESP32-S3-DevKitC-1 (verify them against your board). The ESP32-C3 has its own set, below.
 
 | Function | GPIO |
 | --- | --- |
@@ -56,7 +57,22 @@ constexpr uint8_t KAIROS_FOCUS_PIN = 6;  // or kairos::kNoPin: wake then pulses 
 constexpr int KAIROS_RTC_SDA = 8;        // and the W5500 and RTC pins above it
 ```
 
-Avoid the strapping pins (0, 3, 45, 46), USB (19, 20) and flash/PSRAM (26 to 37). The build stops if the button shares a pin with a camera line. 
+Avoid the strapping pins (0, 3, 45, 46), USB (19, 20) and flash/PSRAM (26 to 37). The build stops if the button shares a pin with a camera line.
+
+### ESP32-C3 (ESP32-C3-DevKitM-1)
+
+The C3 has only GPIO 0 to 21. After the strapping pins (2, 8, 9), USB (18, 19), the console UART (20, 21) and the flash (12 to 17), eight pins are left, and they are all used:
+
+| Function | GPIO |
+| --- | --- |
+| W5500 SCLK / MOSI / MISO / CS (Z CAM only) | 4 / 6 / 5 / 7 |
+| W5500 INT / RST (Z CAM only) | not wired (-1) |
+| RTC SDA / SCL (DS3231) | 0 / 1 |
+| Pairing button | 3 |
+| Camera release | 10 |
+| Camera focus | not wired: wake pulses the release line |
+
+With INT and RST not wired, the Ethernet driver polls the W5500 and the firmware does not reset it before probing. Whether the polling rate is fast enough for the Z CAM's HTTP calls is not tested. The C3 has one core, so the `core` task runs on core 0; the firmware is otherwise identical.
 
 ## Behavior notes
 

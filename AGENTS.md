@@ -7,7 +7,7 @@ Guidance for agents working in this repository.
 | Path | What |
 | --- | --- |
 | `trigger/`, `config.example.json` | The device side on a Raspberry Pi Zero W (Node). It is controlled over Bluetooth only; there is no web interface or HTTP API. |
-| `esp32/` | The device side on an ESP32-S3 (C++, Arduino-ESP32 on PlatformIO). The same protocol and behavior as `trigger/`, with an external RTC and Ethernet for a Z CAM. See `docs/esp32-port.md`. |
+| `esp32/` | The device side on an ESP32-S3 or ESP32-C3 (C++, Arduino-ESP32 on PlatformIO). The same protocol and behavior as `trigger/`, with an external RTC and Ethernet for a Z CAM. See `docs/esp32-port.md`. |
 | `docs/ble-protocol.md` | **The BLE protocol (v2, binary). The source of truth for everything the phone and device exchange.** |
 | `docs/test-vectors.json` | Cross-implementation test vectors, generated from the Node reference (`node test/vectors.js --write`). The ESP32 firmware and both apps pass the same file. |
 | `ios/` | The native iOS app (SwiftUI) and `KairosKit`, a UI-free Swift package for the protocol. |
