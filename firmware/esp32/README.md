@@ -21,6 +21,17 @@ The `device` (ESP32-S3) and `device-c3` (ESP32-C3) environments build the same f
 
 **Flashing keeps the pairing and the schedule.** They live in NVS, which `upload` doesn't touch. Don't run `pio run -t erase` (or any "erase all flash" option) unless you want a factory reset, and never change the `nvs` partition in [partitions.csv](partitions.csv). After a factory reset, a phone that still holds the old bond must forget the device once in its Bluetooth settings.
 
+## Versions and releases
+
+The version the device reports (`fw` in Device Info) is set at build time by [version.py](version.py): `$KAIROS_VERSION` if set, else `git describe`, else `dev`.
+
+Pushing a tag like `v1.2.0` runs [release.yml](../../.github/workflows/release.yml), which tests, builds both chips with that version, and attaches these to a GitHub Release, with `SHA256SUMS`:
+
+- `kairos-<chip>-<version>-factory.bin`: the whole flash image, written at `0x0`. For a blank board. **It erases the pairing and the schedule.**
+- `kairos-<chip>-<version>-app.bin`: the app alone, written at `0x20000`. For updating a paired board; it keeps NVS.
+
+Every CI run also uploads the same binaries as a `firmware` artifact.
+
 ## Layout
 
 | Path | What |

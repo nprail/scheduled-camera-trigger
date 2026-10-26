@@ -339,7 +339,7 @@ Implement `docs/ble-protocol.md` (v2: GATT layout, advertising, framing, securit
 - **Security:** `NimBLEDevice::setSecurityAuth(bond=true, mitm=false, sc=true)`, Just Works, bonds stored in NVS. The shared-secret check at the application layer is what actually gates control, as today.
 - **Entropy:** `esp_fill_random()` is a true RNG only while the RF subsystem is on. BLE is always on here, but generate the nonce after BLE start, and note it in code.
 - **Notifications:** Status at most once per second while recording, plus on every change. Debounce on the `cmd`/`sched` side, not in the BLE callback.
-- **`fw`** is a version string injected as a build flag (`-DFW_VERSION`), the same value an OTA slot will report later.
+- **`fw`** is a version string injected as a build flag (`-DFW_VERSION`, set by `firmware/esp32/version.py` from `$KAIROS_VERSION`, which the release workflow takes from the git tag), the same value an OTA slot will report later.
 
 ## 10. Z CAM over Ethernet
 

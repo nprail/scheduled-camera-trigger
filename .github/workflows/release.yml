@@ -1,0 +1,107 @@
+name: Release firmware
+
+# Push a tag like v1.2.0 to build the ESP32 firmware and attach it to a GitHub Release.
+# The tag (without the "v") becomes the firmware version the device reports.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.chip }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - chip: esp32s3
+            env: device
+          - chip: esp32c3
+            env: device-c3
+    env:
+      KAIROS_VERSION: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('firmware/esp32/platformio.ini') }}
+
+      - run: pip install platformio==6.1.19
+
+      # never ship firmware that fails its own tests
+      - name: Host tests
+        working-directory: firmware/esp32
+        run: pio test -e native
+
+      - name: Build
+        working-directory: firmware/esp32
+        run: pio run -e ${{ matrix.env }}
+
+      - name: Collect binaries
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          out=dist
+          mkdir -p "$out"
+          b=firmware/esp32/.pio/build/${{ matrix.env }}
+          # factory: bootloader, partitions and app in one image, flashed at 0x0 (erases pairing and schedule)
+          cp "$b/firmware.factory.bin" "$out/kairos-${{ matrix.chip }}-$v-factory.bin"
+          # app only: flashed at 0x20000 (keeps pairing and schedule)
+          cp "$b/firmware.bin" "$out/kairos-${{ matrix.chip }}-$v-app.bin"
+          ls -l "$out"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: firmware-${{ matrix.chip }}
+          path: dist/*.bin
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          path: dist
+          pattern: firmware-*
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum *.bin > SHA256SUMS
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          cat > notes.md <<'NOTES'
+          ESP32 firmware for Kairos. Pick the files for your chip (`esp32s3` or `esp32c3`).
+
+          | File | Flash at | When to use it |
+          | --- | --- | --- |
+          | `*-factory.bin` | `0x0` | A new or blank board. **Erases the pairing key and the schedule.** |
+          | `*-app.bin` | `0x20000` | Updating a board that is already paired. Keeps the pairing key and the schedule. |
+
+          With esptool: `esptool.py write_flash 0x0 kairos-esp32s3-<version>-factory.bin`.
+          Verify downloads against `SHA256SUMS`.
+          NOTES
+          gh release create "$TAG" dist/* \
+            --repo "$REPO" \
+            --title "Kairos firmware $TAG" \
+            --notes-file notes.md \
+            --verify-tag

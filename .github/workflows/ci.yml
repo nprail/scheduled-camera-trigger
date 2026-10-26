@@ -66,6 +66,18 @@ jobs:
         working-directory: firmware/esp32
         run: pio run -e device-c3
 
+      # factory.bin is the whole flash image (flash at 0x0), firmware.bin is the app alone (flash at 0x20000)
+      - name: Upload the firmware
+        uses: actions/upload-artifact@v7
+        with:
+          name: firmware
+          path: |
+            firmware/esp32/.pio/build/device/firmware.factory.bin
+            firmware/esp32/.pio/build/device/firmware.bin
+            firmware/esp32/.pio/build/device-c3/firmware.factory.bin
+            firmware/esp32/.pio/build/device-c3/firmware.bin
+          if-no-files-found: error
+
   ios:
     name: iOS (Swift)
     runs-on: macos-15
