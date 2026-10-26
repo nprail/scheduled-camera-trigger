@@ -1,12 +1,12 @@
 {
-  "name": "camera-trigger",
+  "name": "kairos",
   "version": "1.0.0",
   "description": "",
   "main": "trigger/index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon --ignore interface/ trigger/index"
+    "test": "node --test test/*.test.js",
+    "dev": "nodemon trigger/index"
   },
   "keywords": [],
   "author": "Noah Prail <noah@prail.net>",

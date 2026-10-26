@@ -7,22 +7,34 @@ export class Generic extends BaseCamera {
     this.logger = opts.logger
     this.config = opts.config
 
-    if (!opts.config.generic || !opts.config.genericReleaseGpioPin) {
+    if (opts.config.generic?.releaseGpioPin == null) {
       throw new Error('Generic camera configuration not set properly')
     }
 
-    try {
-      this.release = new Gpio(opts.config.genericReleaseGpioPin, 'out')
+    this.ready = false
 
-      if (opts.config.generic.genericFocusGpioPin) {
-        this.focus = new Gpio(opts.config.genericFocusGpioPin, 'out')
+    try {
+      this.release = new Gpio(opts.config.generic.releaseGpioPin, 'out')
+
+      if (opts.config.generic.focusGpioPin != null) {
+        this.focus = new Gpio(opts.config.generic.focusGpioPin, 'out')
       } else {
         this.focus = this.release
       }
 
       this.recording = false
+      this.ready = true
     } catch (err) {
       this.logger.log('Generic', err?.message ?? err, err)
+    }
+  }
+
+  dispose() {
+    try {
+      if (this.focus && this.focus !== this.release) this.focus.unexport()
+      this.release?.unexport()
+    } catch (err) {
+      this.logError(err)
     }
   }
 

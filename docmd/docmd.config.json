@@ -1,0 +1,119 @@
+{
+  "title": "kairos docs",
+  "url": "https://nprail.github.io/kairos/docs",
+  "src": "../docs",
+  "out": "../site/docs",
+  "engine": "js",
+  "logo": {
+    "light": "/assets/images/kairos-mark.svg",
+    "dark": "/assets/images/kairos-mark-reversed.svg",
+    "alt": "Kairos"
+  },
+  "favicon": "/assets/favicon.svg",
+  "layout": {
+    "spa": true,
+    "header": {
+      "enabled": true
+    },
+    "sidebar": {
+      "collapsible": true,
+      "defaultCollapsed": false
+    },
+    "optionsMenu": {
+      "position": "sidebar-top",
+      "components": {
+        "search": true,
+        "themeSwitch": true
+      }
+    },
+    "footer": {
+      "style": "minimal",
+      "content": "Kairos is open source (MIT).",
+      "branding": false
+    }
+  },
+  "theme": {
+    "name": "default",
+    "appearance": "system",
+    "codeHighlight": true,
+    "customCss": [
+      "/assets/css/kairos.css"
+    ]
+  },
+  "minify": true,
+  "autoTitleFromH1": true,
+  "copyCode": true,
+  "pageNavigation": true,
+  "navigation": [
+    {
+      "title": "Overview",
+      "path": "/",
+      "icon": "home"
+    },
+    {
+      "title": "Get started",
+      "icon": "rocket",
+      "collapsible": false,
+      "children": [
+        {
+          "title": "Setting up a device",
+          "path": "/setup/"
+        },
+        {
+          "title": "Hardware",
+          "path": "/hardware/"
+        },
+        {
+          "title": "Configuration",
+          "path": "/configuration/"
+        }
+      ]
+    },
+    {
+      "title": "Reference",
+      "icon": "book-open",
+      "collapsible": false,
+      "children": [
+        {
+          "title": "Bluetooth protocol",
+          "path": "/ble-protocol/"
+        },
+        {
+          "title": "Development",
+          "path": "/development/"
+        }
+      ]
+    },
+    {
+      "title": "Proposals",
+      "icon": "lightbulb",
+      "collapsible": false,
+      "children": [
+        {
+          "title": "ESP32 port",
+          "path": "/esp32-port/"
+        }
+      ]
+    },
+    {
+      "title": "kairos home",
+      "path": "https://nprail.github.io/kairos/",
+      "icon": "arrow-up-right",
+      "external": true
+    },
+    {
+      "title": "GitHub",
+      "path": "https://github.com/nprail/kairos",
+      "icon": "github",
+      "external": true
+    }
+  ],
+  "plugins": {
+    "seo": {
+      "defaultDescription": "Documentation for Kairos, an open source hardware, time-based camera trigger."
+    },
+    "ai": false,
+    "okf": false,
+    "git": false
+  }
+}

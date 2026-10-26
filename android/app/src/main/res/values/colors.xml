@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Kairos brand: ink tile behind the adaptive icon, and the window background shown before Compose draws -->
+    <color name="ic_launcher_background">#14130F</color>
+    <color name="kairos_ground">#F2F0EA</color>
+</resources>

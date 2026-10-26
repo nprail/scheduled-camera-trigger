@@ -1,11 +1,17 @@
 {
   "name": "Device Name",
+  "cameraType": "generic",
   "wakeUpTimeout": 5,
   "startBefore": 20,
   "endAfter": 30,
-  "cameraType": "generic",
-  "genericReleaseGpioPin": 25,
-  "genericFocusGpioPin": 23,
   "logFile": "log.txt",
-  "attempts": ["2022-02-19T17:39:00.000Z", "2022-02-20T17:39:00.000Z"]
+  "buttonGpioPort": 17,
+  "generic": {
+    "releaseGpioPin": 25,
+    "focusGpioPin": 23
+  },
+  "attempts": [
+    { "name": "Attempt 1", "time": "2030-01-01T17:39:00.000Z" },
+    { "name": "Attempt 2", "time": "2030-01-02T17:39:00.000Z" }
+  ]
 }

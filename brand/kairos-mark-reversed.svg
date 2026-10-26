@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" fill="none" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Kairos mark, reversed">
+<path d="M8 34V10H32M88 10H112V34M112 86V110H88M32 110H8V86" stroke="#F2F0EA" stroke-width="7"></path>
+<g stroke="#F2F0EA" stroke-width="6"><line x1="28" y1="64" x2="28" y2="90"></line><line x1="44" y1="64" x2="44" y2="90"></line><line x1="76" y1="64" x2="76" y2="90"></line><line x1="92" y1="64" x2="92" y2="90"></line></g>
+<line x1="60" y1="42" x2="60" y2="90" stroke="#FF5A2E" stroke-width="6"></line>
+<circle cx="60" cy="31" r="10" fill="#FF5A2E"></circle>
+</svg>
