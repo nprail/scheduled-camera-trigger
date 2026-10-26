@@ -167,8 +167,8 @@ dist
 
 config.json
 log.txt
-# docs site build output (docmd builds docs/ into site/docs)
-site/docs/
+# docs site build output (docmd builds docs/ into website/docs)
+website/docs/
 
 # PlatformIO build output
-esp32/.pio/
+firmware/esp32/.pio/

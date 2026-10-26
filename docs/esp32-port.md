@@ -1,8 +1,8 @@
 # ESP32 firmware: design
 
-**Status:** Implemented in [`esp32/`](https://github.com/nprail/kairos/tree/main/esp32) (builds, with host tests; not yet run on hardware). The ESP32 is the recommended device, and the Raspberry Pi version is legacy. See [Implementation notes](#implementation-notes) for where the firmware differs from this design, which was written as a proposal. · **Target:** ESP32-S3 (and ESP32-C3, see §19) + W5500 Ethernet + external RTC · **Framework:** Arduino-ESP32 on PlatformIO · **Storage:** NVS only · **Protocol:** new binary BLE protocol v2
+**Status:** Implemented in [`firmware/esp32/`](https://github.com/nprail/kairos/tree/main/firmware/esp32) (builds, with host tests; not yet run on hardware). The ESP32 is the recommended device, and the Raspberry Pi version is legacy. See [Implementation notes](#19-implementation-notes) for where the firmware differs from this design, which was written as a proposal. · **Target:** ESP32-S3 (and ESP32-C3, see §19) + W5500 Ethernet + external RTC · **Framework:** Arduino-ESP32 on PlatformIO · **Storage:** NVS only · **Protocol:** new binary BLE protocol v2
 
-This document describes the ESP32 version of the device side of Kairos, a port of the original program (`trigger/`, Node on a Raspberry Pi Zero W, now legacy). Because nobody uses the current system yet, the port also replaces the JSON BLE protocol (v1) with a compact binary one (v2, §5). **Both apps change with it.** Nothing needs to stay compatible with v1.
+This document describes the ESP32 version of the device side of Kairos, a port of the original program (`firmware/legacy-pi/trigger/`, Node on a Raspberry Pi Zero W, now legacy). Because nobody uses the current system yet, the port also replaces the JSON BLE protocol (v1) with a compact binary one (v2, §5). **Both apps change with it.** Nothing needs to stay compatible with v1.
 
 ## 1. Why, and what changes
 
@@ -44,7 +44,7 @@ The boot-time and power wins matter in the field: the device can be cold-powered
 
 ### 3.2 Suggested pin map (verify against your board)
 
-All pins are constants in `esp32/src/platform/board.h`, not settings. Anyone wiring a different board edits that file and rebuilds. They are not part of the BLE protocol (§19).
+All pins are constants in `firmware/esp32/src/platform/board.h`, not settings. Anyone wiring a different board edits that file and rebuilds. They are not part of the BLE protocol (§19).
 
 | Function | GPIO | Why |
 | --- | --- | --- |
@@ -226,7 +226,7 @@ Both apps, per `AGENTS.md`:
 Everything protocol-related is **pure C++ with no Arduino or IDF includes**, so it builds in the PlatformIO `native` environment and runs against the shared vectors. There is no JSON anywhere in the pure code.
 
 ```
-esp32/
+firmware/esp32/
   platformio.ini        envs: `device` (esp32-s3), `native` (host tests)
   partitions.csv
   src/main.cpp          setup(): wires modules, starts tasks. loop(): empty
@@ -245,18 +245,18 @@ Mapping from the Node tree:
 
 | Node | ESP32 | Notes |
 | --- | --- | --- |
-| `trigger/ble/framing.js` | `protocol/framing` | Unchanged format |
-| `trigger/ble/auth.js` | `protocol/auth` | HMAC-SHA256, constant-time compare, lockout, pairing window. Raw bytes |
-| `trigger/ble/dispatcher.js` | `protocol/dispatcher` | One op table, binary bodies |
-| `trigger/ble/status.js` | `protocol/status` | 13-byte little-endian |
-| `trigger/ble/gatt.js`, `link.js` | `platform/ble` | NimBLE-Arduino GATT server, fragment queue, MTU |
-| `trigger/controller.js` | `src/controller` | `save`, `setSecret`, `setTime`, `test` |
-| `trigger/lib/config.js` | `config/` | Same rules, binary form. Fixed pins (§19) |
-| `trigger/lib/scheduler.js` | `scheduler/` | Replace `node-schedule` (§7.2) |
-| `trigger/lib/logger.js` | `platform/log` | 500-line RAM ring with `seq`. No file |
-| `trigger/lib/system.js` | `platform/clock` | `setTime` writes the RTC. `disableWifi` becomes a no-op |
-| `trigger/lib/button.js` | `platform/button` | GPIO interrupt, 50 ms debounce |
-| `trigger/cameras/*` | `cameras/` | Same contract (`wake`, `start`, `stop`, `sleep`, `dispose`) |
+| `firmware/legacy-pi/trigger/ble/framing.js` | `protocol/framing` | Unchanged format |
+| `firmware/legacy-pi/trigger/ble/auth.js` | `protocol/auth` | HMAC-SHA256, constant-time compare, lockout, pairing window. Raw bytes |
+| `firmware/legacy-pi/trigger/ble/dispatcher.js` | `protocol/dispatcher` | One op table, binary bodies |
+| `firmware/legacy-pi/trigger/ble/status.js` | `protocol/status` | 13-byte little-endian |
+| `firmware/legacy-pi/trigger/ble/gatt.js`, `link.js` | `platform/ble` | NimBLE-Arduino GATT server, fragment queue, MTU |
+| `firmware/legacy-pi/trigger/controller.js` | `src/controller` | `save`, `setSecret`, `setTime`, `test` |
+| `firmware/legacy-pi/trigger/lib/config.js` | `config/` | Same rules, binary form. Fixed pins (§19) |
+| `firmware/legacy-pi/trigger/lib/scheduler.js` | `scheduler/` | Replace `node-schedule` (§7.2) |
+| `firmware/legacy-pi/trigger/lib/logger.js` | `platform/log` | 500-line RAM ring with `seq`. No file |
+| `firmware/legacy-pi/trigger/lib/system.js` | `platform/clock` | `setTime` writes the RTC. `disableWifi` becomes a no-op |
+| `firmware/legacy-pi/trigger/lib/button.js` | `platform/button` | GPIO interrupt, 50 ms debounce |
+| `firmware/legacy-pi/trigger/cameras/*` | `cameras/` | Same contract (`wake`, `start`, `stop`, `sleep`, `dispose`) |
 
 ### Tasks (FreeRTOS)
 
@@ -401,7 +401,7 @@ Nothing in the port blocks it, and §8 reserves the flash. The transport is the 
 ## 15. Testing
 
 1. **Native unit tests** (`pio test -e native`, Unity) for `protocol`, `config` and `scheduler`:
-   - Run the shared `docs/test-vectors.json`, regenerated for v2: framing, HMAC proofs (v2 labels), Status decoding, **every message encode and decode**, the Config layout, and the error bodies. The firmware and both apps must pass the same vectors.
+   - Run the shared `protocol/test-vectors.json`, regenerated for v2: framing, HMAC proofs (v2 labels), Status decoding, **every message encode and decode**, the Config layout, and the error bodies. The firmware and both apps must pass the same vectors.
    - Port `test/config.test.js`, `test/framing.test.js`, `test/protocol.test.js` and the scheduler cases, using a fake clock and fake camera, as the Node tests do.
 2. **Hardware-in-loop smoke tests** (manual checklist): pair, `time.set`, config save, test run, manual wake/start/stop/sleep, reboot with valid and invalid RTC, power-cycle with the coin cell, pull the Ethernet cable mid-attempt, **re-flash with `upload` and confirm the phone still connects without re-pairing**.
 3. **Real apps:** connect both the iOS and Android apps. Each screen in `AGENTS.md` §6 must behave as before. This is the acceptance test.
@@ -414,9 +414,9 @@ Nothing in the port blocks it, and §8 reserves the flash. The transport is the 
 | --- | --- | --- |
 | 0 | **Spike** on one bench board: BLE advertising with an encrypted write, W5500 DHCP plus one Z CAM HTTP call, RTC read/write, a ~1.2 KB NVS blob write, and a bond that survives `upload` | Each piece works together on the S3, and the version-specific API assumptions in §4 are confirmed or corrected |
 | 1 | **Protocol v2 spec**: rewrite `docs/ble-protocol.md`, new vectors and their generator (`test/vectors.js`, kept in the Node tree until Node is retired) | Reviewed, with vectors checked in |
-| 1b | **Node device speaks v2** (`trigger/ble/`: codecs, dispatcher, Status, Device Info, errors). Config stays `config.json` internally and is converted at the edge. Also fix the advertised-name truncation | Node passes the v2 vectors, and a Pi running it works with the v2 apps. This is the real-device test bed for milestone 2 |
+| 1b | **Node device speaks v2** (`firmware/legacy-pi/trigger/ble/`: codecs, dispatcher, Status, Device Info, errors). Config stays `config.json` internally and is converted at the edge. Also fix the advertised-name truncation | Node passes the v2 vectors, and a Pi running it works with the v2 apps. This is the real-device test bed for milestone 2 |
 | 2 | **Apps**: `KairosKit` and the Android protocol module speak v2 and pass the vectors. UI and demo-mode changes (§5.7) | Both apps' tests pass, demo mode shows every screen on both, and both connect to the v2 Node device. Can run in parallel with 3 |
-| 3 | `esp32/` PlatformIO skeleton, `partitions.csv`, CI build, native test harness. `protocol` + `config` + `scheduler` (pure) | Vectors and ported Node tests pass in the `native` env |
+| 3 | `firmware/esp32/` PlatformIO skeleton, `partitions.csv`, CI build, native test harness. `protocol` + `config` + `scheduler` (pure) | Vectors and ported Node tests pass in the `native` env |
 | 4 | `platform/ble` + NVS storage | Apps scan, connect, pair and authenticate, and config save and reload work |
 | 5 | `rtc` + clock logic | `time.set`/`time.get`, reboot restore, periodic discipline |
 | 6 | `cameras/generic` + button | Real camera triggers on schedule and manually |
@@ -426,10 +426,10 @@ Nothing in the port blocks it, and §8 reserves the flash. The transport is the 
 
 ## 17. Docs and repo changes that come with the port
 
-- Rewrite `docs/ble-protocol.md` as v2 (from §5 here), and regenerate `docs/test-vectors.json`. The Node reference (`trigger/ble/`) is updated to v2 and the vectors keep being generated from it (`node test/vectors.js --write`) while Node exists. When Node is retired, move the generator out of the device tree.
-- Update `AGENTS.md`: the repository layout (add `esp32/`), the app spec's protocol summary and sections affected by §5.7, and the test commands (`cd esp32 && pio test -e native`).
+- Rewrite `docs/ble-protocol.md` as v2 (from §5 here), and regenerate `protocol/test-vectors.json`. The Node reference (`firmware/legacy-pi/trigger/ble/`) is updated to v2 and the vectors keep being generated from it (`cd firmware/legacy-pi && node test/vectors.js --write`) while Node exists. When Node is retired, move the generator out of the device tree.
+- Update `AGENTS.md`: the repository layout (add `firmware/esp32/`), the app spec's protocol summary and sections affected by §5.7, and the test commands (`cd firmware/esp32 && pio test -e native`).
 - README: hardware section and wiring diagram for the ESP32 variant.
-- The Node device code (`trigger/`, `test/`) is updated to v2 (milestone 1b) and kept until the ESP32 fully replaces it, then removed (milestone 9). The Node `package.json` dependencies and the Pi setup docs go with it.
+- The Node device code (`firmware/legacy-pi/trigger/`, `test/`) is updated to v2 (milestone 1b) and kept until the ESP32 fully replaces it, then removed (milestone 9). The Node `package.json` dependencies and the Pi setup docs go with it.
 
 ## 18. Decisions and open questions
 
@@ -458,14 +458,14 @@ Nothing in the port blocks it, and §8 reserves the flash. The transport is the 
 
 ## 19. Implementation notes
 
-The firmware in `esp32/`, the v2 protocol in [ble-protocol.md](ble-protocol.md), the Node device and both apps follow this document, except for these differences:
+The firmware in `firmware/esp32/`, the v2 protocol in [ble-protocol.md](ble-protocol.md), the Node device and both apps follow this document, except for these differences:
 
 - **Platform version.** The firmware pins the pioarduino platform **55.03.311** (Arduino-ESP32 3.3.11) and NimBLE-Arduino **2.5.1**. 55.03.312 needs PlatformIO Core 6.2 or newer.
 - **One task.** Instead of separate `sched` and `cmd` tasks (section 6), one `core` task owns all device state: BLE writes (queued by the radio callbacks), scheduled steps, notifications, the RTC discipline and the button. There are no locks. The cost is that a Z CAM call of up to several seconds delays the next request or step. The watchdog is set to 60 s for that reason.
 - **No `busy` for overlapping requests.** The protocol asks for `busy` when a second request arrives while one runs. With one task, a second request simply waits its turn in the queue. Clients never send overlapping requests.
 - **Test run** is a small state machine stepped by the scheduler tick (wake, 1 s, start, 2 s, stop, sleep, done), so `test.run` returns at once.
 - **Clock discipline** only steps the clock when the system and the RTC differ by two seconds or more, since the RTC has 1 s resolution and is written truncated. Sub-second alignment (section 7.3) is not implemented.
-- **Fixed pins, not in the protocol.** The button, release and focus pins are the constants `KAIROS_BUTTON_PIN`, `KAIROS_RELEASE_PIN` and `KAIROS_FOCUS_PIN` in `esp32/src/platform/board.h`, next to the W5500 and RTC pins. The config layout and the apps carry no pins, so there is no allow-list or pin validation. To use another board layout, edit the constants and rebuild.
+- **Fixed pins, not in the protocol.** The button, release and focus pins are the constants `KAIROS_BUTTON_PIN`, `KAIROS_RELEASE_PIN` and `KAIROS_FOCUS_PIN` in `firmware/esp32/src/platform/board.h`, next to the W5500 and RTC pins. The config layout and the apps carry no pins, so there is no allow-list or pin validation. To use another board layout, edit the constants and rebuild.
 - **Storage.** `NvsStorage` keeps `[revision][config layout]` in one NVS key and the secret in another; `Controller` falls back to the defaults if the stored config doesn't decode.
 - **ESP32-C3.** The same firmware builds for an ESP32-C3 (`pio run -e device-c3`). `board.h` picks the pins by chip (the C3 only has eight usable GPIOs, so the W5500 INT/RST and the focus line are not wired), the `core` task runs on core 0 because the C3 has one core, and `partitions_4mb.csv` fits the usual 4 MB flash. Not run on hardware.
 - **Device id** comes from the Bluetooth MAC (`ESP_MAC_BT`), the last 3 bytes.

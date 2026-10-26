@@ -14,9 +14,12 @@ concurrency:
 
 jobs:
   device:
-    name: Device (Node)
+    name: Legacy device (Node)
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: firmware/legacy-pi
     steps:
       - uses: actions/checkout@v7
 
@@ -24,6 +27,7 @@ jobs:
         with:
           node-version: 20.x
           cache: npm
+          cache-dependency-path: firmware/legacy-pi/package-lock.json
 
       # the native modules (onoff, hci-socket) only build on the Pi
       - run: npm ci --ignore-scripts
@@ -45,21 +49,21 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: ~/.platformio
-          key: pio-${{ runner.os }}-${{ hashFiles('esp32/platformio.ini') }}
+          key: pio-${{ runner.os }}-${{ hashFiles('firmware/esp32/platformio.ini') }}
 
       # the pioarduino platform in platformio.ini needs PlatformIO Core 6.1.19 or newer
       - run: pip install platformio==6.1.19
 
       - name: Host tests (protocol, config, scheduler, cameras)
-        working-directory: esp32
+        working-directory: firmware/esp32
         run: pio test -e native
 
       - name: Build the firmware (ESP32-S3)
-        working-directory: esp32
+        working-directory: firmware/esp32
         run: pio run -e device
 
       - name: Build the firmware (ESP32-C3)
-        working-directory: esp32
+        working-directory: firmware/esp32
         run: pio run -e device-c3
 
   ios:
@@ -74,11 +78,11 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_16.4.app
 
       - name: Test KairosKit
-        working-directory: ios/KairosKit
+        working-directory: apps/ios/KairosKit
         run: swift test
 
       - name: Build the app
-        working-directory: ios
+        working-directory: apps/ios
         run: |
           xcodebuild build \
             -project Kairos.xcodeproj \
@@ -101,16 +105,16 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
 
       - name: Unit tests
-        working-directory: android
+        working-directory: apps/android
         run: ./gradlew :app:testDebugUnitTest
 
       - name: Build debug APK
-        working-directory: android
+        working-directory: apps/android
         run: ./gradlew :app:assembleDebug
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
         with:
           name: app-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: apps/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

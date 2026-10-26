@@ -32,7 +32,7 @@ Each attempt has one moment that matters, T-0. The three timings place everythin
 
 ## Legacy: config.json (Raspberry Pi)
 
-The legacy Pi program reads its settings from `config.json` (see [config.example.json](https://github.com/nprail/kairos/blob/main/config.example.json) for an example, and [setup.md](setup.md#legacy-raspberry-pi) for where the file lives). It holds the settings above, which you can still edit from the apps, plus these, which are only in the file:
+The legacy Pi program reads its settings from `config.json` (see [config.example.json](https://github.com/nprail/kairos/blob/main/firmware/legacy-pi/config.example.json) for an example, and [setup.md](setup.md#legacy-raspberry-pi) for where the file lives). It holds the settings above, which you can still edit from the apps, plus these, which are only in the file:
 
 | Option | Description |
 | --- | --- |

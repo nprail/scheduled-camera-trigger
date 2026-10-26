@@ -4,11 +4,11 @@ How to flash a Kairos device, pair a phone with it, and how the Bluetooth side o
 
 ## Flashing an ESP32
 
-You need a board wired as described in [Hardware](hardware.md), a USB cable, and [PlatformIO](https://platformio.org) Core 6.1.19 or newer. The firmware is in [`esp32/`](https://github.com/nprail/kairos/tree/main/esp32).
+You need a board wired as described in [Hardware](hardware.md), a USB cable, and [PlatformIO](https://platformio.org) Core 6.1.19 or newer. The firmware is in [`firmware/esp32/`](https://github.com/nprail/kairos/tree/main/firmware/esp32).
 
 ```sh
 git clone git@github.com:nprail/kairos.git
-cd kairos/esp32
+cd kairos/firmware/esp32
 pio run -e device -t upload      # ESP32-S3
 pio run -e device-c3 -t upload   # ESP32-C3
 pio device monitor               # serial log
@@ -18,7 +18,7 @@ The first build downloads the toolchain. If the upload cannot find a board that 
 
 **Flashing again keeps the pairing and the schedule.** They live in flash storage that an upload doesn't touch. Do not run `pio run -t erase` unless you want a factory reset. After a factory reset, a phone that still holds the old Bluetooth bond must forget the device once in its Bluetooth settings.
 
-The pins are constants in `esp32/src/platform/board.h`. If your board is wired differently, edit them and rebuild (see [esp32/README.md](https://github.com/nprail/kairos/blob/main/esp32/README.md)). The schedule, timings, camera type and camera address are all set from the apps, and kept on the device.
+The pins are constants in `firmware/esp32/src/platform/board.h`. If your board is wired differently, edit them and rebuild (see [firmware/esp32/README.md](https://github.com/nprail/kairos/blob/main/firmware/esp32/README.md)). The schedule, timings, camera type and camera address are all set from the apps, and kept on the device.
 
 ## Bluetooth control
 
@@ -32,8 +32,8 @@ The device is configured and controlled over Bluetooth Low Energy: set the clock
 
 Both apps find and connect to devices, pair with the button, show live status with a countdown to the next event, edit the schedule and camera settings, run a test, manually wake, start, stop and sleep the camera, and show the device log live.
 
-- **iPhone:** [ios/README.md](https://github.com/nprail/kairos/blob/main/ios/README.md)
-- **Android:** [android/README.md](https://github.com/nprail/kairos/blob/main/android/README.md)
+- **iPhone:** [apps/ios/README.md](https://github.com/nprail/kairos/blob/main/apps/ios/README.md)
+- **Android:** [apps/android/README.md](https://github.com/nprail/kairos/blob/main/apps/android/README.md)
 
 Bluetooth doesn't work in the iOS Simulator or an Android emulator, so run the apps on a phone. Debug builds have a demo mode that shows every screen with sample data (see [AGENTS.md](https://github.com/nprail/kairos/blob/main/AGENTS.md)).
 
@@ -46,7 +46,7 @@ Clone the repository and install the dependencies on the Pi. Node.js 20 is what 
 
 ```sh
 git clone git@github.com:nprail/kairos.git
-cd kairos
+cd kairos/firmware/legacy-pi
 npm install
 cp config.example.json config.json   # edit this for your camera and pins
 node trigger/index.js

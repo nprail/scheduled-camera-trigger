@@ -32,7 +32,7 @@ There is no extra button to buy: pairing uses the board's BOOT button.
 
 ## Pins
 
-Every pin is a constant in [`esp32/src/platform/board.h`](https://github.com/nprail/kairos/blob/main/esp32/src/platform/board.h), picked by the chip. They are fixed in the firmware and are not part of the Bluetooth protocol, so no phone can change them. To use other pins, edit the constants and rebuild (see [esp32/README.md](https://github.com/nprail/kairos/blob/main/esp32/README.md)). Verify the values against your board.
+Every pin is a constant in [`firmware/esp32/src/platform/board.h`](https://github.com/nprail/kairos/blob/main/firmware/esp32/src/platform/board.h), picked by the chip. They are fixed in the firmware and are not part of the Bluetooth protocol, so no phone can change them. To use other pins, edit the constants and rebuild (see [firmware/esp32/README.md](https://github.com/nprail/kairos/blob/main/firmware/esp32/README.md)). Verify the values against your board.
 
 **ESP32-S3 (ESP32-S3-DevKitC-1)**
 
@@ -119,7 +119,7 @@ Attaching a computer to the board's USB port can briefly toggle the same pin, wh
 > [!NOTE]
 > The Raspberry Pi version is **legacy**. It still works and speaks the same protocol, so the apps work with it, but new builds should use the ESP32. The Pi version needs a microSD card and an operating system, takes 30 to 60 seconds to boot, draws about 1 W and has no battery-backed clock.
 
-The Pi program is in [`trigger/`](https://github.com/nprail/kairos/tree/main/trigger) (Node.js). It needs a Raspberry Pi Zero W, a microSD card for Raspberry Pi OS and `config.json`, a 5 V supply (a small battery pack works), a momentary push button, and the same optocoupler stage and camera cable as above. A Z CAM uses a micro-USB OTG Ethernet adapter and a short Ethernet cable, since the Pi Zero W has no Ethernet port.
+The Pi program is in [`firmware/legacy-pi/trigger/`](https://github.com/nprail/kairos/tree/main/firmware/legacy-pi/trigger) (Node.js). It needs a Raspberry Pi Zero W, a microSD card for Raspberry Pi OS and `config.json`, a 5 V supply (a small battery pack works), a momentary push button, and the same optocoupler stage and camera cable as above. A Z CAM uses a micro-USB OTG Ethernet adapter and a short Ethernet cable, since the Pi Zero W has no Ethernet port.
 
 **GPIO pins.** Pins are BCM GPIO numbers, set in `config.json` (see [Configuration](configuration.md)). The apps do not change them. The example config uses these:
 

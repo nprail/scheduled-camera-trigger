@@ -6,19 +6,20 @@ Guidance for agents working in this repository.
 
 | Path | What |
 | --- | --- |
-| `esp32/` | The recommended device: firmware for an ESP32-S3 or ESP32-C3 (C++, Arduino-ESP32 on PlatformIO), with an external RTC and optional Ethernet for a Z CAM. Controlled over Bluetooth only. See `docs/esp32-port.md`. |
-| `trigger/`, `config.example.json` | The **legacy** device program for a Raspberry Pi Zero W (Node). The same protocol and behavior as `esp32/`. It is the reference the test vectors are generated from. |
+| `firmware/esp32/` | The recommended device: firmware for an ESP32-S3 or ESP32-C3 (C++, Arduino-ESP32 on PlatformIO), with an external RTC and optional Ethernet for a Z CAM. Controlled over Bluetooth only. See `docs/esp32-port.md`. |
+| `firmware/legacy-pi/` (`trigger/`, `test/`, `config.example.json`) | The **legacy** device program for a Raspberry Pi Zero W (Node). The same protocol and behavior as `firmware/esp32/`. It is the reference the test vectors are generated from. |
 | `docs/ble-protocol.md` | **The BLE protocol (v2, binary). The source of truth for everything the phone and device exchange.** |
-| `docs/test-vectors.json` | Cross-implementation test vectors, generated from the Node reference (`node test/vectors.js --write`). The ESP32 firmware and both apps pass the same file. |
-| `ios/` | The native iOS app (SwiftUI) and `KairosKit`, a UI-free Swift package for the protocol. |
+| `protocol/test-vectors.json` | Cross-implementation test vectors, generated from the Node reference (`cd firmware/legacy-pi && node test/vectors.js --write`). The ESP32 firmware and both apps pass the same file. |
+| `apps/ios/` | The native iOS app (SwiftUI) and `KairosKit`, a UI-free Swift package for the protocol. |
 | `brand/` | Kairos brand assets for the apps: the mark (SVG) and the two fonts. The design system itself is the "Kairos" artifact. |
-| `android/` | The native Android app (Kotlin, Jetpack Compose, Material 3). The protocol code is in `app/src/main/java/com/noahprail/kairos/protocol/`. |
+| `docs/`, `website/` | The user and developer docs (`docs/`, including the protocol spec), and the marketing page (`website/`). The root `docmd.config.json` and `package.json` build `docs/` into `website/docs/` with docmd. |
+| `apps/android/` | The native Android app (Kotlin, Jetpack Compose, Material 3). The protocol code is in `app/src/main/java/com/noahprail/kairos/protocol/`. |
 
-The iOS app is a standard Xcode project (`ios/Kairos.xcodeproj`), with no project generator. Run the kit's tests with `cd ios/KairosKit && swift test`.
+The iOS app is a standard Xcode project (`apps/ios/Kairos.xcodeproj`), with no project generator. Run the kit's tests with `cd apps/ios/KairosKit && swift test`.
 
-The Android app is a Gradle project (`android/`, wrapper included, JDK 17+). Run its unit tests with `cd android && ./gradlew :app:testDebugUnitTest`, and build the debug APK with `./gradlew :app:assembleDebug`.
+The Android app is a Gradle project (`apps/android/`, wrapper included, JDK 17+). Run its unit tests with `cd apps/android && ./gradlew :app:testDebugUnitTest`, and build the debug APK with `./gradlew :app:assembleDebug`.
 
-The ESP32 firmware is a PlatformIO project (`esp32/`). Run its host tests with `cd esp32 && pio test -e native`, and build it with `pio run -e device` (ESP32-S3) or `pio run -e device-c3` (ESP32-C3). The tests for the legacy Node device are `npm test`.
+The ESP32 firmware is a PlatformIO project (`firmware/esp32/`). Run its host tests with `cd firmware/esp32 && pio test -e native`, and build it with `pio run -e device` (ESP32-S3) or `pio run -e device-c3` (ESP32-C3). The tests for the legacy Node device are `cd firmware/legacy-pi && npm test`.
 
 ## Keep iOS and Android in sync
 
@@ -26,7 +27,7 @@ The ESP32 firmware is a PlatformIO project (`esp32/`). Run its host tests with `
 
 - A change counts as functional if it affects what the user can do or see, how the app talks to the device, or how it handles errors, timing or state. Examples: a new setting, a different confirmation, a new error message, a changed timeout, a protocol change.
 - Purely platform-specific work is the exception: build setup, platform permissions, secure storage, navigation and styling that follow each platform's conventions (SwiftUI and Material 3 respectively). Keep these idiomatic for each platform rather than copying the other.
-- Protocol changes start in `docs/ble-protocol.md` and the reference test vectors (`docs/test-vectors.json`). Both apps must pass the same vectors.
+- Protocol changes start in `docs/ble-protocol.md` and the reference test vectors (`protocol/test-vectors.json`). Both apps must pass the same vectors.
 - Run both apps' tests before finishing (`swift test` for iOS, `./gradlew :app:testDebugUnitTest` for Android), make sure both still build, and check any changed screen on both platforms. The debug demo mode on each shows screens without Bluetooth hardware, so it works in a simulator or emulator as well as on a phone.
 - If you can't change both (for example one toolchain isn't available), say so clearly in your final message and list exactly what is left undone on the other platform. Don't silently ship a change on one platform only.
 
@@ -78,7 +79,7 @@ Read `docs/ble-protocol.md` for the full detail. What the app depends on:
 - Errors are codes with structured detail (`invalid_config` carries a field, an attempt index and a reason). The device sends no message text, so the app builds it (section 9).
 - Only protocol version **2** is supported. A different version in Device Info or `hello` is an error ("unsupported"), with a message telling the user to update the app.
 
-**Test vectors:** `docs/test-vectors.json` covers framing, HMAC proofs, Status, Device Info, the config layout, every message and every error. The Android protocol module must pass the same vectors (see `ios/KairosKit/Tests/` for how the iOS tests use them).
+**Test vectors:** `protocol/test-vectors.json` covers framing, HMAC proofs, Status, Device Info, the config layout, every message and every error. The Android protocol module must pass the same vectors (see `apps/ios/KairosKit/Tests/` for how the iOS tests use them).
 
 ## 4. Connection state machine
 
@@ -276,8 +277,8 @@ The `invalid_config` field names are `name`, `cameraType`, `wakeUpTimeout`, `sta
 Both apps have a debug-only demo mode that fills the app with fixture data and skips Bluetooth, so every screen can be checked without a device, in a simulator or emulator or on a phone. Both support the same scenes, which must be kept in step: `scan`, `scanning`, `off`, `unauthorized`, `unsupported`, `connecting`, `pairing`, `pairing-error`, `ready`, `generic`, `recording`, `banner`. The fixtures should match what a real device sends (for example job states `pending`, `active`, `complete`, `missed`).
 
 - **In the app (both):** on the scan screen, tap a hidden spot 7 times to open a "Demo mode" menu listing the scenes, plus **Exit demo** while in demo mode. The spot is the Kairos lockup (mark and wordmark) on Android and the "Stay within a few metres…" hint under the device list on iOS (a SwiftUI large navigation title can't take taps). In a demo scene, **Disconnect**, **Cancel** or Back returns to the scan screen.
-- **iOS launch argument:** `-demo <scene>`. Code: `ios/Kairos/DemoMode.swift`.
-- **Android intent extras:** `--es demo <scene>`, optionally `--es screen config` or `--es screen logs`, passed to `adb shell am start -n com.noahprail.kairos/.MainActivity`. Code: `android/app/src/main/java/com/noahprail/kairos/DemoMode.kt`.
+- **iOS launch argument:** `-demo <scene>`. Code: `apps/ios/Kairos/DemoMode.swift`.
+- **Android intent extras:** `--es demo <scene>`, optionally `--es screen config` or `--es screen logs`, passed to `adb shell am start -n com.noahprail.kairos/.MainActivity`. Code: `apps/android/app/src/main/java/com/noahprail/kairos/DemoMode.kt`.
 
 Demo mode compiles into debug builds only.
 
@@ -299,4 +300,4 @@ The apps use the **Kairos** brand system (the "Kairos" design system artifact; t
 - **Shape.** Cards and buttons use 8 pt/dp corners, tags and inputs 4. Separate surfaces with hairline borders, not shadows. Motion is functional only.
 - **Errors and warnings** use an icon and text, never color alone: the banner is an inverse (`ink`) surface, and destructive actions (Forget pairing) are `ink` text, confirmed by a dialog.
 - **App icon.** The reversed small mark (cream brackets, `signal` playhead) on an `ink` tile. Android's adaptive icon also has a monochrome layer for themed icons. iOS also uses the mark and `ground` on its launch screen.
-- Fonts are OFL-licensed and bundled (`ios/Kairos/Fonts/`, `android/app/src/main/res/font/`). If a font fails to load, the platform falls back to its system font.
+- Fonts are OFL-licensed and bundled (`apps/ios/Kairos/Fonts/`, `apps/android/app/src/main/res/font/`). If a font fails to load, the platform falls back to its system font.

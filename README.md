@@ -57,7 +57,7 @@ You need an ESP32-S3 or ESP32-C3 board, a camera with a remote trigger port (or 
 
 ```sh
 git clone git@github.com:nprail/kairos.git
-cd kairos/esp32
+cd kairos/firmware/esp32
 pio run -e device -t upload      # ESP32-S3 (use -e device-c3 for an ESP32-C3)
 ```
 
@@ -70,8 +70,8 @@ Install the app on your phone, press the BOOT button on the board, then tap **Pa
 
 With the apps you can find and connect to devices, pair with the button, see live status with a countdown to the next event, edit the schedule and camera settings, run a test, manually wake, start, stop and sleep the camera, and watch the device log live.
 
-- **iPhone:** [ios/](ios/README.md), a native SwiftUI app for iOS 17 and later.
-- **Android:** [android/](android/README.md), a native Jetpack Compose app for Android 8.0 and later.
+- **iPhone:** [apps/ios/](apps/ios/README.md), a native SwiftUI app for iOS 17 and later.
+- **Android:** [apps/android/](apps/android/README.md), a native Jetpack Compose app for Android 8.0 and later.
 
 ## Documentation
 
