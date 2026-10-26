@@ -1,6 +1,6 @@
 import Foundation
 
-/// Message framing from docs/BLE_PROTOCOL.md §3.
+/// Message framing from docs/ble-protocol.md §3.
 ///
 ///     First fragment:        [0x80 | idx] [u16 BE total length] [payload…]
 ///     Continuation fragment: [idx]                              [payload…]

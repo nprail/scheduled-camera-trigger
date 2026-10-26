@@ -1,0 +1,77 @@
+/* Kairos brand for the docmd docs site (see brand/README.md). Light and dark are both first-class. */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@600&display=swap");
+
+/* Kairos palette mapped onto docmd's variables. `ink` is the interactive color. `signal` is not used here. */
+:root,
+:root[data-theme="light"] {
+  --bg-color: #f2f0ea;
+  --text-color: #14130f;
+  --text-heading: #14130f;
+  --text-muted: #6b675e;
+  --border-color: #d9d6cc;
+  --link-color: #14130f;
+  --accent-color: #14130f;
+  --sidebar-bg: #faf9f5;
+  --sidebar-text: #6b675e;
+  --sidebar-link-active-bg: #e8e5dc;
+  --sidebar-link-active-text: #14130f;
+  --header-bg: #f2f0ea;
+  --header-border: #d9d6cc;
+  --code-bg: #faf9f5;
+  --code-text: #14130f;
+}
+
+:root[data-theme="dark"] {
+  --bg-color: #14130f;
+  --text-color: #f2f0ea;
+  --text-heading: #f2f0ea;
+  --text-muted: #a8a398;
+  --border-color: #2e2c27;
+  --link-color: #f2f0ea;
+  --accent-color: #f2f0ea;
+  --sidebar-bg: #1e1d19;
+  --sidebar-text: #a8a398;
+  --sidebar-link-active-bg: #2e2c27;
+  --sidebar-link-active-text: #f2f0ea;
+  --header-bg: #14130f;
+  --header-border: #2e2c27;
+  --code-bg: #1e1d19;
+  --code-text: #f2f0ea;
+}
+
+body {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+}
+
+h1, h2, h3 {
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+code, pre, kbd, samp {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* borders over shadows */
+* {
+  box-shadow: none !important;
+}
+
+a {
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--sky-text);
+  outline-offset: 2px;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+th, td {
+  border: 1px solid var(--sky-border);
+}

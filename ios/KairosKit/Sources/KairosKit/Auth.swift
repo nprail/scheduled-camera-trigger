@@ -1,7 +1,7 @@
 import Foundation
 import CryptoKit
 
-/// Challenge/response from docs/BLE_PROTOCOL.md §5.
+/// Challenge/response from docs/ble-protocol.md §5.
 public enum AuthProof {
     private static func mac(secret: Data, label: String, nonce: Data, clientNonce: Data) -> Data {
         var hmac = HMAC<SHA256>(key: SymmetricKey(data: secret))

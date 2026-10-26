@@ -93,7 +93,7 @@ If any of these bite, the pure modules (§6) are framework-free, so moving to ES
 
 ## 5. Protocol v2: binary
 
-Since the protocol is free to change, v2 is designed for the cheapest possible encode, decode and storage on both ends. This section is the proposal. It is moved into `docs/BLE_PROTOCOL.md` (rewritten as v2) before any code is written (§16).
+Since the protocol is free to change, v2 is designed for the cheapest possible encode, decode and storage on both ends. This section is the proposal. It is moved into `docs/ble-protocol.md` (rewritten as v2) before any code is written (§16).
 
 ### 5.1 Design decisions
 
@@ -217,7 +217,7 @@ The maximum size is about 1.2 KB. `deviceId` and `configRev` are device-owned an
 
 ### 5.7 What changes in the apps
 
-Both apps, kept in step per `AGENTS.md`:
+Both apps, per `AGENTS.md`:
 - Replace the JSON codec with the binary one: framing is unchanged, payloads are new. The `DeviceClient` request/response logic, timeouts and single-flight queue stay.
 - Remove paging for jobs, remove `status.get`, derive job times from the config, and read the next attempt from Status.
 - Build error text from the code plus the `invalid_config` field and reason enums. Drop the device-supplied message text.
@@ -331,7 +331,7 @@ There is no filesystem. Everything persistent is in NVS, written through `Prefer
 
 ## 9. BLE
 
-Implement `docs/BLE_PROTOCOL.md` (v2: GATT layout, advertising, framing, security) with `NimBLE-Arduino`.
+Implement `docs/ble-protocol.md` (v2: GATT layout, advertising, framing, security) with `NimBLE-Arduino`.
 
 - **GATT:** one primary service `6b610001-6169-4f72-8f73-b3e1c5a97d24`. Device Info (read, now binary), Status (read + notify, 13 bytes), Command (`WRITE` | `WRITE_NR` | `WRITE_ENC`, so it **requires an encrypted link**), Response (notify).
 - **Device Info (binary):** `v u8` (2), `id[3]` (the 6 hex digits as raw bytes), `cam u8`, `fw` (`u8` length + ASCII), `name` (`u8` length + UTF-8). It is short, but keep using Read Long.
@@ -396,7 +396,7 @@ An ESP32 reboots in ways a Linux box rarely does, so plan for it:
 Nothing in the port blocks it, and §8 reserves the flash. The transport is the same NimBLE stack. On Arduino the write path is `Update` (a wrapper around `esp_ota_ops`), or `esp_ota_ops` directly where you need rollback.
 
 - **Protocol:** a firmware image of 1 MB or more doesn't suit a 2 KB message and the one-request-in-flight rule. Add a bulk write-without-response characteristic, or ops such as `fw.begin` / `fw.chunk` / `fw.end` with chunk acknowledgements, resume and a SHA-256 check. Authenticated only, and refused unless the device is idle. This is an additive change to v2.
-- **Apps:** both need a firmware picker, a progress screen and the same behavior.
+- **Apps:** both need a firmware picker and a progress screen.
 - **Device:** write to the inactive slot, verify the hash, switch slots, and **roll back automatically if the new image doesn't confirm itself** (`esp_ota_mark_app_valid_cancel_rollback()`). Rollback depends on the core's bootloader supporting it (§4). Confirm that before promising OTA to anyone, because an unreachable field unit that gets a bad image is the worst case.
 - **Speed:** with a 247–517 byte MTU expect roughly 5–20 KB/s, so a 1.5 MB image takes a few minutes.
 - A slot swap leaves NVS alone, so pairing, bonds and the schedule survive an update.
@@ -416,7 +416,7 @@ Nothing in the port blocks it, and §8 reserves the flash. The transport is the 
 | # | Deliverable | Done when |
 | --- | --- | --- |
 | 0 | **Spike** on one bench board: BLE advertising with an encrypted write, W5500 DHCP plus one Z CAM HTTP call, RTC read/write, a ~1.2 KB NVS blob write, and a bond that survives `upload` | Each piece works together on the S3, and the version-specific API assumptions in §4 are confirmed or corrected |
-| 1 | **Protocol v2 spec**: rewrite `docs/BLE_PROTOCOL.md`, new vectors and their generator (`test/vectors.js`, kept in the Node tree until Node is retired) | Reviewed, with vectors checked in |
+| 1 | **Protocol v2 spec**: rewrite `docs/ble-protocol.md`, new vectors and their generator (`test/vectors.js`, kept in the Node tree until Node is retired) | Reviewed, with vectors checked in |
 | 1b | **Node device speaks v2** (`trigger/ble/`: codecs, dispatcher, Status, Device Info, errors). Config stays `config.json` internally and is converted at the edge. Also fix the advertised-name truncation | Node passes the v2 vectors, and a Pi running it works with the v2 apps. This is the real-device test bed for milestone 2 |
 | 2 | **Apps**: `KairosKit` and the Android protocol module speak v2 and pass the vectors. UI and demo-mode changes (§5.7) | Both apps' tests pass, demo mode shows every screen on both, and both connect to the v2 Node device. Can run in parallel with 3 |
 | 3 | `esp32/` PlatformIO skeleton, `partitions.csv`, CI build, native test harness. `protocol` + `config` + `scheduler` (pure) | Vectors and ported Node tests pass in the `native` env |
@@ -429,7 +429,7 @@ Nothing in the port blocks it, and §8 reserves the flash. The transport is the 
 
 ## 17. Docs and repo changes that come with the port
 
-- Rewrite `docs/BLE_PROTOCOL.md` as v2 (from §5 here), and regenerate `docs/test-vectors.json`. The Node reference (`trigger/ble/`) is updated to v2 and the vectors keep being generated from it (`node test/vectors.js --write`) while Node exists. When Node is retired, move the generator out of the device tree.
+- Rewrite `docs/ble-protocol.md` as v2 (from §5 here), and regenerate `docs/test-vectors.json`. The Node reference (`trigger/ble/`) is updated to v2 and the vectors keep being generated from it (`node test/vectors.js --write`) while Node exists. When Node is retired, move the generator out of the device tree.
 - Update `AGENTS.md`: the repository layout (add `esp32/`), the app spec's protocol summary and sections affected by §5.7, and the test commands (`cd esp32 && pio test -e native`).
 - README: hardware section and wiring diagram for the ESP32 variant.
 - The Node device code (`trigger/`, `test/`) is updated to v2 (milestone 1b) and kept until the ESP32 fully replaces it, then removed (milestone 9). The Node `package.json` dependencies and the Pi setup docs go with it.

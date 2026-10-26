@@ -1,6 +1,6 @@
 # Kairos for Android
 
-A native Jetpack Compose app that controls a Kairos device over Bluetooth Low Energy. It speaks the protocol in [docs/BLE_PROTOCOL.md](../docs/BLE_PROTOCOL.md) and behaves the same as the [iPhone app](../ios/README.md).
+A native Jetpack Compose app that controls a Kairos device over Bluetooth Low Energy. It speaks the protocol in [docs/ble-protocol.md](../docs/ble-protocol.md). There is also an [iPhone app](../ios/README.md).
 
 - Find and connect to nearby devices, and pair using the device's button
 - Phone-as-clock: the device's clock is set from the phone on every connect (the Pi has no RTC)

@@ -167,3 +167,5 @@ dist
 
 config.json
 log.txt
+# docs site build output (docmd builds docs/ into site/docs)
+site/docs/

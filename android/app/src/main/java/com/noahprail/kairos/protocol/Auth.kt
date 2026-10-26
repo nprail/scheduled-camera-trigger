@@ -4,7 +4,7 @@ import java.security.SecureRandom
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
-/** Challenge/response from docs/BLE_PROTOCOL.md §5. */
+/** Challenge/response from docs/ble-protocol.md §5. */
 object AuthProof {
     private val random = SecureRandom()
 

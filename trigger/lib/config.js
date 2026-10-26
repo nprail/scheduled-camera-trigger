@@ -1,7 +1,7 @@
 /**
  * Config normalization + validation.
  *
- * Canonical shape (see docs/BLE_PROTOCOL.md §4):
+ * Canonical shape (see docs/ble-protocol.md §4):
  * {
  *   name, cameraType, wakeUpTimeout, startBefore, endAfter, logFile,
  *   buttonGpioPort,

@@ -7,7 +7,7 @@ Guidance for agents working in this repository.
 | Path | What |
 | --- | --- |
 | `trigger/`, `config.example.json` | The device side (Node, Raspberry Pi Zero W). It is controlled over Bluetooth only; there is no web interface or HTTP API. |
-| `docs/BLE_PROTOCOL.md` | **The BLE protocol (v1). The source of truth for everything the phone and device exchange.** |
+| `docs/ble-protocol.md` | **The BLE protocol (v1). The source of truth for everything the phone and device exchange.** |
 | `docs/test-vectors.json` | Cross-implementation test vectors, generated from the Node reference (`node test/vectors.js --write`). |
 | `ios/` | The native iOS app (SwiftUI) and `KairosKit`, a UI-free Swift package for the protocol. |
 | `brand/` | Kairos brand assets for the apps: the mark (SVG) and the two fonts. The design system itself is the "Kairos" artifact. |
@@ -23,7 +23,7 @@ The Android app is a Gradle project (`android/`, wrapper included, JDK 17+). Run
 
 - A change counts as functional if it affects what the user can do or see, how the app talks to the device, or how it handles errors, timing or state. Examples: a new setting, a different confirmation, a new error message, a changed timeout, a protocol change.
 - Purely platform-specific work is the exception: build setup, platform permissions, secure storage, navigation and styling that follow each platform's conventions (SwiftUI and Material 3 respectively). Keep these idiomatic for each platform rather than copying the other.
-- Protocol changes start in `docs/BLE_PROTOCOL.md` and the reference test vectors (`docs/test-vectors.json`). Both apps must pass the same vectors.
+- Protocol changes start in `docs/ble-protocol.md` and the reference test vectors (`docs/test-vectors.json`). Both apps must pass the same vectors.
 - Run both apps' tests before finishing (`swift test` for iOS, `./gradlew :app:testDebugUnitTest` for Android), make sure both still build, and check any changed screen on both platforms. The debug demo mode on each shows screens without Bluetooth hardware, so it works in a simulator or emulator as well as on a phone.
 - If you can't change both (for example one toolchain isn't available), say so clearly in your final message and list exactly what is left undone on the other platform. Don't silently ship a change on one platform only.
 
@@ -31,7 +31,7 @@ The Android app is a Gradle project (`android/`, wrapper included, JDK 17+). Run
 
 # Mobile app specification
 
-This section describes what the apps do. It was written from the iOS app and the Android app implements it, so it applies to both. **Behavior must match across the two apps. Platform idioms (navigation, dialogs, permissions, secure storage) follow each platform's conventions.** Where this spec and `docs/BLE_PROTOCOL.md` disagree, the protocol document wins; report the discrepancy.
+This section describes what the apps do. It was written from the iOS app and the Android app implements it, so it applies to both. **Behavior must match across the two apps. Platform idioms (navigation, dialogs, permissions, secure storage) follow each platform's conventions.** Where this spec and `docs/ble-protocol.md` disagree, the protocol document wins; report the discrepancy.
 
 ## 1. Purpose
 
@@ -64,7 +64,7 @@ On Android, use the same split: a protocol module, a `ViewModel` (or equivalent)
 
 ## 3. Protocol summary
 
-Read `docs/BLE_PROTOCOL.md` for the full detail. What the app depends on:
+Read `docs/ble-protocol.md` for the full detail. What the app depends on:
 
 - One GATT service (`6b610001-6169-4f72-8f73-b3e1c5a97d24`) with four characteristics: Device Info (read, JSON), Status (read and notify, a fixed 12-byte value), Command (write), Response (notify).
 - Requests are JSON, `{id, op, d}`, split into fragments to fit the ATT write size. Responses and unsolicited events arrive on Response and are reassembled. **One request is in flight at a time; extra callers wait their turn.** Each request has a timeout (10 s by default, 20 s for camera actions); a timeout fails the request.

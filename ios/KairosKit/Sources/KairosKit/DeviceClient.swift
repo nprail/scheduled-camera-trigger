@@ -46,7 +46,7 @@ private struct Head: Decodable {
 private struct ResponseEnvelope<T: Decodable>: Decodable { let d: T }
 private struct EventEnvelope<T: Decodable>: Decodable { let d: T }
 
-/// Speaks the request/response protocol (docs/BLE_PROTOCOL.md §4) over a
+/// Speaks the request/response protocol (docs/ble-protocol.md §4) over a
 /// `DeviceTransport`. One request is in flight at a time; extra callers wait.
 @MainActor
 public final class DeviceClient {

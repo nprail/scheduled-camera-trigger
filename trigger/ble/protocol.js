@@ -1,4 +1,4 @@
-// Constants shared by the BLE implementation. See docs/BLE_PROTOCOL.md.
+// Constants shared by the BLE implementation. See docs/ble-protocol.md.
 
 export const PROTOCOL_VERSION = 1
 export const MAX_MESSAGE = 4096
