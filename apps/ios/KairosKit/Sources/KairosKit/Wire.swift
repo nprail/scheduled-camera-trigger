@@ -19,6 +19,9 @@ enum Op: UInt8 {
     case testRun = 0x14
     case logsGet = 0x20
     case logsSubscribe = 0x21
+    case fwBegin = 0x30
+    case fwEnd = 0x31
+    case fwAbort = 0x32
 }
 
 struct ByteWriter {
@@ -198,9 +201,28 @@ enum Wire {
             return DeviceError(code: "invalid_config", message: reasonText(reason), field: fieldName(field, index: index))
         case 7: return DeviceError(code: "too_large", message: "The request is too large for the device.")
         case 8: return DeviceError(code: "pairing_closed", message: "Pairing is closed.")
+        case 10:
+            let reason = r.remaining >= 1 ? Int(r.u8()) : 0
+            return DeviceError(code: "bad_image", message: badImageText(reason))
         default:
             let detail = r.remaining >= 1 ? r.string() : ""
             return DeviceError(code: "internal", message: detail.isEmpty ? "The device had an internal error." : detail)
+        }
+    }
+
+    /// The `bad_image` reasons (docs/ble-protocol.md, Errors).
+    static func badImageText(_ id: Int) -> String {
+        switch id {
+        case 1: return "The firmware file is too small to be a Kairos update."
+        case 2: return "That isn't a Kairos application update. Use the file ending in -app.bin, not -factory.bin."
+        case 3: return "That firmware is for a different chip."
+        case 4: return "The firmware didn't arrive intact. Try again."
+        case 5: return "The device could not write the update. Try again."
+        case 6: return "That firmware isn't signed, and this device only accepts firmware signed by Kairos."
+        case 7: return "The firmware's signature isn't valid for this device."
+        case 8: return "The device did not receive the whole update. Try again."
+        case 9: return "The update stopped because the transfer stalled or a scheduled event came close."
+        default: return "The device rejected the firmware."
         }
     }
 
@@ -300,6 +322,29 @@ enum Wire {
         default:
             return nil
         }
+    }
+
+    /// The `fw` event (0x05). It has its own channel: the uploader waits for it.
+    static func firmwareEvent(_ body: Data) -> FirmwareEvent? {
+        var r = ByteReader(body)
+        let state = Int(r.u8()), offset = Int(r.u32())
+        let reason = r.remaining >= 1 ? Int(r.u8()) : 0
+        guard r.ok, let s = FirmwareEvent.State(rawValue: state) else { return nil }
+        return FirmwareEvent(state: s, offset: offset, reason: reason)
+    }
+
+    static func firmwareBegin(_ body: Data) throws -> (offset: Int, window: Int) {
+        var r = ByteReader(body)
+        let offset = Int(r.u32()), window = Int(r.u16())
+        guard r.ok else { throw malformed }
+        return (offset, window)
+    }
+
+    static func firmwareEnd(_ body: Data) throws -> Int {
+        var r = ByteReader(body)
+        let ms = Int(r.u16())
+        guard r.ok else { throw malformed }
+        return ms
     }
 
     private static let malformed = DeviceError(code: "internal", message: "Malformed response.")

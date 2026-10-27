@@ -17,6 +17,8 @@ public final class BLEDeviceConnection: NSObject, DeviceTransport, CBPeripheralD
     private var statusChar: CBCharacteristic?
     private var commandChar: CBCharacteristic?
     private var responseChar: CBCharacteristic?
+    private var firmwareChar: CBCharacteristic?
+    private var readyContinuation: CheckedContinuation<Void, Error>?
 
     private var stepContinuation: CheckedContinuation<Void, Error>?
     private var writeContinuation: CheckedContinuation<Void, Error>?
@@ -36,7 +38,7 @@ public final class BLEDeviceConnection: NSObject, DeviceTransport, CBPeripheralD
 
     /// Largest write that fits a single ATT packet (MTU - 3).
     public var maxWriteLength: Int {
-        max(peripheral.maximumWriteValueLength(for: .withoutResponse), 20)
+        max(min(peripheral.maximumWriteValueLength(for: .withoutResponse), 512), 20)  // an attribute value holds at most 512 bytes
     }
 
     // MARK: Setup
@@ -50,7 +52,7 @@ public final class BLEDeviceConnection: NSObject, DeviceTransport, CBPeripheralD
             throw DeviceError(code: "not_found", message: "This isn't a Kairos device (service not found).")
         }
 
-        let wanted = [BLEUUID.deviceInfo, BLEUUID.status, BLEUUID.command, BLEUUID.response]
+        let wanted = [BLEUUID.deviceInfo, BLEUUID.status, BLEUUID.command, BLEUUID.response, BLEUUID.firmware]
         try await step { peripheral.discoverCharacteristics(wanted, for: service) }
 
         for c in service.characteristics ?? [] {
@@ -59,6 +61,7 @@ public final class BLEDeviceConnection: NSObject, DeviceTransport, CBPeripheralD
             case BLEUUID.status: statusChar = c
             case BLEUUID.command: commandChar = c
             case BLEUUID.response: responseChar = c
+            case BLEUUID.firmware: firmwareChar = c  // only devices that can be updated have it
             default: break
             }
         }
@@ -120,6 +123,29 @@ public final class BLEDeviceConnection: NSObject, DeviceTransport, CBPeripheralD
         }
     }
 
+    @MainActor
+    public func writeFirmware(_ data: Data) async throws {
+        guard !closed else { throw DeviceError.disconnected }
+        guard let firmwareChar else {
+            // iOS keeps the GATT table of a bonded device: a device whose firmware gained this characteristic can look like it lacks it
+            throw DeviceError(
+                code: "stale_services",
+                message: "This phone remembers an older version of the device's Bluetooth services. Remove the device under Settings › Bluetooth, then connect again.")
+        }
+        // write without response has no acknowledgement: CoreBluetooth says when its buffer has room
+        while !peripheral.canSendWriteWithoutResponse {
+            try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in readyContinuation = c }
+            if closed { throw DeviceError.disconnected }
+        }
+        peripheral.writeValue(data, for: firmwareChar, type: .withoutResponse)
+    }
+
+    public func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
+        let c = readyContinuation
+        readyContinuation = nil
+        c?.resume()
+    }
+
     // MARK: Teardown
 
     func handleDisconnect() {
@@ -128,6 +154,9 @@ public final class BLEDeviceConnection: NSObject, DeviceTransport, CBPeripheralD
         let write = writeContinuation
         writeContinuation = nil
         write?.resume(throwing: DeviceError.disconnected)
+        let ready = readyContinuation
+        readyContinuation = nil
+        ready?.resume(throwing: DeviceError.disconnected)
         let reads = readContinuations
         readContinuations.removeAll()
         for (_, c) in reads { c.resume(throwing: DeviceError.disconnected) }

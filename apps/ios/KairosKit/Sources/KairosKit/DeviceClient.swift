@@ -9,6 +9,14 @@ public protocol DeviceTransport: AnyObject {
     func write(_ data: Data) async throws
     /// Fragments notified on the Response characteristic. Finishes on disconnect.
     var notifications: AsyncStream<Data> { get }
+    /// Write one packet to the Firmware characteristic, without response. Waits while the link's buffer is full.
+    func writeFirmware(_ data: Data) async throws
+}
+
+extension DeviceTransport {
+    public func writeFirmware(_ data: Data) async throws {
+        throw DeviceError(code: "not_supported", message: "The device does not support that.")
+    }
 }
 
 public enum CameraAction {
@@ -55,6 +63,10 @@ public final class DeviceClient {
     private var busy = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
     private var readTask: Task<Void, Never>?
+    private var firmwareQueue: [FirmwareEvent] = []
+    private var firmwareWaiter: CheckedContinuation<FirmwareEvent?, Never>?
+    private var firmwareWaitId = 0
+    private var linkIsClosed = false
 
     public private(set) var maxMessage = Framing.maxMessage
 
@@ -98,7 +110,11 @@ public final class DeviceClient {
     private func dispatch(_ data: Data) {
         switch Wire.parse(data) {
         case .event(let code, let body)?:
-            if let event = Wire.decodeEvent(code: code, body: body) { eventSink.yield(event) }
+            if code == 0x05 {
+                if let event = Wire.firmwareEvent(body) { deliverFirmware(event) }
+            } else if let event = Wire.decodeEvent(code: code, body: body) {
+                eventSink.yield(event)
+            }
         case .response(let id, let status, _)?:
             if id == 0, status != 0 {
                 // an error the device could not attribute to a request (id 0)
@@ -118,9 +134,55 @@ public final class DeviceClient {
     }
 
     private func linkClosed() {
+        linkIsClosed = true
         for id in Array(pending.keys) { resolve(id, .failure(DeviceError.disconnected)) }
         eventSink.finish()
+        firmwareWaiter?.resume(returning: nil)
+        firmwareWaiter = nil
     }
+
+    private func deliverFirmware(_ event: FirmwareEvent) {
+        if let waiter = firmwareWaiter {
+            firmwareWaiter = nil
+            waiter.resume(returning: event)
+        } else {
+            firmwareQueue.append(event)
+        }
+    }
+
+    /// The next `fw` event already received, if any.
+    func pollFirmwareEvent() -> FirmwareEvent? {
+        firmwareQueue.isEmpty ? nil : firmwareQueue.removeFirst()
+    }
+
+    /// Wait for the next `fw` event. Nil on timeout or when the link closes.
+    func awaitFirmwareEvent(timeout: TimeInterval) async -> FirmwareEvent? {
+        if let event = pollFirmwareEvent() { return event }
+        if linkIsClosed { return nil }
+        firmwareWaitId += 1
+        let waitId = firmwareWaitId
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<FirmwareEvent?, Never>) in
+                firmwareWaiter = continuation
+                Task { [weak self] in
+                    try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                    self?.endFirmwareWait(waitId)
+                }
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.endFirmwareWait(waitId) }
+        }
+    }
+
+    private func endFirmwareWait(_ waitId: Int) {
+        guard firmwareWaitId == waitId, let waiter = firmwareWaiter else { return }
+        firmwareWaiter = nil
+        waiter.resume(returning: nil)
+    }
+
+    func dropFirmwareEvents() { firmwareQueue.removeAll() }
+
+    var isLinkClosed: Bool { linkIsClosed }
 
     // MARK: - Sending
 
@@ -257,6 +319,34 @@ public final class DeviceClient {
         w.u8(enabled ? 1 : 0)
         w.u32(UInt32(max(0, after)))
         try await call(.logsSubscribe, body: Data(w.bytes))
+    }
+
+    // MARK: - Firmware update
+
+    /// Declare an image. Returns where to start sending (a resumed transfer starts past 0) and the window.
+    func firmwareBegin(size: Int, sha256: Data, signature: Data) async throws -> (offset: Int, window: Int) {
+        var w = ByteWriter()
+        w.u32(UInt32(size))
+        w.data(sha256)
+        w.data(signature.count == 64 ? signature : Data(count: 64))  // all zeros means unsigned
+        do {
+            return try Wire.firmwareBegin(try await call(.fwBegin, body: Data(w.bytes)))
+        } catch let error as DeviceError where error.code == "busy" {
+            throw DeviceError(
+                code: "update_blocked",
+                message: "The device can't take an update now. It must be idle, with no scheduled event in the next 15 minutes.")
+        } catch let error as DeviceError where error.code == "too_large" {
+            throw DeviceError(code: "too_large", message: "That firmware is too large for this device.")
+        }
+    }
+
+    /// Finish the transfer. The device checks the image and restarts after the returned delay (milliseconds).
+    func firmwareEnd() async throws -> Int {
+        try Wire.firmwareEnd(try await call(.fwEnd, timeout: 20))
+    }
+
+    func firmwareAbort() async {
+        _ = try? await call(.fwAbort)
     }
 
     public func deviceTime() async throws -> Date {

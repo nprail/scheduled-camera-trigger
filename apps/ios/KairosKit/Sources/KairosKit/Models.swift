@@ -12,15 +12,30 @@ public struct DeviceInfo: Equatable {
     /// The camera types this device can drive. A device without the Ethernet module cannot drive a Z CAM.
     public var cams: [String]
     public var fw: String
+    /// Capability bits; bit0 is firmware update over Bluetooth. 0 when the device does not send them.
+    public var caps: Int
+    /// The chip, when the device says (an update needs it to pick the right image).
+    public var chip: Chip?
+    /// The largest firmware image the device accepts, in bytes. 0 when not updatable.
+    public var slot: Int
 
-    public init(v: Int, id: String, name: String, cam: String, cams: [String] = CameraConfig.cameraTypes, fw: String) {
+    public init(
+        v: Int, id: String, name: String, cam: String, cams: [String] = CameraConfig.cameraTypes, fw: String,
+        caps: Int = 0, chip: Chip? = nil, slot: Int = 0
+    ) {
         self.v = v
         self.id = id
         self.name = name
         self.cam = cam
         self.cams = cams
         self.fw = fw
+        self.caps = caps
+        self.chip = chip
+        self.slot = slot
     }
+
+    /// The device can be updated over Bluetooth and the app knows which image fits it.
+    public var canUpdate: Bool { caps & 1 != 0 && chip != nil && slot > 0 }
 
     public init?(data: Data) {
         var r = ByteReader(data)
@@ -31,12 +46,16 @@ public struct DeviceInfo: Equatable {
         let fw = r.string()
         let name = r.string()
         guard r.ok else { return nil }
+        // optional trailing fields, missing on devices that cannot be updated
+        let caps = r.remaining >= 1 ? Int(r.u8()) : 0
+        let chip = r.remaining >= 1 ? Chip(deviceValue: Int(r.u8())) : nil
+        let slot = r.remaining >= 4 ? Int(r.u32()) : 0
         let types = CameraConfig.cameraTypes
         self.init(
             v: v, id: id, name: name,
             cam: cam < types.count ? types[cam] : "generic",
             cams: types.enumerated().filter { mask & (1 << $0.offset) != 0 }.map(\.element),
-            fw: fw)
+            fw: fw, caps: caps, chip: chip, slot: slot)
     }
 }
 
@@ -216,6 +235,22 @@ public struct TestEvent: Equatable {
     public var step: String
     public var ok: Bool
     public var error: String?
+}
+
+/// Progress of a firmware transfer, from the device (docs/ble-protocol.md, fw.*).
+public struct FirmwareEvent: Equatable {
+    public enum State: Int { case receiving = 0, verifying, ready, failed }
+    public var state: State
+    /// The next byte the device expects.
+    public var offset: Int
+    /// A `bad_image` reason when failed.
+    public var reason: Int
+
+    public init(state: State, offset: Int, reason: Int = 0) {
+        self.state = state
+        self.offset = offset
+        self.reason = reason
+    }
 }
 
 public enum DeviceEvent: Equatable {

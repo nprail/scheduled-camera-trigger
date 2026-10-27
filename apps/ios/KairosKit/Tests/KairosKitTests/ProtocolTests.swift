@@ -107,7 +107,12 @@ final class StatusTests: XCTestCase {
         for v in try Vectors.load().list("deviceInfo") {
             let e = v.obj("expected")
             let info = try XCTUnwrap(DeviceInfo(data: v.hexData("hex")))
-            XCTAssertEqual(info, DeviceInfo(v: e.int("v"), id: e.str("id"), name: e.str("name"), cam: e.str("cam"), cams: e.strs("cams"), fw: e.str("fw")))
+            XCTAssertEqual(
+                info,
+                DeviceInfo(
+                    v: e.int("v"), id: e.str("id"), name: e.str("name"), cam: e.str("cam"), cams: e.strs("cams"), fw: e.str("fw"),
+                    caps: e.int("caps"), chip: Chip(rawValue: e.str("chip")), slot: e.int("slot")))
+            XCTAssertEqual(info.canUpdate, e.int("caps") & 1 != 0 && e.str("chip") != "none" && e.int("slot") > 0)
         }
         XCTAssertNil(DeviceInfo(data: Data([2, 1, 2])))
     }
@@ -164,6 +169,7 @@ final class WireTests: XCTestCase {
         case .configSet: return try Wire.encodeConfig(configFrom(f.obj("config")))
         case .logsGet: w.u32(UInt32(f.int("after"))); w.u8(UInt8(f.int("limit")))
         case .logsSubscribe: w.u8(f.bool("enabled") ? 1 : 0); w.u32(UInt32(f.int("after")))
+        case .fwBegin: w.u32(UInt32(f.int("size"))); w.data(f.hexData("sha256Hex")); w.data(f.hexData("sigHex"))
         default: break
         }
         return Data(w.bytes)
@@ -173,7 +179,7 @@ final class WireTests: XCTestCase {
         "hello": .hello, "auth": .auth, "auth.pair": .authPair, "time.get": .timeGet, "time.set": .timeSet,
         "config.get": .configGet, "config.set": .configSet, "jobs.get": .jobsGet, "camera.wake": .cameraWake,
         "camera.start": .cameraStart, "camera.stop": .cameraStop, "camera.sleep": .cameraSleep, "test.run": .testRun,
-        "logs.get": .logsGet, "logs.subscribe": .logsSubscribe,
+        "logs.get": .logsGet, "logs.subscribe": .logsSubscribe, "fw.begin": .fwBegin, "fw.end": .fwEnd, "fw.abort": .fwAbort,
     ]
 
     func testRequestVectorsEncode() throws {
@@ -222,6 +228,12 @@ final class WireTests: XCTestCase {
                 XCTAssertEqual(page.entries.map(\.msg), f.array("lines").map { $0.str("msg") })
             case "auth":
                 XCTAssertEqual(body, f.hexData("proofHex"))
+            case "fw.begin":
+                let b = try Wire.firmwareBegin(body)
+                XCTAssertEqual(b.offset, f.int("offset"))
+                XCTAssertEqual(b.window, f.int("window"))
+            case "fw.end":
+                XCTAssertEqual(try Wire.firmwareEnd(body), f.int("rebootInMs"))
             default:
                 XCTAssertTrue(body.isEmpty, v.str("name"))
             }
@@ -232,6 +244,15 @@ final class WireTests: XCTestCase {
         for v in try Vectors.load().list("messages") where v.str("kind") == "event" {
             let f = v.obj("fields")
             guard case .event(let code, let body)? = Wire.parse(v.hexData("hex")) else { return XCTFail(v.str("name")) }
+            if v.str("ev") == "fw" {
+                XCTAssertEqual(code, 0x05)
+                let e = try XCTUnwrap(Wire.firmwareEvent(body), v.str("name"))
+                XCTAssertEqual(e.state.rawValue, ["receiving", "verifying", "ready", "failed"].firstIndex(of: f.str("state")))
+                XCTAssertEqual(e.offset, f.int("offset"))
+                XCTAssertEqual(e.reason, f.int("reason"))
+                XCTAssertNil(Wire.decodeEvent(code: code, body: body))  // it has its own channel
+                continue
+            }
             let event = try XCTUnwrap(Wire.decodeEvent(code: code, body: body), v.str("name"))
             switch (v.str("ev"), event) {
             case ("job", .job(let e)):
@@ -267,6 +288,7 @@ final class WireTests: XCTestCase {
                 XCTAssertEqual(error.message, Wire.reasonText(d.int("reason")))
             }
             if v.str("code") == "internal", let m = d.optStr("message") { XCTAssertEqual(error.message, m) }
+            if v.str("code") == "bad_image" { XCTAssertEqual(error.message, Wire.badImageText(d.int("reason")), v.str("name")) }
         }
     }
 

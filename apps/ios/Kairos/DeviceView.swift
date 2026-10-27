@@ -5,6 +5,9 @@ struct DeviceView: View {
     @Environment(AppModel.self) private var model
     @State private var confirmingForget = false
     @State private var confirmingCamera: CameraAction?
+    #if DEBUG
+    @State private var demoDestination: String?
+    #endif
 
     private var phase: StatusValue.Phase { model.live?.phase ?? .idle }
 
@@ -27,6 +30,21 @@ struct DeviceView: View {
                 Button("Disconnect") { model.disconnect() }
             }
         }
+        #if DEBUG
+        .navigationDestination(item: $demoDestination) { screen in
+            switch screen {
+            case "config": ConfigEditorView()
+            case "logs": LogsView()
+            default: FirmwareView()
+            }
+        }
+        .onAppear {
+            if let screen = model.demoScreen {
+                model.demoScreen = nil
+                demoDestination = screen
+            }
+        }
+        #endif
         .confirmationDialog(
             "Forget this device?",
             isPresented: $confirmingForget,
@@ -190,6 +208,22 @@ struct DeviceView: View {
     private var deviceSection: some View {
         Section {
             NavigationLink("Logs") { LogsView() }.kairosRow()
+
+            if model.canUpdate {
+                NavigationLink {
+                    FirmwareView()
+                } label: {
+                    HStack {
+                        Text("Firmware")
+                        Spacer()
+                        if let offer = model.firmware.offer {
+                            // a quiet badge: an update is the user's choice, never a prompt
+                            StateTag(text: "Update \(offer.version)", active: false)
+                        }
+                    }
+                }
+                .kairosRow()
+            }
 
             HStack {
                 VStack(alignment: .leading) {

@@ -7,6 +7,7 @@ public enum BLEUUID {
     public static let status = CBUUID(string: "6B610003-6169-4F72-8F73-B3E1C5A97D24")
     public static let command = CBUUID(string: "6B610004-6169-4F72-8F73-B3E1C5A97D24")
     public static let response = CBUUID(string: "6B610005-6169-4F72-8F73-B3E1C5A97D24")
+    public static let firmware = CBUUID(string: "6B610006-6169-4F72-8F73-B3E1C5A97D24")
 }
 
 public struct DiscoveredDevice: Identifiable, Equatable {

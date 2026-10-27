@@ -28,6 +28,8 @@ final class AppModel {
     /// The Status revision of the config this model last fetched.
     @ObservationIgnored private var configRev: UInt32?
 
+    var firmware = FirmwareState()
+
     var testSteps: [String] = []
     var testRunning = false
     var working = false
@@ -36,15 +38,27 @@ final class AppModel {
 
     // MARK: Plumbing
 
-    @ObservationIgnored private let central = BLECentral()
-    @ObservationIgnored private var connection: BLEDeviceConnection?
-    @ObservationIgnored private var client: DeviceClient?
-    @ObservationIgnored private var currentId: UUID?
-    @ObservationIgnored private var listeners: [Task<Void, Never>] = []
+    @ObservationIgnored let central = BLECentral()
+    @ObservationIgnored var connection: BLEDeviceConnection?
+    @ObservationIgnored var client: DeviceClient?
+    @ObservationIgnored var currentId: UUID?
+    @ObservationIgnored var listeners: [Task<Void, Never>] = []
+
+    // Firmware updates (AppModel+Firmware.swift)
+    @ObservationIgnored let updateStore = UserDefaultsUpdateStore()
+    @ObservationIgnored lazy var updateService = UpdateService(store: updateStore)
+    @ObservationIgnored lazy var firmwareCache = FirmwareCache(
+        directory: FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("Firmware"))
+    @ObservationIgnored var installTask: Task<Void, Never>?
+    @ObservationIgnored var reconnectTask: Task<Void, Never>?
+    @ObservationIgnored var installPhase: InstallPhase = .none
+    @ObservationIgnored var oldVersion: String?
 
     #if DEBUG
     /// True when the debug demo fixtures are driving the screens (no Bluetooth).
     var demo = false
+    /// `-screen config|logs|firmware`: open that screen on the device screen (for screenshots).
+    var demoScreen: String?
     #endif
 
     init() {
@@ -53,6 +67,7 @@ final class AppModel {
         let args = ProcessInfo.processInfo.arguments
         if let i = args.firstIndex(of: "-demo"), i + 1 < args.count {
             applyDemo(args[i + 1])
+            if let s = args.firstIndex(of: "-screen"), s + 1 < args.count { demoScreen = args[s + 1] }
         }
         #endif
     }
@@ -185,7 +200,7 @@ final class AppModel {
         disconnect()
     }
 
-    private func becomeReady() async throws {
+    func becomeReady() async throws {
         guard let client, let connection else { return }
 
         clock = try? await client.syncClock()
@@ -196,6 +211,7 @@ final class AppModel {
         jobs = try await client.jobs(for: config)
         link = .ready
 
+        checkForUpdatesQuietly()
         await loadLogs()
     }
 
@@ -215,7 +231,7 @@ final class AppModel {
 
     // MARK: Live updates
 
-    private func listen(client: DeviceClient, connection: BLEDeviceConnection) {
+    func listen(client: DeviceClient, connection: BLEDeviceConnection) {
         listeners.forEach { $0.cancel() }
         listeners = [
             Task { [weak self] in
@@ -327,7 +343,7 @@ final class AppModel {
         (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
     }
 
-    private func fail(_ error: Error) {
+    func fail(_ error: Error) {
         let message = describe(error)
         if let id = currentId { central.disconnect(id) }
         teardown()
@@ -336,12 +352,26 @@ final class AppModel {
     }
 
     private func connectionLost() {
+        if installPhase == .restarting {
+            reconnectAfterUpdate()  // expected: the device restarts to run the new firmware
+            return
+        }
+        let duringUpdate = installPhase == .transferring
         teardown()
-        banner = "The connection to the device was lost."
+        banner = duringUpdate
+            ? "The connection was lost during the update. The device keeps what it received for 2 minutes: connect again and install the same firmware to continue."
+            : "The connection to the device was lost."
         central.startScan()
     }
 
-    private func teardown() {
+    func teardown() {
+        installTask?.cancel()
+        installTask = nil
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        installPhase = .none
+        keepScreenAwake(false)
+        firmware = FirmwareState()
         listeners.forEach { $0.cancel() }
         listeners = []
         client = nil

@@ -19,6 +19,8 @@
 		A10000000000000000000012 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* Assets.xcassets */; };
 		A10000000000000000000022 /* SpaceGrotesk-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000021 /* SpaceGrotesk-Variable.ttf */; };
 		A10000000000000000000032 /* JetBrainsMono-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000031 /* JetBrainsMono-Variable.ttf */; };
+		A1F00002000000000000AA01 /* AppModel+Firmware.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F00001000000000000AA01 /* AppModel+Firmware.swift */; };
+		A1F00002000000000000AA02 /* FirmwareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F00001000000000000AA02 /* FirmwareView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +38,8 @@
 		A10000000000000000000011 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A10000000000000000000021 /* SpaceGrotesk-Variable.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Variable.ttf"; sourceTree = "<group>"; };
 		A10000000000000000000031 /* JetBrainsMono-Variable.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "JetBrainsMono-Variable.ttf"; sourceTree = "<group>"; };
+		A1F00001000000000000AA01 /* AppModel+Firmware.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Firmware.swift"; sourceTree = "<group>"; };
+		A1F00001000000000000AA02 /* FirmwareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirmwareView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -91,6 +95,8 @@
 				A10000000000000000000001 /* Brand.swift */,
 				A10000000000000000000041 /* Fonts */,
 				5EA4F03E11DC935FD4230BBF /* AppModel.swift */,
+				A1F00001000000000000AA02 /* FirmwareView.swift */,
+				A1F00001000000000000AA01 /* AppModel+Firmware.swift */,
 				641BEBEEB87E3B29D1841CFA /* KairosApp.swift */,
 				BCE484CD892EB69FCCA994BB /* ConfigEditorView.swift */,
 				905571EEFD358B239AFFF936 /* DemoMode.swift */,
@@ -180,6 +186,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				20D7DE037803A237C20A3A87 /* AppModel.swift in Sources */,
+				A1F00002000000000000AA02 /* FirmwareView.swift in Sources */,
+				A1F00002000000000000AA01 /* AppModel+Firmware.swift in Sources */,
 				A10000000000000000000002 /* Brand.swift in Sources */,
 				83C6645A5564F7FD6048C2F3 /* KairosApp.swift in Sources */,
 				829AC8834730FC5A889A0099 /* ConfigEditorView.swift in Sources */,

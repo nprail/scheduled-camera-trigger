@@ -9,6 +9,7 @@ extension AppModel {
     static let scenes = [
         "scan", "scanning", "off", "unauthorized", "unsupported", "connecting",
         "pairing", "pairing-error", "ready", "generic", "recording", "banner",
+        "firmware", "firmware-progress", "firmware-failed",
     ]
 
     func applyDemo(_ scene: String) {
@@ -24,7 +25,9 @@ extension AppModel {
         bluetooth = .poweredOn
         banner = nil
         let now = Date()
-        let device = DeviceInfo(v: Int(protocolVersion), id: "A1B2C3", name: "Pad Cam", cam: "zcam", fw: "1.2.0")
+        let device = DeviceInfo(
+            v: Int(protocolVersion), id: "A1B2C3", name: "Pad Cam", cam: "zcam", fw: "1.2.0",
+            caps: 1, chip: .esp32s3, slot: 0x1F0000)
 
         switch scene {
         case "off": bluetooth = .poweredOff
@@ -37,7 +40,7 @@ extension AppModel {
             link = .needsPairing(reason: scene == "pairing"
                 ? "This device hasn't been paired with a phone yet."
                 : "Press the button on the device, then try again within 2 minutes.")
-        case "ready", "generic", "recording", "banner":
+        case "ready", "generic", "recording", "banner", "firmware", "firmware-progress", "firmware-failed":
             let recording = scene == "recording"
             // the generic scene is a unit without the Ethernet module: no Z CAM option
             info = scene == "generic"
@@ -71,6 +74,22 @@ extension AppModel {
                     log(4, -60, "camera", "Failed to reach camera, retrying")]
             link = .ready
             if scene == "banner" { banner = "The connection to the device was lost." }
+            if scene.hasPrefix("firmware") {
+                // idle, with the next event far enough away that an update could start
+                live = StatusValue(data: status(flags: 0b1010, phase: 0, next: now.addingTimeInterval(5400), type: 1, attempt: 0))
+                let image = ReleaseManifest.Image(
+                    file: "kairos-esp32s3-1.3.0-app.bin", size: 1_187_344,
+                    sha256: String(repeating: "a", count: 64), sig: String(repeating: "b", count: 128))
+                firmware.offer = FirmwareOffer(version: "1.3.0", notes: "Fixes the Z CAM retry and adds firmware updates.", image: image)
+                if scene == "firmware-progress" {
+                    firmware.prepared = PreparedFirmware(
+                        title: "Version 1.3.0", version: "1.3.0", fileName: image.file, data: Data(count: 1_187_344),
+                        signature: Data(count: 64), sha256: String(repeating: "a", count: 64))
+                    firmware.stage = .sending(0.42)
+                } else if scene == "firmware-failed" {
+                    firmware.stage = .failed("The firmware's signature isn't valid for this device.")
+                }
+            }
         default: // "scan"
             devices = [
                 DiscoveredDevice(id: UUID(), name: "Pad Cam-A1B2C3", rssi: -52, lastSeen: now),
