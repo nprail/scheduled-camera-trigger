@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>kairos: a camera trigger for the exact moment</title>
+  <meta name="description" content="Kairos is an open source hardware, time-based camera trigger. It wakes your camera and starts and stops recording at the second you choose, set from your phone.">
+  <meta name="theme-color" content="#f2f0ea" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#14130f" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="kairos: a camera trigger for the exact moment">
+  <meta property="og:description" content="An open source hardware, time-based camera trigger. Set from your phone.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&family=Space+Grotesk:wght@600&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script>
+    // Kairos brand tokens (see brand/README.md). Light and dark are both first-class.
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ground: 'rgb(var(--ground) / <alpha-value>)',
+            raised: 'rgb(var(--raised) / <alpha-value>)',
+            ink: 'rgb(var(--ink) / <alpha-value>)',
+            muted: 'rgb(var(--muted) / <alpha-value>)',
+            hairline: 'rgb(var(--hairline) / <alpha-value>)',
+            signal: 'rgb(var(--signal) / <alpha-value>)',
+          },
+          fontFamily: {
+            display: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
+            sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+          },
+          borderRadius: { sm: '4px', md: '8px' },
+        },
+      },
+    }
+  </script>
+  <style>
+    :root {
+      --ground: 242 240 234; --raised: 250 249 245; --ink: 20 19 15;
+      --muted: 107 103 94; --hairline: 217 214 204; --signal: 242 63 18;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --ground: 20 19 15; --raised: 30 29 25; --ink: 242 240 234;
+        --muted: 168 163 152; --hairline: 46 44 39; --signal: 255 90 46;
+      }
+    }
+    html { scroll-behavior: smooth; }
+    body { background: rgb(var(--ground)); color: rgb(var(--ink)); }
+    /* a solid 2px ink ring, offset by 2px, on every focusable element */
+    :focus-visible { outline: 2px solid rgb(var(--ink)); outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    .mark-ink { stroke: rgb(var(--ink)); }
+    .mark-sig { stroke: rgb(var(--signal)); }
+    .mark-dot { fill: rgb(var(--signal)); }
+    .label { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
+    .wordmark { font-family: 'Space Grotesk', system-ui, sans-serif; font-weight: 600; letter-spacing: -0.03em; }
+  </style>
+</head>
+<body class="font-sans text-base antialiased">
+  <svg width="0" height="0" class="absolute" aria-hidden="true">
+    <defs>
+      <symbol id="mark" viewBox="0 0 120 120">
+        <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path class="mark-ink" stroke-width="7" d="M8 34V10H32M88 10H112V34M112 86V110H88M32 110H8V86"/>
+          <g class="mark-ink" stroke-width="6"><line x1="28" y1="64" x2="28" y2="90"/><line x1="44" y1="64" x2="44" y2="90"/><line x1="76" y1="64" x2="76" y2="90"/><line x1="92" y1="64" x2="92" y2="90"/></g>
+          <line class="mark-sig" stroke-width="6" x1="60" y1="42" x2="60" y2="90"/>
+        </g>
+        <circle class="mark-dot" cx="60" cy="31" r="10"/>
+      </symbol>
+      <symbol id="mark-small" viewBox="0 0 120 120">
+        <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path class="mark-ink" stroke-width="10" d="M8 34V10H32M88 10H112V34M112 86V110H88M32 110H8V86"/>
+          <line class="mark-sig" stroke-width="10" x1="60" y1="42" x2="60" y2="92"/>
+        </g>
+        <circle class="mark-dot" cx="60" cy="31" r="13"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-ink focus:px-4 focus:py-2 focus:text-ground">Skip to content</a>
+
+  <header class="border-b border-hairline">
+    <div class="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4">
+      <a href="#" class="flex items-center gap-[10px]" aria-label="kairos, home">
+        <svg width="32" height="32" aria-hidden="true"><use href="#mark"/></svg>
+        <span class="wordmark text-3xl leading-none">kairos</span>
+      </a>
+      <nav aria-label="Primary" class="flex items-center gap-6 text-sm">
+        <a class="hidden hover:underline sm:inline" href="#how-it-works">How it works</a>
+        <a class="hidden hover:underline sm:inline" href="#features">Features</a>
+        <a class="hidden hover:underline md:inline" href="#apps">Apps</a>
+        <a class="hidden hover:underline md:inline" href="#hardware">Hardware</a>
+        <a class="hover:underline" href="docs/">Docs</a>
+        <a class="rounded-md border border-ink px-4 py-2 font-medium hover:bg-ink hover:text-ground" href="https://github.com/nprail/kairos">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- Hero -->
+    <section class="mx-auto grid max-w-6xl items-center gap-12 px-6 py-16 md:py-24 lg:grid-cols-[1.1fr_1fr]">
+      <div>
+        <p class="label text-muted">Open source hardware</p>
+        <h1 class="mt-4 font-display text-5xl font-semibold leading-[1.05] tracking-[-0.02em] sm:text-6xl">A camera trigger for the exact moment.</h1>
+        <p class="mt-6 max-w-[34rem] text-lg leading-7 text-muted">Kairos is a time-based camera trigger. It wakes your camera and starts and stops recording at the second you choose. You set it from your phone.</p>
+        <div class="mt-8 flex flex-wrap gap-3">
+          <a class="rounded-md bg-ink px-5 py-3 font-medium text-ground hover:opacity-90" href="https://github.com/nprail/kairos">View on GitHub</a>
+          <a class="rounded-md border border-ink px-5 py-3 font-medium hover:bg-ink hover:text-ground" href="docs/">Read the docs</a>
+        </div>
+      </div>
+
+      <!-- A live readout: the countdown ticks and the playhead moves toward T-0 -->
+      <figure class="rounded-md border border-hairline bg-raised p-6" aria-label="Example readout of an attempt counting down to T-0">
+        <div class="flex items-baseline justify-between">
+          <span class="label text-muted">Next · Stop recording</span>
+          <span class="label text-muted">Attempt 1</span>
+        </div>
+        <p id="readout" class="mt-3 font-mono text-5xl font-medium tracking-tight sm:text-6xl" aria-hidden="true">T-00:00:10</p>
+        <svg id="timeline" viewBox="0 0 560 100" class="mt-6 w-full" role="img" aria-label="A timeline from wake, through start recording, to T-0 and stop recording, with one playhead">
+          <g id="ticks" stroke-width="3" stroke-linecap="round" class="text-muted" stroke="currentColor"></g>
+          <g class="font-mono" font-size="14" fill="currentColor">
+            <text x="16" y="90" class="text-muted" text-anchor="start">wake</text>
+            <text x="64" y="90" class="text-muted">start</text>
+            <text x="256" y="90" text-anchor="middle">T-0</text>
+            <text x="544" y="90" text-anchor="end" class="text-muted">stop</text>
+          </g>
+          <g id="playhead">
+            <line x1="0" y1="26" x2="0" y2="68" stroke-width="4" stroke-linecap="round" class="mark-sig"/>
+            <circle cx="0" cy="16" r="7" class="mark-dot"/>
+          </g>
+        </svg>
+        <figcaption class="mt-4 text-sm text-muted">Choose when the camera wakes, when it starts recording and when it stops, all around T-0.</figcaption>
+      </figure>
+    </section>
+
+    <!-- Origin -->
+    <section class="border-y border-hairline bg-raised">
+      <div class="mx-auto max-w-6xl px-6 py-12 md:py-16">
+        <p class="max-w-3xl font-display text-2xl font-semibold leading-snug tracking-[-0.01em] sm:text-3xl">Built to record a rocket launch without anyone next to the camera. It does one thing: be ready, and press record at the right second.</p>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="mx-auto max-w-6xl scroll-mt-8 px-6 py-16 md:py-24">
+      <p class="label text-muted">Features</p>
+      <h2 class="mt-3 max-w-2xl font-display text-4xl font-semibold leading-[1.1] tracking-[-0.02em]">Everything you need to hit the moment.</h2>
+      <ul class="mt-12 grid gap-px overflow-hidden rounded-md border border-hairline bg-hairline sm:grid-cols-2 lg:grid-cols-3">
+        <li class="bg-ground p-6">
+          <h3 class="font-display text-[22px] font-semibold leading-7 tracking-[-0.01em]">Exact timing</h3>
+          <p class="mt-2 text-muted">Plan each attempt around one moment, T-0. Kairos wakes the camera, starts recording before it and stops after it. Plan as many attempts as you need.</p>
+        </li>
+        <li class="bg-ground p-6">
+          <h3 class="font-display text-[22px] font-semibold leading-7 tracking-[-0.01em]">Works with your camera</h3>
+          <p class="mt-2 text-muted">Works with cameras that have a remote trigger port, and with Z CAM cameras.</p>
+        </li>
+        <li class="bg-ground p-6">
+          <h3 class="font-display text-[22px] font-semibold leading-7 tracking-[-0.01em]">Controlled from your phone</h3>
+          <p class="mt-2 text-muted">The iPhone and Android apps connect to Kairos over Bluetooth Low Energy (BLE). Edit the schedule, check the countdown, run a test and watch the log, in the field.</p>
+        </li>
+        <li class="bg-ground p-6">
+          <h3 class="font-display text-[22px] font-semibold leading-7 tracking-[-0.01em]">Small and low power</h3>
+          <p class="mt-2 text-muted">Small enough to sit next to the camera, and light on power. A small battery pack is enough.</p>
+        </li>
+        <li class="bg-ground p-6 lg:col-span-2">
+          <h3 class="font-display text-[22px] font-semibold leading-7 tracking-[-0.01em]">Open</h3>
+          <p class="mt-2 text-muted">The device software and both apps are open source and documented in one repository.</p>
+        </li>
+      </ul>
+    </section>
+
+    <!-- How it works -->
+    <section id="how-it-works" class="scroll-mt-8 border-y border-hairline bg-raised">
+      <div class="mx-auto max-w-6xl px-6 py-16 md:py-24">
+        <p class="label text-muted">How it works</p>
+        <h2 class="mt-3 max-w-2xl font-display text-4xl font-semibold leading-[1.1] tracking-[-0.02em]">Set it up once. Then walk away.</h2>
+        <ol class="mt-12 grid gap-8 md:grid-cols-3">
+          <li>
+            <p class="font-mono text-sm font-medium text-muted">01</p>
+            <h3 class="mt-2 font-display text-[22px] font-semibold leading-7 tracking-[-0.01em]">Set the attempts</h3>
+            <p class="mt-2 text-muted">Add your T-0 times, then set three timings: when to wake the camera, when to start recording, and when to stop.</p>
+          </li>
+          <li>
+            <p class="font-mono text-sm font-medium text-muted">02</p>
+            <h3 class="mt-2 font-display text-[22px] font-semibold leading-7 tracking-[-0.01em]">Run a test</h3>
+            <p class="mt-2 text-muted">Run a test from the app to check that everything works with your camera.</p>
+          </li>
+          <li>
+            <p class="font-mono text-sm font-medium text-muted">03</p>
+            <h3 class="mt-2 font-display text-[22px] font-semibold leading-7 tracking-[-0.01em]">Leave</h3>
+            <p class="mt-2 text-muted">Walk away. Kairos wakes the camera and starts and stops recording on schedule.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- Apps -->
+    <section id="apps" class="mx-auto grid max-w-6xl scroll-mt-8 items-center gap-12 px-6 py-16 md:py-24 lg:grid-cols-2">
+      <div>
+        <p class="label text-muted">Apps</p>
+        <h2 class="mt-3 font-display text-4xl font-semibold leading-[1.1] tracking-[-0.02em]">Available on iPhone and Android.</h2>
+        <p class="mt-6 max-w-lg text-lg leading-7 text-muted">Set up and control Kairos from your phone. You can:</p>
+        <ul class="mt-6 grid max-w-lg gap-3 text-muted">
+          <li class="flex gap-3"><span class="mt-[10px] h-px w-4 shrink-0 bg-ink" aria-hidden="true"></span>Find and connect to devices, and pair with the button</li>
+          <li class="flex gap-3"><span class="mt-[10px] h-px w-4 shrink-0 bg-ink" aria-hidden="true"></span>Show live status with a countdown to the next event</li>
+          <li class="flex gap-3"><span class="mt-[10px] h-px w-4 shrink-0 bg-ink" aria-hidden="true"></span>Edit the schedule and the camera settings</li>
+          <li class="flex gap-3"><span class="mt-[10px] h-px w-4 shrink-0 bg-ink" aria-hidden="true"></span>Run a test, and wake, start, stop and sleep the camera by hand</li>
+          <li class="flex gap-3"><span class="mt-[10px] h-px w-4 shrink-0 bg-ink" aria-hidden="true"></span>Show the device log, live</li>
+        </ul>
+      </div>
+      <div class="flex justify-center">
+        <figure class="w-3/4 max-w-[280px]">
+          <img src="img/app-ios.png" width="560" height="1218" alt="The Kairos app during a recording: status, a T-minus countdown to the next event, camera controls and the schedule." class="w-full rounded-[28px] border border-hairline" loading="lazy">
+        </figure>
+      </div>
+    </section>
+
+    <!-- Hardware -->
+    <section id="hardware" class="scroll-mt-8 border-y border-hairline bg-raised">
+      <div class="mx-auto grid max-w-6xl gap-12 px-6 py-16 md:py-24 lg:grid-cols-[1fr_1.2fr]">
+        <div>
+          <p class="label text-muted">Hardware</p>
+          <h2 class="mt-3 font-display text-4xl font-semibold leading-[1.1] tracking-[-0.02em]">Small, simple hardware.</h2>
+          <p class="mt-6 max-w-md text-lg leading-7 text-muted">A small ESP32-based device that sits next to your camera and connects to it. It has one button, and it runs from a small battery pack.</p>
+          <a class="mt-8 inline-block rounded-md border border-ink px-5 py-3 font-medium hover:bg-ink hover:text-ground" href="docs/hardware/">Read the hardware guide</a>
+        </div>
+        <dl class="grid gap-px overflow-hidden rounded-md border border-hairline bg-hairline sm:grid-cols-2">
+          <div class="bg-ground p-6"><dt class="label text-muted">Camera</dt><dd class="mt-2">Connects to your camera, wired.</dd></div>
+          <div class="bg-ground p-6"><dt class="label text-muted">Phone</dt><dd class="mt-2">Controlled from the iPhone or Android app.</dd></div>
+          <div class="bg-ground p-6"><dt class="label text-muted">Pairing</dt><dd class="mt-2">One button. Only your phone can control the device.</dd></div>
+          <div class="bg-ground p-6"><dt class="label text-muted">Power</dt><dd class="mt-2">Starts in seconds and is light on power. A small battery pack is enough.</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <!-- Open source -->
+    <section class="mx-auto max-w-6xl px-6 py-16 text-center md:py-24">
+      <svg width="64" height="64" class="mx-auto" aria-hidden="true"><use href="#mark"/></svg>
+      <h2 class="mx-auto mt-6 max-w-2xl font-display text-4xl font-semibold leading-[1.1] tracking-[-0.02em]">Build one. Change it.</h2>
+      <p class="mx-auto mt-4 max-w-xl text-lg leading-7 text-muted">Everything is in one repository: the device software, the iPhone and Android apps, and the documentation. It is open source.</p>
+      <div class="mt-8 flex flex-wrap justify-center gap-3">
+        <a class="rounded-md bg-ink px-5 py-3 font-medium text-ground hover:opacity-90" href="https://github.com/nprail/kairos">View on GitHub</a>
+        <a class="rounded-md border border-ink px-5 py-3 font-medium hover:bg-ink hover:text-ground" href="docs/">Read the docs</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-hairline">
+    <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-8 text-sm text-muted">
+      <div class="flex items-center gap-[8px] text-ink">
+        <svg width="24" height="24" aria-hidden="true"><use href="#mark-small"/></svg>
+        <span class="wordmark text-2xl leading-none">kairos</span>
+      </div>
+      <p>A camera trigger for the exact moment. Open source.</p>
+      <nav aria-label="Footer" class="flex gap-6">
+        <a class="hover:underline" href="https://github.com/nprail/kairos">GitHub</a>
+        <a class="hover:underline" href="docs/">Docs</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script>
+    // The hero readout: a functional countdown from T-20 to T-0, with the playhead moving along the ticks.
+    (function () {
+      var ticks = document.getElementById('ticks');
+      var NS = 'http://www.w3.org/2000/svg';
+      // ticks on a 16-unit pitch, as in the logo
+      for (var x = 16; x <= 544; x += 16) {
+        var l = document.createElementNS(NS, 'line');
+        // taller, full-strength ticks mark wake (T-25), start (T-20), T-0 and stop (T+30)
+        var key = x === 16 || x === 64 || x === 256 || x === 544;
+        l.setAttribute('x1', x); l.setAttribute('x2', x);
+        l.setAttribute('y1', key ? 30 : 36); l.setAttribute('y2', key ? 66 : 60);
+        l.setAttribute('opacity', key ? 1 : 0.45);
+        ticks.appendChild(l);
+      }
+      var readout = document.getElementById('readout');
+      var head = document.getElementById('playhead');
+      // map T-25 s .. T+30 s onto x = 16 .. 544; the demo runs from the start of recording (T-20 s) to T-0
+      var X0 = 16, X1 = 544, SPAN = 55;
+      function xFor(t) { return X0 + ((t + 25) / SPAN) * (X1 - X0); }
+      function show(secondsToT0) {
+        var s = Math.max(0, Math.ceil(secondsToT0));
+        var h = String(Math.floor(s / 3600)).padStart(2, '0');
+        var m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+        var sec = String(s % 60).padStart(2, '0');
+        readout.textContent = 'T-' + h + ':' + m + ':' + sec;
+        head.setAttribute('transform', 'translate(' + xFor(-secondsToT0).toFixed(1) + ' 0)');
+      }
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { show(10); return; }
+      var start = performance.now();
+      function frame(now) {
+        var elapsed = (now - start) / 1000;
+        var left = 20 - (elapsed % 22);      // 20 s countdown, then a 2 s hold at T-0
+        show(left < 0 ? 0 : left);
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>

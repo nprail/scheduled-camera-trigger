@@ -1,18 +1,17 @@
 # Kairos documentation
 
-Kairos is an open source hardware, time-based camera trigger. It wakes a camera and starts and stops recording at the exact moment you choose, set from your phone. These pages cover setting up a device, wiring it to a camera, configuring it, and working on the project.
+Kairos is an open source hardware, time-based camera trigger. It wakes a camera and starts and stops recording at the exact moment you choose, set from your phone. Kairos runs on an ESP32; the original Raspberry Pi version is legacy. These pages cover setting up a device, wiring it to a camera, configuring it, and working on the project.
 
 ## Get started
 
-- [Setting up a device](SETUP.md): run Kairos on a Raspberry Pi, set up Bluetooth, and pair a phone.
-- [Hardware](HARDWARE.md): parts, GPIO pins, and wiring for remote trigger ports and Z CAMs.
-- [Configuration](CONFIGURATION.md): every `config.json` option, and the timeline of an attempt.
+- [Setting up a device](setup.md): flash an ESP32, pair a phone, and how the Bluetooth side works. The legacy Raspberry Pi setup is at the end of the page.
+- [Hardware](hardware.md): the ESP32 parts, pins, and wiring for remote trigger ports and Z CAMs. The legacy Raspberry Pi hardware is at the end of the page.
+- [Configuration](configuration.md): every setting, and the timeline of an attempt.
+- [Updating the firmware](updating-firmware.md): update a device from the app over Bluetooth, from GitHub or from a file, and how releases are signed.
 
 ## Reference
 
 - [Bluetooth protocol](ble-protocol.md): how the phone and the device talk to each other.
-- [Development](DEVELOPMENT.md): repository layout, running the tests, and the test vectors.
-
-## Proposals
-
-- [ESP32 port](esp32-port.md): a design proposal for an ESP32 version of the device.
+- [ESP32 firmware](esp32-port.md): the design of the ESP32 firmware, its status, and what it changes from the legacy Raspberry Pi version.
+- [Firmware update design](ota-plan.md): how updates over Bluetooth work and why.
+- [Development](development.md): repository layout, running the tests, and the test vectors.

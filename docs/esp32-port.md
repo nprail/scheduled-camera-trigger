@@ -1,12 +1,12 @@
-# ESP32 Port — Design Proposal
+# ESP32 firmware: design
 
-**Status:** Draft proposal. Nothing is implemented. · **Target:** ESP32-S3 + W5500 Ethernet + external RTC · **Framework:** Arduino-ESP32 on PlatformIO · **Storage:** NVS only · **Protocol:** new binary BLE protocol v2
+**Status:** Implemented in [`firmware/esp32/`](https://github.com/nprail/kairos/tree/main/firmware/esp32) (builds, with host tests; not yet run on hardware). The ESP32 is the recommended device, and the Raspberry Pi version is legacy. See [Implementation notes](#19-implementation-notes) for where the firmware differs from this design, which was written as a proposal. · **Target:** ESP32-S3 (and ESP32-C3, see §19) + W5500 Ethernet + external RTC · **Framework:** Arduino-ESP32 on PlatformIO · **Storage:** NVS only · **Protocol:** new binary BLE protocol v2
 
-This document describes how to port the device side of Kairos (`trigger/`, currently Node on a Raspberry Pi Zero W) to an ESP32. Because nobody uses the current system yet, the port also replaces the JSON BLE protocol (v1) with a compact binary one (v2, §5). **Both apps change with it.** Nothing needs to stay compatible with v1.
+This document describes the ESP32 version of the device side of Kairos, a port of the original program (`firmware/legacy-pi/trigger/`, Node on a Raspberry Pi Zero W, now legacy). Because nobody uses the current system yet, the port also replaces the JSON BLE protocol (v1) with a compact binary one (v2, §5). **Both apps change with it.** Nothing needs to stay compatible with v1.
 
 ## 1. Why, and what changes
 
-| | Pi Zero W (today) | ESP32-S3 (proposed) |
+| | Pi Zero W (legacy) | ESP32 (recommended) |
 | --- | --- | --- |
 | Runtime | Linux + Node, BlueZ-free raw HCI via `ble-host` | Arduino-ESP32 firmware (FreeRTOS underneath), NimBLE host on the on-chip controller |
 | Protocol | JSON messages, ISO dates, base64, paged lists | **Binary v2.** Stored form equals wire form (§5) |
@@ -25,7 +25,7 @@ The boot-time and power wins matter in the field: the device can be cold-powered
 **In:** the ESP32 firmware, the v2 binary protocol, the matching iOS and Android changes, and **updating the Node device code to v2**. Node stays the working device until the ESP32 reaches parity, so the apps can be developed and tested against real hardware. Node is then retired.
 
 **Out:**
-- Wi-Fi, an HTTP server, and OTA in v1. Updates are over USB, but the flash layout reserves two app slots so BLE OTA can be added later without repartitioning (§8, §14).
+- Wi-Fi and an HTTP server. (Updates over Bluetooth were added after v1: see §14 and [Updating the firmware](updating-firmware.md).)
 - Persisting schedule state across resets. After a reboot any attempt whose wake time has passed is `missed`, exactly as on the Pi.
 - A persistent log. The log is a RAM ring, as on the Pi's in-memory buffer.
 
@@ -36,7 +36,7 @@ The boot-time and power wins matter in the field: the device can be cold-powered
 | Part | Notes |
 | --- | --- |
 | ESP32-S3 dev board | e.g. ESP32-S3-DevKitC-1 (N8; PSRAM is not needed). BLE 5, USB-serial/JTAG for flashing |
-| W5500 SPI Ethernet module | Hardware TCP/IP offload, 10/100 Mbit, supported by the Arduino core's `ETH` library. Connects to the Z CAM with a short Cat5e cable |
+| W5500 SPI Ethernet module (**optional**: only for the Z CAM integration) | Hardware TCP/IP offload, 10/100 Mbit, supported by the Arduino core's `ETH` library. Connects to the Z CAM with a short Cat5e cable |
 | RTC module | See §3.3 |
 | Push button | Pairing. Active-high with pull-down to match today's rising-edge behavior, or active-low with the internal pull-up (decide in §18) |
 | Output stage for `generic` cameras | 3.3 V GPIO is **not** enough to drive a camera release. Use an optocoupler or small MOSFET per line (release, focus) |
@@ -44,7 +44,7 @@ The boot-time and power wins matter in the field: the device can be cold-powered
 
 ### 3.2 Suggested pin map (verify against your board)
 
-The Z CAM and RTC pins are fixed at build time (`build_flags` in `platformio.ini`). The button and `generic` pins stay configurable over BLE, validated against a chip-aware allow-list (§8).
+All pins are constants in `firmware/esp32/src/platform/board.h`, not settings. Anyone wiring a different board edits that file and rebuilds. They are not part of the BLE protocol (§19).
 
 | Function | GPIO | Why |
 | --- | --- | --- |
@@ -52,7 +52,7 @@ The Z CAM and RTC pins are fixed at build time (`build_flags` in `platformio.ini
 | W5500 INT / RST | 14 / 9 | INT is required for efficient receive. RST lets firmware recover a hung PHY |
 | RTC SDA / SCL | 8 / 18 | Any free pins work. These avoid SPI2 |
 | RTC SQW/INT (optional) | 15 | 1 Hz edge for sub-second alignment (§7.3) |
-| Button (default) | 4 | |
+| Button | 0 (C3: 9) | The board's BOOT button, active low with a pull-up. Only read after boot |
 | Release / Focus (default) | 5 / 6 | |
 
 Avoid on ESP32-S3: GPIO 0, 3, 45, 46 (strapping), 19 and 20 (USB), 26–32 (flash), and 33–37 on octal-PSRAM modules.
@@ -169,7 +169,7 @@ A **log line** is `seq u32`, `ts u32` (Unix seconds), `ns` (`u8` length + ASCII,
 | 8 | `pairing_closed` | — |
 | 9 | `internal` | optional `u8` length + UTF-8 text |
 
-`invalid_config` fields: 1 `name`, 2 `cameraType`, 3 `wakeUpTimeout`, 4 `startBefore`, 5 `endAfter`, 6 `buttonPin`, 7 `releasePin`, 8 `focusPin`, 9 `cameraIp`, 10 `attempts` (the list), 11 `attempts[i].name`, 12 `attempts[i].time`. Reasons: 1 required, 2 out of range, 3 bad value, 4 in the past, 5 duplicate, 6 too soon (the wake-up time has passed), 7 too many. The apps keep showing "{field}: {message}", built from these enums.
+`invalid_config` fields: 1 `name`, 2 `cameraType`, 3 `wakeUpTimeout`, 4 `startBefore`, 5 `endAfter`, 9 `cameraIp` (6 to 8 are unused), 10 `attempts` (the list), 11 `attempts[i].name`, 12 `attempts[i].time`. Reasons: 1 required, 2 out of range, 3 bad value, 4 in the past, 5 duplicate, 6 too soon (the wake-up time has passed), 7 too many. The apps keep showing "{field}: {message}", built from these enums.
 
 ### 5.4 Status characteristic (13 bytes)
 
@@ -198,9 +198,6 @@ This is both the `config.get`/`config.set` body and the stored blob (§8).
 | `wakeUpTimeout` | u16 | seconds |
 | `startBefore` | u16 | seconds |
 | `endAfter` | u16 | seconds |
-| `buttonPin` | u8 | `0xFF` none |
-| `releasePin` | u8 | `0xFF` none (required when `generic`) |
-| `focusPin` | u8 | `0xFF` none |
 | `cameraIp` | 4 bytes | IPv4 (required when `zcam`) |
 | `name` | u8 length + UTF-8 | ≤ 32 bytes |
 | `count` | u8 | ≤ 30 |
@@ -229,7 +226,7 @@ Both apps, per `AGENTS.md`:
 Everything protocol-related is **pure C++ with no Arduino or IDF includes**, so it builds in the PlatformIO `native` environment and runs against the shared vectors. There is no JSON anywhere in the pure code.
 
 ```
-esp32/
+firmware/esp32/
   platformio.ini        envs: `device` (esp32-s3), `native` (host tests)
   partitions.csv
   src/main.cpp          setup(): wires modules, starts tasks. loop(): empty
@@ -248,18 +245,18 @@ Mapping from the Node tree:
 
 | Node | ESP32 | Notes |
 | --- | --- | --- |
-| `trigger/ble/framing.js` | `protocol/framing` | Unchanged format |
-| `trigger/ble/auth.js` | `protocol/auth` | HMAC-SHA256, constant-time compare, lockout, pairing window. Raw bytes |
-| `trigger/ble/dispatcher.js` | `protocol/dispatcher` | One op table, binary bodies |
-| `trigger/ble/status.js` | `protocol/status` | 13-byte little-endian |
-| `trigger/ble/gatt.js`, `link.js` | `platform/ble` | NimBLE-Arduino GATT server, fragment queue, MTU |
-| `trigger/controller.js` | `src/controller` | `save`, `setSecret`, `setTime`, `test` |
-| `trigger/lib/config.js` | `config/` | Same rules, binary form. Pin allow-list (§8) |
-| `trigger/lib/scheduler.js` | `scheduler/` | Replace `node-schedule` (§7.2) |
-| `trigger/lib/logger.js` | `platform/log` | 500-line RAM ring with `seq`. No file |
-| `trigger/lib/system.js` | `platform/clock` | `setTime` writes the RTC. `disableWifi` becomes a no-op |
-| `trigger/lib/button.js` | `platform/button` | GPIO interrupt, 50 ms debounce |
-| `trigger/cameras/*` | `cameras/` | Same contract (`wake`, `start`, `stop`, `sleep`, `dispose`) |
+| `firmware/legacy-pi/trigger/ble/framing.js` | `protocol/framing` | Unchanged format |
+| `firmware/legacy-pi/trigger/ble/auth.js` | `protocol/auth` | HMAC-SHA256, constant-time compare, lockout, pairing window. Raw bytes |
+| `firmware/legacy-pi/trigger/ble/dispatcher.js` | `protocol/dispatcher` | One op table, binary bodies |
+| `firmware/legacy-pi/trigger/ble/status.js` | `protocol/status` | 13-byte little-endian |
+| `firmware/legacy-pi/trigger/ble/gatt.js`, `link.js` | `platform/ble` | NimBLE-Arduino GATT server, fragment queue, MTU |
+| `firmware/legacy-pi/trigger/controller.js` | `src/controller` | `save`, `setSecret`, `setTime`, `test` |
+| `firmware/legacy-pi/trigger/lib/config.js` | `config/` | Same rules, binary form. Fixed pins (§19) |
+| `firmware/legacy-pi/trigger/lib/scheduler.js` | `scheduler/` | Replace `node-schedule` (§7.2) |
+| `firmware/legacy-pi/trigger/lib/logger.js` | `platform/log` | 500-line RAM ring with `seq`. No file |
+| `firmware/legacy-pi/trigger/lib/system.js` | `platform/clock` | `setTime` writes the RTC. `disableWifi` becomes a no-op |
+| `firmware/legacy-pi/trigger/lib/button.js` | `platform/button` | GPIO interrupt, 50 ms debounce |
+| `firmware/legacy-pi/trigger/cameras/*` | `cameras/` | Same contract (`wake`, `start`, `stop`, `sleep`, `dispose`) |
 
 ### Tasks (FreeRTOS)
 
@@ -309,10 +306,10 @@ There is no filesystem. Everything persistent is in NVS, written through `Prefer
 | NimBLE store | BLE bonds | small | Managed by the BLE stack |
 
 - **Device identity:** `deviceId` is derived from the last 3 bytes of the factory MAC (6 uppercase hex, the format the apps parse). It is not stored, and it is stable across erases. Keep the BLE address as the default **public** address (derived from the same MAC), never a random one, because phone bonds are tied to it.
-- **First boot** (nothing stored): use in-code defaults: empty `name`, `generic`, timings 5 / 20 / 30 s, no attempts, button and release pins from build flags. The device is immediately pairable and configurable over BLE.
+- **First boot** (nothing stored): use in-code defaults: empty `name`, `generic`, timings 5 / 20 / 30 s, no attempts. The device is immediately pairable and configurable over BLE.
 - **Saving:** validate → one `putBytes` of the new blob → re-plan the scheduler → emit the `config` event. `configRev` increments on every successful save.
 - **If the stored blob fails to decode or validate** (corruption, or a future layout it doesn't know), log it and fall back to the defaults. Keep the secret and bonds.
-- **Validation** is a port of `validateConfig` into the binary form (§5.5 field and reason codes). One deliberate difference: `isPin` allows 0–40 on the Pi. On the S3 (GPIO 0–48 with reserved ranges) use a chip-aware allow-list and reject strapping, USB, flash and PSRAM pins with `invalid_config`.
+- **Validation** is a port of `validateConfig` into the binary form (§5.5 field and reason codes). One deliberate difference: the pins are not configurable on the S3. They are constants in `board.h`, and a config naming other pins is refused with `invalid_config` (reason "not valid").
 - **Logs:** a 500-line RAM ring (about 60 KB worst case at 120-byte messages), each line with a `seq`. It is lost at reset. At boot, log `esp_reset_reason()` as the first line, so a brownout or watchdog reset is visible to the phone afterwards. For crash detail, the `coredump` partition is raw flash, not a filesystem (§13).
 - **Partitions** (a custom `partitions.csv`, selected with `board_build.partitions`). Use an 8 MB flash part (the N8 DevKitC modules have it). A 4 MB part also works with 1.75 MB app slots.
 
@@ -334,7 +331,7 @@ There is no filesystem. Everything persistent is in NVS, written through `Prefer
 Implement `docs/ble-protocol.md` (v2: GATT layout, advertising, framing, security) with `NimBLE-Arduino`.
 
 - **GATT:** one primary service `6b610001-6169-4f72-8f73-b3e1c5a97d24`. Device Info (read, now binary), Status (read + notify, 13 bytes), Command (`WRITE` | `WRITE_NR` | `WRITE_ENC`, so it **requires an encrypted link**), Response (notify).
-- **Device Info (binary):** `v u8` (2), `id[3]` (the 6 hex digits as raw bytes), `cam u8`, `fw` (`u8` length + ASCII), `name` (`u8` length + UTF-8). It is short, but keep using Read Long.
+- **Device Info (binary):** `v u8` (2), `id[3]` (the 6 hex digits as raw bytes), `cam u8`, `cams u8` (the camera types the unit can drive, a bit set: without a W5500 only `generic`), `fw` (`u8` length + ASCII), `name` (`u8` length + UTF-8). It is short, but keep using Read Long.
 - **Connections:** `-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1` in `build_flags`. Stop advertising on connect, restart on disconnect. Interval ~1 s.
 - **Advertising:** service UUID (128-bit, 18 bytes) in the advertisement. Local name in the scan response. The 31-byte scan response limits the name to 29 bytes.
   - **Pitfall (also in the Node code):** `gatt.js` truncates `deviceName.slice(0, 29)`, which cuts off the `-ID` suffix for names over ~22 characters, and the apps identify "already paired" devices by that suffix. On the ESP32 truncate the **name part**, not the ID: `name[:22] + "-" + ID`. State this rule in the v2 protocol doc.
@@ -342,7 +339,7 @@ Implement `docs/ble-protocol.md` (v2: GATT layout, advertising, framing, securit
 - **Security:** `NimBLEDevice::setSecurityAuth(bond=true, mitm=false, sc=true)`, Just Works, bonds stored in NVS. The shared-secret check at the application layer is what actually gates control, as today.
 - **Entropy:** `esp_fill_random()` is a true RNG only while the RF subsystem is on. BLE is always on here, but generate the nonce after BLE start, and note it in code.
 - **Notifications:** Status at most once per second while recording, plus on every change. Debounce on the `cmd`/`sched` side, not in the BLE callback.
-- **`fw`** is a version string injected as a build flag (`-DFW_VERSION`), the same value an OTA slot will report later.
+- **`fw`** is a version string injected as a build flag (`-DFW_VERSION`, set by `firmware/esp32/version.py` from `$KAIROS_VERSION`, which the release workflow takes from the git tag), the same value an OTA slot will report later.
 
 ## 10. Z CAM over Ethernet
 
@@ -388,23 +385,25 @@ An ESP32 reboots in ways a Linux box rarely does, so plan for it:
   - Use plain `upload`. It writes the bootloader, partition table and app, and leaves NVS alone.
   - Don't run `erase` (or any "erase all flash" option) unless you mean a factory reset.
   - Don't change the `nvs` partition (§8).
-- **Updates in v1:** reflash over USB.
+- **Updates:** over USB, or over Bluetooth from the app (below). The first firmware with Bluetooth updates has to go on over USB.
 - **CI:** one ESP32 job in the existing workflow: `pio test -e native`, then `pio run -e device` to prove it builds. Separate from the iOS and Android jobs.
 
-### BLE OTA (future, not in v1)
+### BLE OTA (implemented)
 
-Nothing in the port blocks it, and §8 reserves the flash. The transport is the same NimBLE stack. On Arduino the write path is `Update` (a wrapper around `esp_ota_ops`), or `esp_ota_ops` directly where you need rollback.
+Updates over Bluetooth use the two app slots that §8 reserved. The user guide is [Updating the firmware](updating-firmware.md), the design and its reasons are in [the update plan](ota-plan.md), and the wire format is `fw.*` in [the protocol](ble-protocol.md).
 
-- **Protocol:** a firmware image of 1 MB or more doesn't suit a 2 KB message and the one-request-in-flight rule. Add a bulk write-without-response characteristic, or ops such as `fw.begin` / `fw.chunk` / `fw.end` with chunk acknowledgements, resume and a SHA-256 check. Authenticated only, and refused unless the device is idle. This is an additive change to v2.
-- **Apps:** both need a firmware picker and a progress screen.
-- **Device:** write to the inactive slot, verify the hash, switch slots, and **roll back automatically if the new image doesn't confirm itself** (`esp_ota_mark_app_valid_cancel_rollback()`). Rollback depends on the core's bootloader supporting it (§4). Confirm that before promising OTA to anyone, because an unreachable field unit that gets a bad image is the worst case.
-- **Speed:** with a 247–517 byte MTU expect roughly 5–20 KB/s, so a 1.5 MB image takes a few minutes.
+- **Receiving:** a fifth characteristic takes the image as `[offset][bytes]` writes without response. `lib/kairos/update/updater.cpp` (pure C++, tested on the host) keeps the SHA-256, checks the first 64 bytes as they arrive (image magic, chip id, application descriptor), asks the phone to rewind on a gap, and resumes a transfer for 2 minutes. `src/platform/ota_flash.cpp` writes to the idle slot with `esp_ota_ops`.
+- **Safe to start:** only an authenticated phone, only when the device is idle with no event in the next 15 minutes, and a running transfer is dropped if an event gets within 2 minutes.
+- **Signed:** `fw.begin` carries an ECDSA P-256 signature over the image's SHA-256, checked with mbedTLS against the keys in `src/platform/signing_keys.h` before any data is accepted. The `device-dev` environments accept unsigned images (developer builds, flagged in the log at boot).
+- **Rollback:** the prebuilt Arduino core's bootloader supports it (`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` and `CONFIG_APP_ROLLBACK_ENABLE` are set in the S3 and C3 libraries). The firmware overrides `verifyRollbackLater()` so the core leaves a new image pending, and confirms it with `esp_ota_mark_app_valid_cancel_rollback()` once it has run for 30 seconds and a phone has authenticated over Bluetooth with it (so an image whose radio is broken is never kept). A reset before then, a power cycle included, returns to the old image. Tried on an ESP32-C3: an image that aborts 4 s after boot, and an image that never advertises, both went back to the previous firmware.
+- **Version in the file:** every image holds a small `KAIROSFW` tag with its version and chip (`src/platform/fw_tag.cpp`), so the apps can show it before installing.
+- **Speed:** with a 247-byte MTU and a short connection interval expect roughly 10 to 30 KB/s: a minute or two for the 1.1 to 1.2 MB image. Measure it on hardware.
 - A slot swap leaves NVS alone, so pairing, bonds and the schedule survive an update.
 
 ## 15. Testing
 
 1. **Native unit tests** (`pio test -e native`, Unity) for `protocol`, `config` and `scheduler`:
-   - Run the shared `docs/test-vectors.json`, regenerated for v2: framing, HMAC proofs (v2 labels), Status decoding, **every message encode and decode**, the Config layout, and the error bodies. The firmware and both apps must pass the same vectors.
+   - Run the shared `protocol/test-vectors.json`, regenerated for v2: framing, HMAC proofs (v2 labels), Status decoding, **every message encode and decode**, the Config layout, and the error bodies. The firmware and both apps must pass the same vectors.
    - Port `test/config.test.js`, `test/framing.test.js`, `test/protocol.test.js` and the scheduler cases, using a fake clock and fake camera, as the Node tests do.
 2. **Hardware-in-loop smoke tests** (manual checklist): pair, `time.set`, config save, test run, manual wake/start/stop/sleep, reboot with valid and invalid RTC, power-cycle with the coin cell, pull the Ethernet cable mid-attempt, **re-flash with `upload` and confirm the phone still connects without re-pairing**.
 3. **Real apps:** connect both the iOS and Android apps. Each screen in `AGENTS.md` §6 must behave as before. This is the acceptance test.
@@ -417,9 +416,9 @@ Nothing in the port blocks it, and §8 reserves the flash. The transport is the 
 | --- | --- | --- |
 | 0 | **Spike** on one bench board: BLE advertising with an encrypted write, W5500 DHCP plus one Z CAM HTTP call, RTC read/write, a ~1.2 KB NVS blob write, and a bond that survives `upload` | Each piece works together on the S3, and the version-specific API assumptions in §4 are confirmed or corrected |
 | 1 | **Protocol v2 spec**: rewrite `docs/ble-protocol.md`, new vectors and their generator (`test/vectors.js`, kept in the Node tree until Node is retired) | Reviewed, with vectors checked in |
-| 1b | **Node device speaks v2** (`trigger/ble/`: codecs, dispatcher, Status, Device Info, errors). Config stays `config.json` internally and is converted at the edge. Also fix the advertised-name truncation | Node passes the v2 vectors, and a Pi running it works with the v2 apps. This is the real-device test bed for milestone 2 |
+| 1b | **Node device speaks v2** (`firmware/legacy-pi/trigger/ble/`: codecs, dispatcher, Status, Device Info, errors). Config stays `config.json` internally and is converted at the edge. Also fix the advertised-name truncation | Node passes the v2 vectors, and a Pi running it works with the v2 apps. This is the real-device test bed for milestone 2 |
 | 2 | **Apps**: `KairosKit` and the Android protocol module speak v2 and pass the vectors. UI and demo-mode changes (§5.7) | Both apps' tests pass, demo mode shows every screen on both, and both connect to the v2 Node device. Can run in parallel with 3 |
-| 3 | `esp32/` PlatformIO skeleton, `partitions.csv`, CI build, native test harness. `protocol` + `config` + `scheduler` (pure) | Vectors and ported Node tests pass in the `native` env |
+| 3 | `firmware/esp32/` PlatformIO skeleton, `partitions.csv`, CI build, native test harness. `protocol` + `config` + `scheduler` (pure) | Vectors and ported Node tests pass in the `native` env |
 | 4 | `platform/ble` + NVS storage | Apps scan, connect, pair and authenticate, and config save and reload work |
 | 5 | `rtc` + clock logic | `time.set`/`time.get`, reboot restore, periodic discipline |
 | 6 | `cameras/generic` + button | Real camera triggers on schedule and manually |
@@ -429,10 +428,10 @@ Nothing in the port blocks it, and §8 reserves the flash. The transport is the 
 
 ## 17. Docs and repo changes that come with the port
 
-- Rewrite `docs/ble-protocol.md` as v2 (from §5 here), and regenerate `docs/test-vectors.json`. The Node reference (`trigger/ble/`) is updated to v2 and the vectors keep being generated from it (`node test/vectors.js --write`) while Node exists. When Node is retired, move the generator out of the device tree.
-- Update `AGENTS.md`: the repository layout (add `esp32/`), the app spec's protocol summary and sections affected by §5.7, and the test commands (`cd esp32 && pio test -e native`).
+- Rewrite `docs/ble-protocol.md` as v2 (from §5 here), and regenerate `protocol/test-vectors.json`. The Node reference (`firmware/legacy-pi/trigger/ble/`) is updated to v2 and the vectors keep being generated from it (`cd firmware/legacy-pi && node test/vectors.js --write`) while Node exists. When Node is retired, move the generator out of the device tree.
+- Update `AGENTS.md`: the repository layout (add `firmware/esp32/`), the app spec's protocol summary and sections affected by §5.7, and the test commands (`cd firmware/esp32 && pio test -e native`).
 - README: hardware section and wiring diagram for the ESP32 variant.
-- The Node device code (`trigger/`, `test/`) is updated to v2 (milestone 1b) and kept until the ESP32 fully replaces it, then removed (milestone 9). The Node `package.json` dependencies and the Pi setup docs go with it.
+- The Node device code (`firmware/legacy-pi/trigger/`, `test/`) is updated to v2 (milestone 1b) and kept until the ESP32 fully replaces it, then removed (milestone 9). The Node `package.json` dependencies and the Pi setup docs go with it.
 
 ## 18. Decisions and open questions
 
@@ -458,3 +457,20 @@ Nothing in the port blocks it, and §8 reserves the flash. The transport is the 
 7. **Flash encryption / secure boot** for deployed units, yes or no? Not available in the prebuilt Arduino core (§4). A yes means switching to Arduino-as-an-IDF-component.
 8. **RTC part:** DS3231 recommended, final choice pending (§3.3).
 9. **Bootloader rollback and core dumps:** confirm whether the pinned Arduino core's prebuilt config enables them (§4, §13, §14). It decides whether OTA is safe to build later.
+
+## 19. Implementation notes
+
+The firmware in `firmware/esp32/`, the v2 protocol in [ble-protocol.md](ble-protocol.md), the Node device and both apps follow this document, except for these differences:
+
+- **Platform version.** The firmware pins the pioarduino platform **55.03.311** (Arduino-ESP32 3.3.11) and NimBLE-Arduino **2.5.1**. 55.03.312 needs PlatformIO Core 6.2 or newer.
+- **One task.** Instead of separate `sched` and `cmd` tasks (section 6), one `core` task owns all device state: BLE writes (queued by the radio callbacks), scheduled steps, notifications, the RTC discipline and the button. There are no locks. The cost is that a Z CAM call of up to several seconds delays the next request or step. The watchdog is set to 60 s for that reason.
+- **No `busy` for overlapping requests.** The protocol asks for `busy` when a second request arrives while one runs. With one task, a second request simply waits its turn in the queue. Clients never send overlapping requests.
+- **Test run** is a small state machine stepped by the scheduler tick (wake, 1 s, start, 2 s, stop, sleep, done), so `test.run` returns at once.
+- **Clock discipline** only steps the clock when the system and the RTC differ by two seconds or more, since the RTC has 1 s resolution and is written truncated. Sub-second alignment (section 7.3) is not implemented.
+- **Fixed pins, not in the protocol.** The button, release and focus pins are the constants `KAIROS_BUTTON_PIN`, `KAIROS_RELEASE_PIN` and `KAIROS_FOCUS_PIN` in `firmware/esp32/src/platform/board.h`, next to the W5500 and RTC pins. The config layout and the apps carry no pins, so there is no allow-list or pin validation. To use another board layout, edit the constants and rebuild.
+- **Storage.** `NvsStorage` keeps `[revision][config layout]` in one NVS key and the secret in another; `Controller` falls back to the defaults if the stored config doesn't decode.
+- **ESP32-C3.** The same firmware builds for an ESP32-C3 (`pio run -e device-c3`). `board.h` picks the pins by chip (the C3 only has eight usable GPIOs, so the W5500 INT/RST and the focus line are not wired), the `core` task runs on core 0 because the C3 has one core, and `partitions_4mb.csv` fits the usual 4 MB flash. Not run on hardware.
+- **Device id** comes from the Bluetooth MAC (`ESP_MAC_BT`), the last 3 bytes.
+- **Wi-Fi code.** The prebuilt core still links it. Nothing starts it.
+
+Still open until it runs on hardware: the trigger pulse width for generic cameras, the Z CAM's DHCP behavior, the pairing-and-bond flow on both phone platforms, and whether the core's bootloader supports rollback (needed before OTA).

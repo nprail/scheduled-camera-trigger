@@ -1,0 +1,10 @@
+{
+  "name": "kairos",
+  "version": "1.0.0",
+  "description": "Kairos firmware logic: protocol v2, config, scheduler and camera drivers (pure C++)",
+  "build": {
+    "srcDir": ".",
+    "includeDir": ".",
+    "flags": ["-std=gnu++17"]
+  }
+}
