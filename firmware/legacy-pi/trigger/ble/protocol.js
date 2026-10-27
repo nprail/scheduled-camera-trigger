@@ -9,6 +9,8 @@ export const UUID = {
   status: '6b610003-6169-4f72-8f73-b3e1c5a97d24',
   command: '6b610004-6169-4f72-8f73-b3e1c5a97d24',
   response: '6b610005-6169-4f72-8f73-b3e1c5a97d24',
+  // Only on devices that can be updated over Bluetooth (Device Info caps bit0), never on the Pi.
+  firmware: '6b610006-6169-4f72-8f73-b3e1c5a97d24',
 }
 
 export const ErrorCode = {
@@ -21,6 +23,7 @@ export const ErrorCode = {
   TOO_LARGE: 'too_large',
   PAIRING_CLOSED: 'pairing_closed',
   INTERNAL: 'internal',
+  BAD_IMAGE: 'bad_image',
 }
 
 /** Numeric error codes on the wire. */
@@ -34,6 +37,7 @@ export const ERROR_ID = {
   too_large: 7,
   pairing_closed: 8,
   internal: 9,
+  bad_image: 10,
 }
 
 /** `extra` carries the structured detail of an error (retryAfter, or field/index/reason for invalid_config). */
@@ -70,3 +74,12 @@ export const FIELD = {
 export const REASON = {
   required: 1, range: 2, bad_value: 3, past: 4, duplicate: 5, too_soon: 6, too_many: 7,
 }
+
+// Firmware update (docs/ble-protocol.md, fw.*). The Pi never implements these; the reference only encodes them.
+export const FW_STATE = { receiving: 0, verifying: 1, ready: 2, failed: 3 }
+export const BAD_IMAGE = {
+  size: 1, header: 2, chip: 3, hash: 4, write: 5, signature_missing: 6, signature_invalid: 7, incomplete: 8, interrupted: 9,
+}
+/** Device Info `caps` bits and `chip` values. */
+export const CAP_FIRMWARE_UPDATE = 1 << 0
+export const CHIP = { none: 0, esp32s3: 1, esp32c3: 2 }

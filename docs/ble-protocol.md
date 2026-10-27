@@ -13,7 +13,7 @@ A Bluetooth Low Energy (GATT) protocol for configuring, monitoring and manually 
 
 ## 2. GATT layout
 
-One primary service, four characteristics. **All multi-byte integers are little-endian**, except the 2-byte message length in the fragment header (§3).
+One primary service, four characteristics, plus an optional fifth (Firmware) on devices that can be updated over Bluetooth. **All multi-byte integers are little-endian**, except the 2-byte message length in the fragment header (§3).
 
 | Name | UUID | Properties | Purpose |
 | --- | --- | --- | --- |
@@ -22,6 +22,7 @@ One primary service, four characteristics. **All multi-byte integers are little-
 | Status | `6b610003-6169-4f72-8f73-b3e1c5a97d24` | Read, Notify | Compact live state (13 bytes) |
 | Command | `6b610004-6169-4f72-8f73-b3e1c5a97d24` | Write, Write Without Response | Client → device messages |
 | Response | `6b610005-6169-4f72-8f73-b3e1c5a97d24` | Notify | Device → client responses and events |
+| Firmware | `6b610006-6169-4f72-8f73-b3e1c5a97d24` | Write Without Response | Firmware image bytes (§4.3). Present only when Device Info `caps` bit0 is set. |
 
 ### Advertising
 
@@ -41,7 +42,11 @@ One primary service, four characteristics. **All multi-byte integers are little-
 | 6 | u8 + bytes | `fw`: software version, a length-prefixed ASCII string |
 | … | u8 + bytes | `name`: friendly name, a length-prefixed UTF‑8 string (may be empty) |
 
-Strings are a `u8` length followed by that many bytes. Clients must use Read Long.
+| … | u8 | `caps` (optional): bit0 = the device can be updated over Bluetooth (§4.3). Missing means 0. |
+| … | u8 | `chip` (optional, after `caps`): 1 ESP32-S3, 2 ESP32-C3, 0 or missing for other hardware |
+| … | u32 | `slot` (optional, after `chip`): the largest firmware image the device accepts, in bytes. 0 or missing when not updatable. |
+
+Strings are a `u8` length followed by that many bytes. Clients must use Read Long. The last three fields were added after the first release of v2 and follow `name`. A client reads them only if bytes remain, and treats a device that lacks them as not updatable.
 
 ### Status (read / notify)
 
@@ -121,6 +126,9 @@ Event   : [ 0x81  ][ ev u8 ][ body … ]
 | `test.run` | 0x14 | yes | — | — |
 | `logs.get` | 0x20 | yes | `after u32`, `limit u8` | `last u32`, `more u8`, `count u8`, then `count` log lines |
 | `logs.subscribe` | 0x21 | yes | `enabled u8`, `after u32` | — |
+| `fw.begin` | 0x30 | yes | `size u32`, `sha256[32]`, `sig[64]` | `offset u32`, `window u16` |
+| `fw.end` | 0x31 | yes | — | `rebootInMs u16` |
+| `fw.abort` | 0x32 | yes | — | — |
 
 Code 0x06 (the v1 `status.get`) is unused: the Status characteristic carries everything it did.
 
@@ -169,6 +177,28 @@ No body. Manual commands call the matching camera action and respond when it ret
 
 Each log line has a monotonically increasing `seq`. A **log line** is `seq u32`, `ts u32` (Unix seconds), `ns` (string, ASCII, ≤ 8 bytes), `msg` (string, UTF‑8, ≤ 120 bytes). `logs.get` returns up to `limit` lines with `seq > after` (limit ≤ 100, capped so the response fits `maxMessage`); `last` is the highest `seq` returned and `more` is 1 if lines remain. `logs.subscribe` with `enabled = 1` replays lines after `after`, then pushes a `log` event for each new line. The log's free-form data blob is never sent over BLE.
 
+#### `fw.*` (firmware update)
+
+Updates are always the user's choice: the device never starts one itself. Only devices with Device Info `caps` bit0 accept these ops. Any other device answers `not_supported`.
+
+**Flow.** `fw.begin`, then the image bytes on the Firmware characteristic, then `fw.end`. The device reboots into the new image and the connection drops. The phone reconnects and reads `fw` from Device Info to see which version is running.
+
+- `fw.begin` declares the image: its `size` in bytes, the `sha256` of the whole image, and `sig`, a 64-byte ECDSA P-256 signature (`r` then `s`, 32 bytes each, big-endian) over that SHA-256 value. All zeros means no signature. It is refused with:
+  - `busy` unless the phase is idle and the next scheduled event is at least 15 minutes away (a clock that is not valid counts as no event);
+  - `too_large` if `size` exceeds Device Info `slot`;
+  - `bad_image` (size) if `size` is below the smallest valid image;
+  - `bad_image` (signature missing) for an all-zero `sig`, unless the device accepts unsigned images (developer builds only);
+  - `bad_image` (signature invalid) if `sig` does not verify against any of the device's embedded public keys.
+- The response gives the `offset` to start from (0, or the resume point), and `window`, the number of bytes the phone may have sent but not yet seen acknowledged. A `fw.begin` with the same `size` and `sha256` as a transfer already in progress resumes it. The device keeps an unfinished transfer in RAM for 2 minutes after a disconnect, and loses it on a reset. A different image replaces it.
+- **Firmware characteristic.** Each write is `[offset u32][bytes]` and at most MTU − 3 bytes in total. The device accepts a write only when `offset` is the next byte it expects. A write at a lower offset is ignored, and one at a higher offset (a gap) is not stored and makes the device send an `fw` event with its `offset`, so the phone rewinds to it. The first 64 bytes are checked as soon as they arrive: image magic `0xE9`, the chip ID (a little-endian `u16` at offset 12) matching `chip`, and the application descriptor magic `0xABCD5432` (a little-endian `u32` at offset 32). The last check is what tells an application image from a factory image, which must never be sent.
+- **Progress.** The `fw` event (below) reports the next expected offset every `window / 4` bytes and on any state change.
+- `fw.end` is valid when every byte has arrived. The device compares the SHA-256 it computed with the declared one, validates the image, selects it for the next boot, answers with `rebootInMs`, and restarts after that delay. Errors are `bad_image` (incomplete, hash, write failed) and `busy` if no transfer is open.
+- `fw.abort` discards an unfinished transfer. It is always accepted.
+- The device aborts a transfer, keeps running the current firmware, and sends an `fw` event with `failed` and reason `interrupted` when no data arrives for 2 minutes or a scheduled event comes within 2 minutes.
+- The new image must confirm itself after booting: the device marks it valid once it has run for 30 seconds **and a client has authenticated over Bluetooth with it**. If it resets before that, the bootloader returns to the previous image. A client therefore reconnects and authenticates after the restart (the apps do this to read the new version).
+
+**Signing.** Release images are signed with the project's key. The device holds one or more public keys and verifies the signature in `fw.begin`, before accepting any data. Developer builds may accept unsigned images. Clients treat the signature as opaque bytes.
+
 ### Events
 
 Pushed to an authenticated client on the Response characteristic: `[0x81][ev][body]`. Events are best-effort: after a reconnect a client rebuilds everything from Status, `config.get` and `jobs.get`.
@@ -179,6 +209,7 @@ Pushed to an authenticated client on the Response characteristic: `[0x81][ev][bo
 | `config` | 0x02 | `configRev u32` |
 | `test` | 0x03 | `step u8` (0 wake, 1 start, 2 stop, 3 sleep, 4 done), `ok u8`, `error` string (empty unless a failed `done`) |
 | `log` | 0x04 | a log line |
+| `fw` | 0x05 | `state u8` (0 receiving, 1 verifying, 2 ready to reboot, 3 failed), `offset u32` (the next byte expected), `reason u8` (a `bad_image` reason when failed, else 0) |
 
 ### Errors
 
@@ -195,9 +226,12 @@ A response with `status ≠ 0` carries an error code and its detail in the body.
 | 7 | `too_large` | — |
 | 8 | `pairing_closed` | — |
 | 9 | `internal` | an optional string with detail |
+| 10 | `bad_image` | `reason u8` |
 
 `invalid_config` **fields**: 1 `name`, 2 `cameraType`, 3 `wakeUpTimeout`, 4 `startBefore`, 5 `endAfter`, 9 `cameraIp` (6 to 8 are unused), 10 `attempts` (the list), 11 `attempts[i].name`, 12 `attempts[i].time`.
 **Reasons**: 1 required, 2 out of range, 3 bad value, 4 in the past, 5 duplicate, 6 too soon (the wake-up time has already passed), 7 too many.
+
+`bad_image` **reasons**: 1 size (below the smallest valid image), 2 header (not an application image), 3 chip (built for different hardware), 4 hash, 5 write (flash failed), 6 signature missing, 7 signature invalid, 8 incomplete (`fw.end` before all bytes arrived), 9 interrupted (no data for 2 minutes, or a scheduled event came close).
 
 The apps build their error text from these codes, so the device carries no message strings.
 
@@ -251,4 +285,5 @@ Client                                         Device
 - **Reference implementations.** `firmware/esp32/` (C++, on an ESP32) and `firmware/legacy-pi/trigger/ble/` (Node, on the legacy Raspberry Pi). Both keep the protocol logic free of any radio code so it can be tested without hardware.
 - **Job state after a restart.** State lives in memory. After a restart, any attempt whose wake-up time has already passed is `missed`, even if it ran before.
 - **Log buffer.** The last 500 lines are kept in memory.
+- **Firmware images.** A release image carries a small tag the apps read to show its version before installing: the 8 bytes `KAIROSFW`, a `u8` tag version (1), a `u8` chip (1 ESP32-S3, 2 ESP32-C3) and a 32-byte NUL-padded ASCII version. A client scans the whole file for it. `protocol/test-vectors.json` has vectors for reading images and for comparing versions.
 - **Compatibility.** Additive changes (new ops, new trailing fields) don't change `v`. Anything that changes framing or existing layouts does.

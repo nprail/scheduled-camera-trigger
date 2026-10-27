@@ -3,7 +3,7 @@
 // so they can be written straight into protocol/test-vectors.json.
 import {
   PROTOCOL_VERSION, ErrorCode, ERROR_ID, ProtocolError, PHASE, EVENT_TYPE, NO_ATTEMPT,
-  JOB_STATE, JOB_STEP, TEST_STEP, CAMERA_TYPE,
+  JOB_STATE, JOB_STEP, TEST_STEP, CAMERA_TYPE, FW_STATE, CHIP,
 } from './protocol.js'
 
 export const OP = {
@@ -22,9 +22,12 @@ export const OP = {
   'test.run': 0x14,
   'logs.get': 0x20,
   'logs.subscribe': 0x21,
+  'fw.begin': 0x30,
+  'fw.end': 0x31,
+  'fw.abort': 0x32,
 }
 export const OP_NAME = Object.fromEntries(Object.entries(OP).map(([k, v]) => [v, k]))
-export const EVENT_ID = { job: 0x01, config: 0x02, test: 0x03, log: 0x04 }
+export const EVENT_ID = { job: 0x01, config: 0x02, test: 0x03, log: 0x04, fw: 0x05 }
 export const EVENT_NAME = Object.fromEntries(Object.entries(EVENT_ID).map(([k, v]) => [v, k]))
 const ERROR_NAME = Object.fromEntries(Object.entries(ERROR_ID).map(([k, v]) => [v, k]))
 
@@ -37,6 +40,7 @@ const JOB_STATE_NAME = invert(JOB_STATE)
 const JOB_STEP_NAME = invert(JOB_STEP)
 const TEST_STEP_NAME = invert(TEST_STEP)
 const CAMERA_NAME = invert(CAMERA_TYPE)
+const FW_STATE_NAME = invert(FW_STATE)
 const PHASE_NAME = invert(PHASE)
 const EVENT_TYPE_NAME = invert(EVENT_TYPE)
 
@@ -152,16 +156,22 @@ export const decodeConfig = (buf) => {
 
 // --- Device Info and Status ----------------------------------------------
 
-/** `cams` is the camera types the device can drive, as a bit set on the wire (bit = CAMERA_TYPE value). */
-export const encodeDeviceInfo = ({ v = PROTOCOL_VERSION, id, cam, cams = Object.keys(CAMERA_TYPE), fw, name }) =>
-  new Writer()
+/**
+ * `cams` is the camera types the device can drive, as a bit set on the wire (bit = CAMERA_TYPE value).
+ * `caps`, `chip` and `slot` are optional trailing fields (firmware update support); they are written only
+ * when `caps` is given, and a device without them reads back as caps 0, chip 'none', slot 0.
+ */
+export const encodeDeviceInfo = ({ v = PROTOCOL_VERSION, id, cam, cams = Object.keys(CAMERA_TYPE), fw, name, caps, chip = 'none', slot = 0 }) => {
+  const w = new Writer()
     .u8(v)
     .hex(id.toLowerCase(), 3)
     .u8(CAMERA_TYPE[cam] ?? 0)
     .u8(cams.reduce((mask, c) => mask | (1 << CAMERA_TYPE[c]), 0))
     .str(fw, 255)
     .str(name ?? '', MAX_NAME)
-    .done()
+  if (caps != null) w.u8(caps).u8(CHIP[chip] ?? 0).u32(slot)
+  return w.done()
+}
 
 export const decodeDeviceInfo = (buf) => {
   const r = new Reader(buf)
@@ -170,7 +180,11 @@ export const decodeDeviceInfo = (buf) => {
   const cam = CAMERA_NAME[r.u8()] ?? 'generic'
   const mask = r.u8()
   const cams = Object.keys(CAMERA_TYPE).filter((c) => mask & (1 << CAMERA_TYPE[c]))
-  return { v, id, cam, cams, fw: r.str(), name: r.str() }
+  const info = { v, id, cam, cams, fw: r.str(), name: r.str() }
+  info.caps = r.left >= 1 ? r.u8() : 0
+  info.chip = invert(CHIP)[r.left >= 1 ? r.u8() : 0] ?? 'none'
+  info.slot = r.left >= 4 ? r.u32() : 0
+  return info
 }
 
 export const encodeStatus = ({ flags, phase, configRev, nextEventAt, nextEventType, attemptsRemaining, nextAttempt }) =>
@@ -238,6 +252,12 @@ const REQUEST_BODY = {
     enc: (f) => new Writer().u8(f.enabled ? 1 : 0).u32(f.after).done(),
     dec: (r) => ({ enabled: r.u8() !== 0, after: r.u32() }),
   },
+  'fw.begin': {
+    enc: (f) => new Writer().u32(f.size).hex(f.sha256Hex, 32).hex(f.sigHex, 64).done(),
+    dec: (r) => ({ size: r.u32(), sha256Hex: r.hex(32), sigHex: r.hex(64) }),
+  },
+  'fw.end': { enc: () => Buffer.alloc(0), dec: () => ({}) },
+  'fw.abort': { enc: () => Buffer.alloc(0), dec: () => ({}) },
 }
 
 export const encodeRequest = (op, id, fields = {}) =>
@@ -312,6 +332,15 @@ const RESPONSE_BODY = {
     },
   },
   'logs.subscribe': { enc: () => Buffer.alloc(0), dec: () => ({}) },
+  'fw.begin': {
+    enc: (f) => new Writer().u32(f.offset).u16(f.window).done(),
+    dec: (r) => ({ offset: r.u32(), window: r.u16() }),
+  },
+  'fw.end': {
+    enc: (f) => new Writer().u16(f.rebootInMs).done(),
+    dec: (r) => ({ rebootInMs: r.u16() }),
+  },
+  'fw.abort': { enc: () => Buffer.alloc(0), dec: () => ({}) },
 }
 for (const name of ['camera.wake', 'camera.start', 'camera.stop', 'camera.sleep']) {
   RESPONSE_BODY[name] = {
@@ -330,6 +359,7 @@ export const encodeError = (id, code, detail = {}) => {
   if (code === ErrorCode.LOCKED_OUT) w.u16(detail.retryAfter ?? 0)
   else if (code === ErrorCode.INVALID_CONFIG) w.u8(detail.field ?? 0).u8(detail.index ?? 0).u8(detail.reason ?? 0)
   else if (code === ErrorCode.INTERNAL && detail.message) w.str(truncateUtf8(detail.message, 120), 120)
+  else if (code === ErrorCode.BAD_IMAGE) w.u8(detail.reason ?? 0)
   return Buffer.concat([head, w.done()])
 }
 
@@ -346,6 +376,7 @@ export const decodeResponse = (op, buf) => {
   else if (code === ErrorCode.INVALID_CONFIG) {
     if (r.left >= 3) { detail.field = r.u8(); detail.index = r.u8(); detail.reason = r.u8() }
   } else if (code === ErrorCode.INTERNAL && r.left >= 1) detail.message = r.str()
+  else if (code === ErrorCode.BAD_IMAGE) detail.reason = r.left >= 1 ? r.u8() : 0
   return { id, ok: false, code, detail }
 }
 
@@ -368,6 +399,10 @@ const EVENT_BODY = {
     enc: (f) => writeLine(new Writer(), f).done(),
     dec: (r) => readLine(r),
   },
+  fw: {
+    enc: (f) => new Writer().u8(FW_STATE[f.state]).u32(f.offset).u8(f.reason ?? 0).done(),
+    dec: (r) => ({ state: FW_STATE_NAME[r.u8()] ?? 'failed', offset: r.u32(), reason: r.left ? r.u8() : 0 }),
+  },
 }
 
 export const encodeEvent = (ev, fields) =>
@@ -383,3 +418,13 @@ export const decodeEvent = (buf) => {
 /** True for a response/event discriminator byte. */
 export const isResponse = (buf) => buf.length > 0 && buf[0] === RESPONSE
 export const isEvent = (buf) => buf.length > 0 && buf[0] === EVENT
+
+// --- Firmware data writes ---------------------------------------------------
+
+/** One write to the Firmware characteristic: the offset of the first byte, then the bytes. */
+export const encodeFirmwareWrite = (offset, data) => Buffer.concat([new Writer().u32(offset).done(), data])
+export const decodeFirmwareWrite = (buf) => {
+  const r = new Reader(buf)
+  const offset = r.u32()
+  return { offset, data: buf.subarray(4) }
+}

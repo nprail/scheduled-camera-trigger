@@ -164,7 +164,11 @@
   "deviceInfo": [
     {
       "hex": "02a1b2c3000305312e302e30075061642043616d",
+      "trailing": false,
       "expected": {
+        "caps": 0,
+        "chip": "none",
+        "slot": 0,
         "v": 2,
         "id": "A1B2C3",
         "cam": "generic",
@@ -178,7 +182,11 @@
     },
     {
       "hex": "0200ff1001030a322e332e342d6265746100",
+      "trailing": false,
       "expected": {
+        "caps": 0,
+        "chip": "none",
+        "slot": 0,
         "v": 2,
         "id": "00FF10",
         "cam": "zcam",
@@ -192,7 +200,11 @@
     },
     {
       "hex": "020a0b0c000105312e302e300b4e6f2045746865726e6574",
+      "trailing": false,
       "expected": {
+        "caps": 0,
+        "chip": "none",
+        "slot": 0,
         "v": 2,
         "id": "0A0B0C",
         "cam": "generic",
@@ -201,6 +213,58 @@
         ],
         "fw": "1.0.0",
         "name": "No Ethernet"
+      }
+    },
+    {
+      "hex": "02a1b2c3000305312e322e30075061642043616d010100001f00",
+      "trailing": true,
+      "expected": {
+        "caps": 1,
+        "chip": "esp32s3",
+        "slot": 2031616,
+        "v": 2,
+        "id": "A1B2C3",
+        "cam": "generic",
+        "cams": [
+          "generic",
+          "zcam"
+        ],
+        "fw": "1.2.0",
+        "name": "Pad Cam"
+      }
+    },
+    {
+      "hex": "0200ff1000010c312e322e302d626574612e3100010200001d00",
+      "trailing": true,
+      "expected": {
+        "caps": 1,
+        "chip": "esp32c3",
+        "slot": 1900544,
+        "v": 2,
+        "id": "00FF10",
+        "cam": "generic",
+        "cams": [
+          "generic"
+        ],
+        "fw": "1.2.0-beta.1",
+        "name": ""
+      }
+    },
+    {
+      "hex": "020a0b0c000105312e302e3000000000000000",
+      "trailing": true,
+      "expected": {
+        "caps": 0,
+        "chip": "none",
+        "slot": 0,
+        "v": 2,
+        "id": "0A0B0C",
+        "cam": "generic",
+        "cams": [
+          "generic"
+        ],
+        "fw": "1.0.0",
+        "name": ""
       }
     }
   ],
@@ -847,6 +911,130 @@
         "msg": "Start 'Attempt 1'"
       },
       "hex": "8104790000001b79e76a05494e4445581153746172742027417474656d7074203127"
+    },
+    {
+      "name": "fw.begin",
+      "kind": "request",
+      "op": "fw.begin",
+      "id": 20,
+      "fields": {
+        "size": 1187344,
+        "sha256Hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "sigHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f"
+      },
+      "hex": "3014101e1200000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f"
+    },
+    {
+      "name": "fw.begin, unsigned",
+      "kind": "request",
+      "op": "fw.begin",
+      "id": 21,
+      "fields": {
+        "size": 65536,
+        "sha256Hex": "0708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20212223242526",
+        "sigHex": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "hex": "3015000001000708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2021222324252600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "name": "fw.begin",
+      "kind": "response",
+      "op": "fw.begin",
+      "id": 20,
+      "fields": {
+        "offset": 0,
+        "window": 8192
+      },
+      "hex": "801400000000000020"
+    },
+    {
+      "name": "fw.begin, resuming",
+      "kind": "response",
+      "op": "fw.begin",
+      "id": 22,
+      "fields": {
+        "offset": 524288,
+        "window": 8192
+      },
+      "hex": "801600000008000020"
+    },
+    {
+      "name": "fw.end",
+      "kind": "request",
+      "op": "fw.end",
+      "id": 23,
+      "fields": {},
+      "hex": "3117"
+    },
+    {
+      "name": "fw.end",
+      "kind": "response",
+      "op": "fw.end",
+      "id": 23,
+      "fields": {
+        "rebootInMs": 500
+      },
+      "hex": "801700f401"
+    },
+    {
+      "name": "fw.abort",
+      "kind": "request",
+      "op": "fw.abort",
+      "id": 24,
+      "fields": {},
+      "hex": "3218"
+    },
+    {
+      "name": "fw.abort",
+      "kind": "response",
+      "op": "fw.abort",
+      "id": 24,
+      "fields": {},
+      "hex": "801800"
+    },
+    {
+      "name": "fw receiving",
+      "kind": "event",
+      "ev": "fw",
+      "fields": {
+        "state": "receiving",
+        "offset": 2048,
+        "reason": 0
+      },
+      "hex": "8105000008000000"
+    },
+    {
+      "name": "fw verifying",
+      "kind": "event",
+      "ev": "fw",
+      "fields": {
+        "state": "verifying",
+        "offset": 1187344,
+        "reason": 0
+      },
+      "hex": "810501101e120000"
+    },
+    {
+      "name": "fw ready",
+      "kind": "event",
+      "ev": "fw",
+      "fields": {
+        "state": "ready",
+        "offset": 1187344,
+        "reason": 0
+      },
+      "hex": "810502101e120000"
+    },
+    {
+      "name": "fw failed, hash mismatch",
+      "kind": "event",
+      "ev": "fw",
+      "fields": {
+        "state": "failed",
+        "offset": 1187344,
+        "reason": 4
+      },
+      "hex": "810503101e120004"
     }
   ],
   "errors": [
@@ -949,6 +1137,651 @@
       "code": "internal",
       "detail": {},
       "hex": "800f09"
+    },
+    {
+      "name": "bad_image, chip",
+      "id": 16,
+      "code": "bad_image",
+      "detail": {
+        "reason": 3
+      },
+      "hex": "80100a03"
+    },
+    {
+      "name": "bad_image, signature invalid",
+      "id": 17,
+      "code": "bad_image",
+      "detail": {
+        "reason": 7
+      },
+      "hex": "80110a07"
+    },
+    {
+      "name": "bad_image, interrupted",
+      "id": 18,
+      "code": "bad_image",
+      "detail": {
+        "reason": 9
+      },
+      "hex": "80120a09"
     }
-  ]
+  ],
+  "firmwareWrites": [
+    {
+      "name": "first chunk",
+      "offset": 0,
+      "dataHex": "000102030405060708090a0b0c0d0e0f",
+      "hex": "00000000000102030405060708090a0b0c0d0e0f"
+    },
+    {
+      "name": "a later chunk",
+      "offset": 1187328,
+      "dataHex": "6465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f50515253",
+      "hex": "001e12006465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f50515253"
+    },
+    {
+      "name": "the largest offset",
+      "offset": 4294967295,
+      "dataHex": "ff",
+      "hex": "ffffffffff"
+    }
+  ],
+  "firmware": {
+    "images": [
+      {
+        "name": "app image for the S3, with a tag",
+        "chip": "esp32s3",
+        "hex": "e9000000000000000000000009000000000000000000000000000000000000003254cdab00000000000000000000000000000000000000000000000000000000555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555554b4149524f5346570101312e332e300000000000000000000000000000000000000000000000000000000000000000000000555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555",
+        "expected": {
+          "status": "ok",
+          "version": "1.3.0",
+          "chip": "esp32s3"
+        }
+      },
+      {
+        "name": "app image for the C3, with a tag and a pre-release version",
+        "chip": "esp32c3",
+        "hex": "e9000000000000000000000005000000000000000000000000000000000000003254cdab00000000000000000000000000000000000000000000000000000000555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555554b4149524f5346570102312e332e302d626574612e3200000000000000000000000000000000000000000000000000000000555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555",
+        "expected": {
+          "status": "ok",
+          "version": "1.3.0-beta.2",
+          "chip": "esp32c3"
+        }
+      },
+      {
+        "name": "app image without a tag",
+        "chip": "esp32s3",
+        "hex": "e9000000000000000000000009000000000000000000000000000000000000003254cdab00000000000000000000000000000000000000000000000000000000555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555",
+        "expected": {
+          "status": "ok",
+          "version": null,
+          "chip": "esp32s3"
+        }
+      },
+      {
+        "name": "an S3 image offered to a C3",
+        "chip": "esp32c3",
+        "hex": "e9000000000000000000000009000000000000000000000000000000000000003254cdab00000000000000000000000000000000000000000000000000000000555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555554b4149524f5346570101312e332e300000000000000000000000000000000000000000000000000000000000000000000000555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555",
+        "expected": {
+          "status": "wrong_chip",
+          "version": null,
+          "chip": "esp32s3"
+        }
+      },
+      {
+        "name": "the header says S3 but the tag says C3",
+        "chip": "esp32s3",
+        "hex": "e9000000000000000000000009000000000000000000000000000000000000003254cdab00000000000000000000000000000000000000000000000000000000555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555554b4149524f5346570102312e332e300000000000000000000000000000000000000000000000000000000000000000000000555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555",
+        "expected": {
+          "status": "wrong_chip",
+          "version": null,
+          "chip": "esp32c3"
+        }
+      },
+      {
+        "name": "a factory image (no application descriptor)",
+        "chip": "esp32s3",
+        "hex": "e9000000000000000000000009000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555",
+        "expected": {
+          "status": "not_app",
+          "version": null,
+          "chip": "esp32s3"
+        }
+      },
+      {
+        "name": "not an image",
+        "chip": "esp32s3",
+        "hex": "7f000000000000000000000009000000000000000000000000000000000000003254cdab00000000000000000000000000000000000000000000000000000000555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555",
+        "expected": {
+          "status": "not_image",
+          "version": null,
+          "chip": null
+        }
+      },
+      {
+        "name": "too short",
+        "chip": "esp32s3",
+        "hex": "e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9e9",
+        "expected": {
+          "status": "not_image",
+          "version": null,
+          "chip": null
+        }
+      },
+      {
+        "name": "an unknown chip",
+        "chip": "esp32s3",
+        "hex": "e9000000000000000000000002000000000000000000000000000000000000003254cdab00000000000000000000000000000000000000000000000000000000555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555",
+        "expected": {
+          "status": "wrong_chip",
+          "version": null,
+          "chip": null
+        }
+      },
+      {
+        "name": "a tag with an unknown tag version is ignored",
+        "chip": "esp32s3",
+        "hex": "e9000000000000000000000009000000000000000000000000000000000000003254cdab00000000000000000000000000000000000000000000000000000000555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555554b4149524f5346570201392e392e390000000000000000000000000000000000000000000000000000000000000000000000555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555",
+        "expected": {
+          "status": "ok",
+          "version": null,
+          "chip": "esp32s3"
+        }
+      }
+    ],
+    "versions": [
+      {
+        "a": "1.2.0",
+        "b": "1.2.0",
+        "expected": 0
+      },
+      {
+        "a": "1.2.0",
+        "b": "1.10.0",
+        "expected": -1
+      },
+      {
+        "a": "2.0.0",
+        "b": "1.99.99",
+        "expected": 1
+      },
+      {
+        "a": "1.0.0",
+        "b": "1.0.0-beta.1",
+        "expected": 1
+      },
+      {
+        "a": "1.0.0-beta.1",
+        "b": "1.0.0-beta.2",
+        "expected": -1
+      },
+      {
+        "a": "1.0.0-beta.2",
+        "b": "1.0.0-beta.10",
+        "expected": -1
+      },
+      {
+        "a": "1.0.0-alpha",
+        "b": "1.0.0-beta",
+        "expected": -1
+      },
+      {
+        "a": "1.0.0-1",
+        "b": "1.0.0-alpha",
+        "expected": -1
+      },
+      {
+        "a": "1.0.0-alpha",
+        "b": "1.0.0-alpha.1",
+        "expected": -1
+      },
+      {
+        "a": "v1.3.0",
+        "b": "1.3.0",
+        "expected": 0
+      },
+      {
+        "a": "1.3.0+build5",
+        "b": "1.3.0",
+        "expected": 0
+      },
+      {
+        "a": "dev",
+        "b": "1.0.0",
+        "expected": null
+      },
+      {
+        "a": "1.0.0",
+        "b": "dev",
+        "expected": null
+      },
+      {
+        "a": "1.2",
+        "b": "1.2.0",
+        "expected": null
+      },
+      {
+        "a": "",
+        "b": "1.0.0",
+        "expected": null
+      }
+    ],
+    "manifests": [
+      {
+        "name": "an update is available",
+        "manifest": {
+          "version": "1.3.0",
+          "protocol": 2,
+          "minFrom": "1.2.0",
+          "notes": "Fixes",
+          "images": {
+            "esp32s3": {
+              "file": "kairos-esp32s3-1.3.0-app.bin",
+              "size": 1187344,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "esp32c3": {
+              "file": "kairos-esp32c3-1.3.0-app.bin",
+              "size": 1160192,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        },
+        "chip": "esp32s3",
+        "deviceFw": "1.2.0",
+        "appProtocol": 2,
+        "expected": {
+          "status": "available",
+          "image": {
+            "file": "kairos-esp32s3-1.3.0-app.bin",
+            "size": 1187344,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        }
+      },
+      {
+        "name": "the same version",
+        "manifest": {
+          "version": "1.3.0",
+          "protocol": 2,
+          "minFrom": "1.2.0",
+          "notes": "Fixes",
+          "images": {
+            "esp32s3": {
+              "file": "kairos-esp32s3-1.3.0-app.bin",
+              "size": 1187344,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "esp32c3": {
+              "file": "kairos-esp32c3-1.3.0-app.bin",
+              "size": 1160192,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        },
+        "chip": "esp32s3",
+        "deviceFw": "1.3.0",
+        "appProtocol": 2,
+        "expected": {
+          "status": "up_to_date",
+          "image": {
+            "file": "kairos-esp32s3-1.3.0-app.bin",
+            "size": 1187344,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        }
+      },
+      {
+        "name": "the device is ahead",
+        "manifest": {
+          "version": "1.3.0",
+          "protocol": 2,
+          "minFrom": "1.2.0",
+          "notes": "Fixes",
+          "images": {
+            "esp32s3": {
+              "file": "kairos-esp32s3-1.3.0-app.bin",
+              "size": 1187344,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "esp32c3": {
+              "file": "kairos-esp32c3-1.3.0-app.bin",
+              "size": 1160192,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        },
+        "chip": "esp32s3",
+        "deviceFw": "1.4.0",
+        "appProtocol": 2,
+        "expected": {
+          "status": "newer_installed",
+          "image": {
+            "file": "kairos-esp32s3-1.3.0-app.bin",
+            "size": 1187344,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        }
+      },
+      {
+        "name": "a development build",
+        "manifest": {
+          "version": "1.3.0",
+          "protocol": 2,
+          "minFrom": "1.2.0",
+          "notes": "Fixes",
+          "images": {
+            "esp32s3": {
+              "file": "kairos-esp32s3-1.3.0-app.bin",
+              "size": 1187344,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "esp32c3": {
+              "file": "kairos-esp32c3-1.3.0-app.bin",
+              "size": 1160192,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        },
+        "chip": "esp32s3",
+        "deviceFw": "dev",
+        "appProtocol": 2,
+        "expected": {
+          "status": "unknown_current",
+          "image": {
+            "file": "kairos-esp32s3-1.3.0-app.bin",
+            "size": 1187344,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        }
+      },
+      {
+        "name": "a git describe build",
+        "manifest": {
+          "version": "1.3.0",
+          "protocol": 2,
+          "minFrom": "1.2.0",
+          "notes": "Fixes",
+          "images": {
+            "esp32s3": {
+              "file": "kairos-esp32s3-1.3.0-app.bin",
+              "size": 1187344,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "esp32c3": {
+              "file": "kairos-esp32c3-1.3.0-app.bin",
+              "size": 1160192,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        },
+        "chip": "esp32s3",
+        "deviceFw": "1.2.0-4-gabcdef0-dirty",
+        "appProtocol": 2,
+        "expected": {
+          "status": "needs_usb",
+          "image": {
+            "file": "kairos-esp32s3-1.3.0-app.bin",
+            "size": 1187344,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        }
+      },
+      {
+        "name": "the device is too old for a Bluetooth update",
+        "manifest": {
+          "version": "1.3.0",
+          "protocol": 2,
+          "minFrom": "1.2.0",
+          "notes": "Fixes",
+          "images": {
+            "esp32s3": {
+              "file": "kairos-esp32s3-1.3.0-app.bin",
+              "size": 1187344,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "esp32c3": {
+              "file": "kairos-esp32c3-1.3.0-app.bin",
+              "size": 1160192,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        },
+        "chip": "esp32s3",
+        "deviceFw": "1.1.0",
+        "appProtocol": 2,
+        "expected": {
+          "status": "needs_usb",
+          "image": {
+            "file": "kairos-esp32s3-1.3.0-app.bin",
+            "size": 1187344,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        }
+      },
+      {
+        "name": "no minFrom",
+        "manifest": {
+          "version": "1.3.0",
+          "protocol": 2,
+          "notes": "Fixes",
+          "images": {
+            "esp32s3": {
+              "file": "kairos-esp32s3-1.3.0-app.bin",
+              "size": 1187344,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "esp32c3": {
+              "file": "kairos-esp32c3-1.3.0-app.bin",
+              "size": 1160192,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        },
+        "chip": "esp32c3",
+        "deviceFw": "0.1.0",
+        "appProtocol": 2,
+        "expected": {
+          "status": "available",
+          "image": {
+            "file": "kairos-esp32c3-1.3.0-app.bin",
+            "size": 1160192,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        }
+      },
+      {
+        "name": "the image needs a newer app",
+        "manifest": {
+          "version": "1.3.0",
+          "protocol": 3,
+          "minFrom": "1.2.0",
+          "notes": "Fixes",
+          "images": {
+            "esp32s3": {
+              "file": "kairos-esp32s3-1.3.0-app.bin",
+              "size": 1187344,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "esp32c3": {
+              "file": "kairos-esp32c3-1.3.0-app.bin",
+              "size": 1160192,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        },
+        "chip": "esp32s3",
+        "deviceFw": "1.2.0",
+        "appProtocol": 2,
+        "expected": {
+          "status": "app_too_old",
+          "image": {
+            "file": "kairos-esp32s3-1.3.0-app.bin",
+            "size": 1187344,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        }
+      },
+      {
+        "name": "no image for this chip",
+        "manifest": {
+          "version": "1.3.0",
+          "protocol": 2,
+          "minFrom": "1.2.0",
+          "notes": "Fixes",
+          "images": {
+            "esp32s3": {
+              "file": "kairos-esp32s3-1.3.0-app.bin",
+              "size": 1187344,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        },
+        "chip": "esp32c3",
+        "deviceFw": "1.2.0",
+        "appProtocol": 2,
+        "expected": {
+          "status": "unavailable",
+          "image": null
+        }
+      },
+      {
+        "name": "a bad hash",
+        "manifest": {
+          "version": "1.3.0",
+          "protocol": 2,
+          "minFrom": "1.2.0",
+          "notes": "Fixes",
+          "images": {
+            "esp32s3": {
+              "file": "x.bin",
+              "size": 1187344,
+              "sha256": "zz",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        },
+        "chip": "esp32s3",
+        "deviceFw": "1.2.0",
+        "appProtocol": 2,
+        "expected": {
+          "status": "invalid",
+          "image": null
+        }
+      },
+      {
+        "name": "a missing signature",
+        "manifest": {
+          "version": "1.3.0",
+          "protocol": 2,
+          "minFrom": "1.2.0",
+          "notes": "Fixes",
+          "images": {
+            "esp32s3": {
+              "file": "x.bin",
+              "size": 5,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "chip": "esp32s3",
+        "deviceFw": "1.2.0",
+        "appProtocol": 2,
+        "expected": {
+          "status": "invalid",
+          "image": null
+        }
+      },
+      {
+        "name": "a bad version",
+        "manifest": {
+          "version": "latest",
+          "protocol": 2,
+          "minFrom": "1.2.0",
+          "notes": "Fixes",
+          "images": {
+            "esp32s3": {
+              "file": "kairos-esp32s3-1.3.0-app.bin",
+              "size": 1187344,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "esp32c3": {
+              "file": "kairos-esp32c3-1.3.0-app.bin",
+              "size": 1160192,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        },
+        "chip": "esp32s3",
+        "deviceFw": "1.2.0",
+        "appProtocol": 2,
+        "expected": {
+          "status": "invalid",
+          "image": null
+        }
+      },
+      {
+        "name": "a pre-release is newer than the previous release",
+        "manifest": {
+          "version": "1.3.0-beta.1",
+          "protocol": 2,
+          "minFrom": "1.2.0",
+          "notes": "Fixes",
+          "images": {
+            "esp32s3": {
+              "file": "kairos-esp32s3-1.3.0-app.bin",
+              "size": 1187344,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "esp32c3": {
+              "file": "kairos-esp32c3-1.3.0-app.bin",
+              "size": 1160192,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        },
+        "chip": "esp32s3",
+        "deviceFw": "1.2.0",
+        "appProtocol": 2,
+        "expected": {
+          "status": "available",
+          "image": {
+            "file": "kairos-esp32s3-1.3.0-app.bin",
+            "size": 1187344,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sig": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        }
+      }
+    ]
+  }
 }

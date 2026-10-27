@@ -36,6 +36,7 @@ test('Device Info is binary and names the device', async () => {
   const dev = await makeDevice()
   assert.deepEqual(decodeDeviceInfo(dev.ble.deviceInfo()), {
     v: 2, id: 'ABC123', cam: 'generic', cams: ['generic', 'zcam'], fw: process.env.npm_package_version ?? '1.0.0', name: 'Test',
+    caps: 0, chip: 'none', slot: 0, // the Pi cannot be updated over Bluetooth
   })
 })
 
@@ -443,4 +444,15 @@ test('attempts whose wake-up time already passed are marked missed', async () =>
 
 test('encodeRequest and the link agree on the envelope', () => {
   assert.deepEqual([...encodeRequest('camera.start', 12)], [0x11, 12])
+})
+
+test('the Pi answers the firmware ops with not_supported', async () => {
+  const dev = await makeDevice()
+  const c = new TestClient(dev.ble)
+  await c.authenticate(SECRET)
+  for (const [op, fields] of [['fw.begin', { size: 70000, sha256Hex: '00'.repeat(32), sigHex: '00'.repeat(64) }], ['fw.end', {}], ['fw.abort', {}]]) {
+    const r = await c.request(op, fields)
+    assert.equal(r.ok, false, op)
+    assert.equal(r.code, 'not_supported', op)
+  }
 })
