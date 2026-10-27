@@ -52,7 +52,8 @@ static const std::map<std::string, Op>& opMap() {
       {"hello", Op::Hello}, {"auth", Op::Auth}, {"auth.pair", Op::AuthPair}, {"time.get", Op::TimeGet},
       {"time.set", Op::TimeSet}, {"config.get", Op::ConfigGet}, {"config.set", Op::ConfigSet}, {"jobs.get", Op::JobsGet},
       {"camera.wake", Op::CameraWake}, {"camera.start", Op::CameraStart}, {"camera.stop", Op::CameraStop},
-      {"camera.sleep", Op::CameraSleep}, {"test.run", Op::TestRun}, {"logs.get", Op::LogsGet}, {"logs.subscribe", Op::LogsSubscribe}};
+      {"camera.sleep", Op::CameraSleep}, {"test.run", Op::TestRun}, {"logs.get", Op::LogsGet}, {"logs.subscribe", Op::LogsSubscribe},
+      {"fw.begin", Op::FwBegin}, {"fw.end", Op::FwEnd}, {"fw.abort", Op::FwAbort}};
   return m;
 }
 
@@ -69,7 +70,7 @@ static Err errFromName(const std::string& n) {
   static const std::map<std::string, Err> m = {
       {"bad_request", Err::BadRequest}, {"unauthorized", Err::Unauthorized}, {"locked_out", Err::LockedOut},
       {"not_supported", Err::NotSupported}, {"busy", Err::Busy}, {"invalid_config", Err::InvalidConfig},
-      {"too_large", Err::TooLarge}, {"pairing_closed", Err::PairingClosed}, {"internal", Err::Internal}};
+      {"too_large", Err::TooLarge}, {"pairing_closed", Err::PairingClosed}, {"internal", Err::Internal}, {"bad_image", Err::BadImage}};
   return m.at(n);
 }
 
@@ -328,6 +329,12 @@ void test_vectors_status_and_device_info() {
     for (const auto& c : e["cams"].a) d.cams |= c.s == "zcam" ? kCamZcam : kCamGeneric;
     d.fw = e["fw"].s;
     d.name = e["name"].s;
+    d.update = v["trailing"].b;
+    if (d.update) {
+      d.caps = static_cast<uint8_t>(e["caps"].n);
+      d.chip = e["chip"].s == "esp32s3" ? kChipEsp32S3 : e["chip"].s == "esp32c3" ? kChipEsp32C3 : 0;
+      d.slot = static_cast<uint32_t>(e["slot"].n);
+    }
     TEST_ASSERT_EQUAL_STRING(v["hex"].s.c_str(), toHex(encodeDeviceInfo(d)).c_str());
     TEST_ASSERT_EQUAL_STRING(e["id"].s.c_str(), formatDeviceId(d.id).c_str());
   }
@@ -388,7 +395,9 @@ static Bytes buildResponse(const std::string& opName, uint8_t id, const Json& f)
       for (const auto& l : f["lines"].a) lines.push_back(lineFromJson(l));
       return encodeLogsGetResponse(id, static_cast<uint32_t>(f["last"].n), f["more"].b, lines);
     }
-    default: return encodeEmptyResponse(id);  // auth.pair, test.run, logs.subscribe
+    case Op::FwBegin: return encodeFwBeginResponse(id, static_cast<uint32_t>(f["offset"].n), static_cast<uint16_t>(f["window"].n));
+    case Op::FwEnd: return encodeFwEndResponse(id, static_cast<uint16_t>(f["rebootInMs"].n));
+    default: return encodeEmptyResponse(id);  // auth.pair, test.run, logs.subscribe, fw.abort
   }
 }
 
@@ -403,6 +412,11 @@ static Bytes buildEvent(const std::string& ev, const Json& f) {
     const std::string& s = f["step"].s;
     TestStep step = s == "wake" ? TestStep::Wake : s == "start" ? TestStep::Start : s == "stop" ? TestStep::Stop : s == "sleep" ? TestStep::Sleep : TestStep::Done;
     return encodeTestEvent(step, f["ok"].b, f["error"].s);
+  }
+  if (ev == "fw") {
+    const std::string& s = f["state"].s;
+    FwState state = s == "receiving" ? FwState::Receiving : s == "verifying" ? FwState::Verifying : s == "ready" ? FwState::Ready : FwState::Failed;
+    return encodeFwEvent(state, static_cast<uint32_t>(f["offset"].n), static_cast<BadImage>(static_cast<int>(f["reason"].n)));
   }
   return encodeLogEvent(lineFromJson(f));
 }
@@ -435,6 +449,11 @@ void test_vectors_messages() {
           TEST_ASSERT_EQUAL(f["enabled"].b, q.enabled);
           TEST_ASSERT_EQUAL_UINT32(static_cast<uint32_t>(f["after"].n), q.after);
           break;
+        case Op::FwBegin:
+          TEST_ASSERT_EQUAL_UINT32(static_cast<uint32_t>(f["size"].n), q.fwSize);
+          TEST_ASSERT_EQUAL_STRING(f["sha256Hex"].s.c_str(), toHex(q.fwSha, 32).c_str());
+          TEST_ASSERT_EQUAL_STRING(f["sigHex"].s.c_str(), toHex(q.fwSig, 64).c_str());
+          break;
         default: break;
       }
     } else if (kind == "response") {
@@ -456,6 +475,7 @@ void test_vectors_errors() {
       d.index = static_cast<uint8_t>(det["index"].n);
       d.reason = static_cast<Reason>(static_cast<int>(det["reason"].n));
     }
+    else if (det.has("reason")) d.badImage = static_cast<BadImage>(static_cast<int>(det["reason"].n));
     if (det.has("message")) d.message = det["message"].s;
     Bytes b = encodeError(static_cast<uint8_t>(v["id"].n), errFromName(v["code"].s), d);
     TEST_ASSERT_EQUAL_STRING_MESSAGE(v["hex"].s.c_str(), toHex(b).c_str(), v["name"].s.c_str());
@@ -1245,6 +1265,411 @@ void test_next_event_picks_the_earliest_across_attempts() {
   TEST_ASSERT_TRUE(d.scheduler.nextDueMs() == n.atMs);
 }
 
+
+// ---------------------------------------------------------------------------
+// firmware update
+
+namespace {
+constexpr uint16_t kS3Chip = 9;
+constexpr uint16_t kC3Chip = 5;
+
+/// A fake application image: the real header fields at the real offsets, then filler.
+Bytes makeImage(size_t size, uint16_t chip = kS3Chip, bool appDesc = true, uint8_t magic = 0xE9) {
+  Bytes b(size);
+  for (size_t i = 0; i < size; i++) b[i] = static_cast<uint8_t>((i * 31 + 7) & 0xff);
+  std::fill(b.begin(), b.begin() + 64, 0);
+  b[0] = magic;
+  b[12] = chip & 0xff;
+  b[13] = chip >> 8;
+  if (appDesc) {
+    b[32] = 0x32; b[33] = 0x54; b[34] = 0xCD; b[35] = 0xAB;  // 0xABCD5432, little-endian
+  }
+  return b;
+}
+
+Bytes sha(const Bytes& b) {
+  Sha256 h;
+  h.update(b.data(), b.size());
+  Bytes out(32);
+  h.final(out.data());
+  return out;
+}
+
+struct FakeFlash : FlashSink {
+  size_t cap = 0x1F0000;
+  Bytes data;
+  bool opened = false, finished = false, activated = false, aborted = false;
+  bool failBegin = false, failWrite = false, failFinish = false, failActivate = false;
+  int begins = 0;
+  size_t capacity() override { return cap; }
+  bool begin(size_t) override { begins++; if (failBegin) return false; opened = true; data.clear(); aborted = false; return true; }
+  bool write(const uint8_t* p, size_t n) override { if (failWrite) return false; data.insert(data.end(), p, p + n); return true; }
+  bool finish() override { finished = true; return !failFinish; }
+  bool activate() override { activated = true; return !failActivate; }
+  void abort() override { aborted = true; opened = false; }
+};
+
+struct FakeVerifier : SignatureVerifier {
+  Bytes goodSig = Bytes(64, 0xAB);
+  int calls = 0;
+  bool verify(const uint8_t*, const uint8_t sig[64]) override {
+    calls++;
+    return std::memcmp(sig, goodSig.data(), 64) == 0;
+  }
+};
+
+struct Fw {
+  FakeFlash flash;
+  FakeVerifier verifier;
+  FwGate gate;
+  FwConfig config;
+  std::unique_ptr<Updater> up;
+  uint64_t now = 1000;
+  Fw(bool allowUnsigned = false, uint16_t chip = kS3Chip) {
+    config.headerChipId = chip;
+    config.minSize = 4096;
+    config.allowUnsigned = allowUnsigned;
+    up.reset(new Updater(flash, verifier, config, [this]() { return gate; }));
+  }
+  FwResult begin(const Bytes& img, const Bytes* sig = nullptr) {
+    Bytes h = sha(img);
+    return up->begin(static_cast<uint32_t>(img.size()), h.data(), sig ? sig->data() : verifier.goodSig.data(), now);
+  }
+  /// Send [from, to) of the image in chunks.
+  void send(const Bytes& img, size_t from, size_t to, size_t chunk = 240) {
+    for (size_t at = from; at < to;) {
+      size_t n = std::min(chunk, to - at);
+      Bytes m = {static_cast<uint8_t>(at), static_cast<uint8_t>(at >> 8), static_cast<uint8_t>(at >> 16), static_cast<uint8_t>(at >> 24)};
+      m.insert(m.end(), img.begin() + at, img.begin() + at + n);
+      up->onData(m.data(), m.size(), now);
+      at += n;
+      now += 5;
+    }
+  }
+  std::vector<FwProgress> drain() {
+    std::vector<FwProgress> out;
+    FwProgress p;
+    while (up->takeProgress(p)) out.push_back(p);
+    return out;
+  }
+};
+}  // namespace
+
+void test_fw_a_whole_image_transfers_verifies_and_activates() {
+  Fw f;
+  Bytes img = makeImage(70000);
+  FwResult b = f.begin(img);
+  TEST_ASSERT_TRUE(b.ok);
+  TEST_ASSERT_EQUAL_UINT32(0, b.offset);
+  TEST_ASSERT_EQUAL_UINT16(kFwWindow, b.value);
+  TEST_ASSERT_TRUE(f.up->active());
+  f.send(img, 0, img.size());
+  auto progress = f.drain();
+  TEST_ASSERT_EQUAL(1, static_cast<int>(progress.size()));  // pending events coalesce into the latest
+  TEST_ASSERT_TRUE(progress.back().state == FwState::Receiving);
+  TEST_ASSERT_EQUAL_UINT32(img.size(), progress.back().offset);
+  FwResult e = f.up->end(f.now);
+  TEST_ASSERT_TRUE(e.ok);
+  TEST_ASSERT_EQUAL_UINT16(500, e.value);
+  TEST_ASSERT_TRUE(f.flash.finished && f.flash.activated);
+  TEST_ASSERT_TRUE(f.flash.data == img);
+  TEST_ASSERT_FALSE(f.up->rebootDue(f.now));
+  TEST_ASSERT_TRUE(f.up->rebootDue(f.now + 500));
+  auto last = f.drain();
+  TEST_ASSERT_EQUAL(1, static_cast<int>(last.size()));
+  TEST_ASSERT_TRUE(last[0].state == FwState::Ready);
+}
+
+void test_fw_progress_is_reported_every_quarter_window() {
+  Fw f;
+  Bytes img = makeImage(40000);
+  f.begin(img);
+  f.send(img, 0, kFwWindow / 4 - 300);
+  TEST_ASSERT_EQUAL(0, static_cast<int>(f.drain().size()));
+  f.send(img, kFwWindow / 4 - 300, kFwWindow / 4 + 1000);
+  auto p = f.drain();
+  TEST_ASSERT_EQUAL(1, static_cast<int>(p.size()));
+  TEST_ASSERT_TRUE(p[0].offset >= kFwWindow / 4);
+}
+
+void test_fw_a_gap_asks_the_phone_to_rewind_and_a_repeat_is_ignored() {
+  Fw f;
+  Bytes img = makeImage(20000);
+  f.begin(img);
+  f.send(img, 0, 960);
+  f.drain();
+  f.send(img, 1200, 1440);  // 960..1200 was lost
+  auto p = f.drain();
+  TEST_ASSERT_EQUAL(1, static_cast<int>(p.size()));
+  TEST_ASSERT_EQUAL_UINT32(960, p[0].offset);
+  TEST_ASSERT_EQUAL_UINT32(960, f.up->received());
+  f.send(img, 0, 480);  // a repeat of bytes already stored
+  TEST_ASSERT_EQUAL_UINT32(960, f.up->received());
+  f.send(img, 720, img.size());  // overlaps the stored bytes, then continues
+  TEST_ASSERT_EQUAL_UINT32(img.size(), f.up->received());
+  TEST_ASSERT_TRUE(f.up->end(f.now).ok);
+  TEST_ASSERT_TRUE(f.flash.data == img);
+}
+
+void test_fw_small_writes_that_split_the_header_are_handled() {
+  Fw f;
+  Bytes img = makeImage(9000);
+  f.begin(img);
+  f.send(img, 0, img.size(), 16);  // the default MTU: 16 payload bytes per write
+  TEST_ASSERT_TRUE(f.up->end(f.now).ok);
+  TEST_ASSERT_TRUE(f.flash.data == img);
+}
+
+void test_fw_the_same_image_resumes_and_a_different_one_restarts() {
+  Fw f;
+  Bytes img = makeImage(30000);
+  f.begin(img);
+  f.send(img, 0, 5000);
+  f.now += 60000;  // the phone reconnects within the two minutes
+  FwResult again = f.begin(img);
+  TEST_ASSERT_TRUE(again.ok);
+  TEST_ASSERT_EQUAL_UINT32(5000, again.offset);
+  TEST_ASSERT_EQUAL(1, f.flash.begins);
+
+  Bytes other = makeImage(30000, kS3Chip);
+  other[500] ^= 0xff;
+  FwResult fresh = f.begin(other);
+  TEST_ASSERT_TRUE(fresh.ok);
+  TEST_ASSERT_EQUAL_UINT32(0, fresh.offset);
+  TEST_ASSERT_EQUAL(2, f.flash.begins);
+  TEST_ASSERT_TRUE(f.flash.aborted == false);  // the new begin opened a new write
+}
+
+void test_fw_a_transfer_with_no_data_for_two_minutes_is_dropped() {
+  Fw f;
+  Bytes img = makeImage(30000);
+  f.begin(img);
+  f.send(img, 0, 2000);
+  f.drain();
+  const uint64_t lastData = f.now - 5;  // send() advances the clock after each chunk
+  f.up->tick(lastData + kFwIdleTimeoutMs);
+  TEST_ASSERT_TRUE(f.up->active());
+  f.up->tick(lastData + kFwIdleTimeoutMs + 1);
+  TEST_ASSERT_FALSE(f.up->active());
+  auto p = f.drain();
+  TEST_ASSERT_EQUAL(1, static_cast<int>(p.size()));
+  TEST_ASSERT_TRUE(p[0].state == FwState::Failed);
+  TEST_ASSERT_TRUE(p[0].reason == BadImage::Interrupted);
+  TEST_ASSERT_TRUE(f.flash.aborted);
+  TEST_ASSERT_FALSE(f.up->end(f.now).ok);
+  // a new begin after the drop starts from zero
+  TEST_ASSERT_EQUAL_UINT32(0, f.begin(img).offset);
+}
+
+void test_fw_begin_needs_an_idle_device_with_no_event_in_fifteen_minutes() {
+  Fw f;
+  Bytes img = makeImage(30000);
+  f.gate.idle = false;
+  FwResult r = f.begin(img);
+  TEST_ASSERT_FALSE(r.ok);
+  TEST_ASSERT_TRUE(r.err == Err::Busy);
+  f.gate.idle = true;
+  f.gate.secondsToNextEvent = kFwMinGapSec - 1;
+  TEST_ASSERT_TRUE(f.begin(img).err == Err::Busy);
+  f.gate.secondsToNextEvent = kFwMinGapSec;
+  TEST_ASSERT_TRUE(f.begin(img).ok);
+}
+
+void test_fw_a_transfer_is_dropped_when_an_event_gets_close() {
+  Fw f;
+  Bytes img = makeImage(30000);
+  f.begin(img);
+  f.send(img, 0, 1000);
+  f.gate.secondsToNextEvent = kFwAbortGapSec;
+  f.up->tick(f.now);
+  TEST_ASSERT_TRUE(f.up->active());
+  f.gate.secondsToNextEvent = kFwAbortGapSec - 1;
+  f.up->tick(f.now);
+  TEST_ASSERT_FALSE(f.up->active());
+  TEST_ASSERT_TRUE(f.drain().back().reason == BadImage::Interrupted);
+}
+
+void test_fw_size_limits() {
+  Fw f;
+  Bytes tiny = makeImage(4000);
+  FwResult r = f.begin(tiny);
+  TEST_ASSERT_TRUE(r.err == Err::BadImage && r.reason == BadImage::Size);
+  f.flash.cap = 10000;
+  Bytes big = makeImage(10001);
+  TEST_ASSERT_TRUE(f.begin(big).err == Err::TooLarge);
+  TEST_ASSERT_TRUE(f.begin(makeImage(10000)).ok);
+}
+
+void test_fw_signatures() {
+  Fw f;
+  Bytes img = makeImage(30000);
+  Bytes none(64, 0);
+  FwResult r = f.begin(img, &none);
+  TEST_ASSERT_TRUE(r.err == Err::BadImage && r.reason == BadImage::SignatureMissing);
+  TEST_ASSERT_EQUAL(0, f.verifier.calls);
+  Bytes bad(64, 0x11);
+  r = f.begin(img, &bad);
+  TEST_ASSERT_TRUE(r.err == Err::BadImage && r.reason == BadImage::SignatureInvalid);
+  TEST_ASSERT_TRUE(f.begin(img).ok);
+
+  Fw dev(true);  // a developer build accepts an unsigned image
+  TEST_ASSERT_TRUE(dev.begin(img, &none).ok);
+  r = dev.begin(img, &bad);  // but a signature that is present must still verify
+  TEST_ASSERT_TRUE(r.err == Err::BadImage && r.reason == BadImage::SignatureInvalid);
+}
+
+void test_fw_the_first_bytes_are_checked_as_they_arrive() {
+  Fw f;
+  Bytes wrongChip = makeImage(30000, kC3Chip);
+  f.begin(wrongChip);
+  f.send(wrongChip, 0, 480);
+  auto p = f.drain();
+  TEST_ASSERT_EQUAL(1, static_cast<int>(p.size()));
+  TEST_ASSERT_TRUE(p[0].state == FwState::Failed && p[0].reason == BadImage::Chip);
+  TEST_ASSERT_FALSE(f.up->active());
+  TEST_ASSERT_TRUE(f.flash.data.empty());  // nothing was written
+
+  Bytes factory = makeImage(30000, kS3Chip, false);  // the bootloader image: no application descriptor
+  f.begin(factory);
+  f.send(factory, 0, 480);
+  p = f.drain();
+  TEST_ASSERT_TRUE(p.back().reason == BadImage::Header);
+
+  Bytes notAnImage = makeImage(30000, kS3Chip, true, 0x7f);
+  f.begin(notAnImage);
+  f.send(notAnImage, 0, 480);
+  TEST_ASSERT_TRUE(f.drain().back().reason == BadImage::Header);
+}
+
+void test_fw_end_checks_the_length_the_hash_and_the_image() {
+  Fw f;
+  Bytes img = makeImage(30000);
+  TEST_ASSERT_TRUE(f.up->end(f.now).err == Err::Busy);  // no transfer open
+
+  f.begin(img);
+  f.send(img, 0, 20000);
+  FwResult r = f.up->end(f.now);
+  TEST_ASSERT_TRUE(r.err == Err::BadImage && r.reason == BadImage::Incomplete);
+  TEST_ASSERT_TRUE(f.up->active());  // still open: the phone can finish
+  f.send(img, 20000, img.size());
+  TEST_ASSERT_TRUE(f.up->end(f.now).ok);
+
+  Fw g;  // the bytes differ from what was declared
+  Bytes corrupt = img;
+  g.begin(img);
+  corrupt[20000] ^= 1;
+  g.send(corrupt, 0, corrupt.size());
+  r = g.up->end(g.now);
+  TEST_ASSERT_TRUE(r.err == Err::BadImage && r.reason == BadImage::Hash);
+  TEST_ASSERT_FALSE(g.flash.activated);
+  TEST_ASSERT_TRUE(g.flash.aborted);
+
+  Fw h;  // the slot rejects the image
+  h.begin(img);
+  h.send(img, 0, img.size());
+  h.flash.failFinish = true;
+  TEST_ASSERT_TRUE(h.up->end(h.now).reason == BadImage::Header);
+  TEST_ASSERT_FALSE(h.flash.activated);
+
+  Fw k;  // the boot slot could not be switched
+  k.begin(img);
+  k.send(img, 0, img.size());
+  k.flash.failActivate = true;
+  TEST_ASSERT_TRUE(k.up->end(k.now).reason == BadImage::Write);
+}
+
+void test_fw_flash_errors_and_extra_bytes_fail_the_transfer() {
+  Fw f;
+  Bytes img = makeImage(30000);
+  f.flash.failBegin = true;
+  TEST_ASSERT_TRUE(f.begin(img).reason == BadImage::Write);
+  f.flash.failBegin = false;
+  f.begin(img);
+  f.flash.failWrite = true;
+  f.send(img, 0, 480);
+  TEST_ASSERT_TRUE(f.drain().back().reason == BadImage::Write);
+
+  Fw g;
+  g.begin(img);
+  Bytes more = img;
+  more.insert(more.end(), 100, 0);
+  g.send(more, 0, more.size());
+  TEST_ASSERT_TRUE(g.drain().back().reason == BadImage::Size);
+}
+
+void test_fw_abort_discards_the_transfer() {
+  Fw f;
+  Bytes img = makeImage(30000);
+  f.begin(img);
+  f.send(img, 0, 1000);
+  f.up->abort();
+  TEST_ASSERT_FALSE(f.up->active());
+  TEST_ASSERT_TRUE(f.flash.aborted);
+  f.send(img, 1000, 1240);  // data with no transfer open is ignored
+  TEST_ASSERT_EQUAL_UINT32(1000, f.up->received());
+}
+
+void test_fw_ops_need_auth_and_are_unsupported_without_an_updater() {
+  Device d;
+  d.begin();
+  d.pairWith();
+  Client c(d);
+  Bytes body(4 + 32 + 64, 0);
+  TEST_ASSERT_EQUAL_UINT8(2, errCode(c.op(0x30, body)));  // unauthorized
+  TEST_ASSERT_EQUAL_UINT8(2, errCode(c.op(0x31)));
+  TEST_ASSERT_EQUAL_UINT8(2, errCode(c.op(0x32)));
+  c.authenticate();
+  TEST_ASSERT_EQUAL_UINT8(4, errCode(c.op(0x30, body)));  // not_supported
+  TEST_ASSERT_EQUAL_UINT8(4, errCode(c.op(0x31)));
+  TEST_ASSERT_EQUAL_UINT8(4, errCode(c.op(0x32)));
+}
+
+void test_fw_through_the_dispatcher() {
+  Device d;
+  d.begin();
+  d.pairWith();
+  Fw f;
+  f.config.minSize = 4096;
+  d.dispatcher.setFirmware(f.up.get(), [&]() { return f.now; });
+  Client c(d);
+  c.authenticate();
+
+  Bytes img = makeImage(30000);
+  Bytes h = sha(img);
+  Writer w;
+  w.u32(static_cast<uint32_t>(img.size())).raw(h).raw(f.verifier.goodSig);
+  Bytes r = c.op(0x30, w.bytes());
+  TEST_ASSERT_TRUE(isOk(r));
+  TEST_ASSERT_EQUAL_STRING("00000000" "0020", toHex(r.data() + 3, 6).c_str());  // offset 0, window 8192
+  f.send(img, 0, img.size());
+  r = c.op(0x31);
+  TEST_ASSERT_TRUE(isOk(r));
+  TEST_ASSERT_EQUAL_STRING("f401", toHex(r.data() + 3, 2).c_str());  // 500 ms
+  TEST_ASSERT_TRUE(f.flash.activated);
+
+  Writer bad;
+  bad.u32(static_cast<uint32_t>(img.size())).raw(h).raw(Bytes(64, 0x11));
+  r = c.op(0x30, bad.bytes());
+  TEST_ASSERT_EQUAL_UINT8(10, errCode(r));  // bad_image
+  TEST_ASSERT_EQUAL_UINT8(7, r[3]);         // signature invalid
+  TEST_ASSERT_TRUE(isOk(c.op(0x32)));
+}
+
+void test_device_info_trailing_fields() {
+  DeviceInfo d;
+  TEST_ASSERT_TRUE(parseDeviceId("A1B2C3", d.id));
+  d.fw = "1.2.0";
+  d.name = "x";
+  Bytes plain = encodeDeviceInfo(d);
+  d.update = true;
+  d.caps = kCapFirmwareUpdate;
+  d.chip = kChipEsp32C3;
+  d.slot = 0x1D0000;
+  Bytes ext = encodeDeviceInfo(d);
+  TEST_ASSERT_EQUAL(static_cast<int>(plain.size() + 6), static_cast<int>(ext.size()));
+  TEST_ASSERT_EQUAL_STRING("010200001d00", toHex(ext.data() + plain.size(), 6).c_str());
+}
+
 // ---------------------------------------------------------------------------
 
 void setUp() {}
@@ -1320,5 +1745,22 @@ int main(int, char**) {
   RUN_TEST(test_zcam_retries_start_and_stop_once_and_reports_not_ready_without_a_link);
   RUN_TEST(test_zcam_replies_are_parsed);
   RUN_TEST(test_next_event_picks_the_earliest_across_attempts);
+  RUN_TEST(test_fw_a_whole_image_transfers_verifies_and_activates);
+  RUN_TEST(test_fw_progress_is_reported_every_quarter_window);
+  RUN_TEST(test_fw_a_gap_asks_the_phone_to_rewind_and_a_repeat_is_ignored);
+  RUN_TEST(test_fw_small_writes_that_split_the_header_are_handled);
+  RUN_TEST(test_fw_the_same_image_resumes_and_a_different_one_restarts);
+  RUN_TEST(test_fw_a_transfer_with_no_data_for_two_minutes_is_dropped);
+  RUN_TEST(test_fw_begin_needs_an_idle_device_with_no_event_in_fifteen_minutes);
+  RUN_TEST(test_fw_a_transfer_is_dropped_when_an_event_gets_close);
+  RUN_TEST(test_fw_size_limits);
+  RUN_TEST(test_fw_signatures);
+  RUN_TEST(test_fw_the_first_bytes_are_checked_as_they_arrive);
+  RUN_TEST(test_fw_end_checks_the_length_the_hash_and_the_image);
+  RUN_TEST(test_fw_flash_errors_and_extra_bytes_fail_the_transfer);
+  RUN_TEST(test_fw_abort_discards_the_transfer);
+  RUN_TEST(test_fw_ops_need_auth_and_are_unsupported_without_an_updater);
+  RUN_TEST(test_fw_through_the_dispatcher);
+  RUN_TEST(test_device_info_trailing_fields);
   return UNITY_END();
 }

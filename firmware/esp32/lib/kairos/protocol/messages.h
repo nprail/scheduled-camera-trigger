@@ -23,6 +23,9 @@ struct Request {
   uint32_t after = 0;
   uint8_t limit = 0;
   bool enabled = false;
+  uint32_t fwSize = 0;
+  uint8_t fwSha[32] = {0};
+  uint8_t fwSig[64] = {0};
 };
 
 /// Decode a request message. Returns false if it is too short or its body is malformed; `id` is the id
@@ -50,6 +53,7 @@ struct ErrorDetail {
   uint8_t index = 0;
   Reason reason = Reason::None;
   std::string message;              // internal
+  BadImage badImage = BadImage::None;  // bad_image
 };
 
 Bytes encodeEmptyResponse(uint8_t id);
@@ -62,12 +66,15 @@ Bytes encodeConfigSetResponse(uint8_t id, uint32_t configRev);
 Bytes encodeJobsResponse(uint8_t id, const std::vector<JobState>& states);
 Bytes encodeCameraResponse(uint8_t id, bool recording);
 Bytes encodeLogsGetResponse(uint8_t id, uint32_t last, bool more, const std::vector<LogLine>& lines);
+Bytes encodeFwBeginResponse(uint8_t id, uint32_t offset, uint16_t window);
+Bytes encodeFwEndResponse(uint8_t id, uint16_t rebootInMs);
 Bytes encodeError(uint8_t id, Err code, const ErrorDetail& detail = ErrorDetail());
 
 Bytes encodeJobEvent(uint8_t attempt, JobStep step, uint32_t atSec);
 Bytes encodeConfigEvent(uint32_t configRev);
 Bytes encodeTestEvent(TestStep step, bool ok, const std::string& error);
 Bytes encodeLogEvent(const LogLine& line);
+Bytes encodeFwEvent(FwState state, uint32_t offset, BadImage reason);
 
 struct StatusValue {
   uint8_t flags = 0;
@@ -88,6 +95,11 @@ struct DeviceInfo {
   uint8_t cams = kCamGeneric | kCamZcam;
   std::string fw;
   std::string name;
+  // optional trailing fields: firmware update support (written only when `update` is set)
+  bool update = false;
+  uint8_t caps = 0;
+  uint8_t chip = 0;
+  uint32_t slot = 0;
 };
 Bytes encodeDeviceInfo(const DeviceInfo& d);
 

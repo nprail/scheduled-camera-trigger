@@ -1,5 +1,6 @@
 // Constants of protocol v2 (docs/ble-protocol.md). Pure C++.
 #pragma once
+#include <cstddef>
 #include <cstdint>
 
 namespace kairos {
@@ -20,6 +21,12 @@ constexpr const char* kUuidDeviceInfo = "6b610002-6169-4f72-8f73-b3e1c5a97d24";
 constexpr const char* kUuidStatus = "6b610003-6169-4f72-8f73-b3e1c5a97d24";
 constexpr const char* kUuidCommand = "6b610004-6169-4f72-8f73-b3e1c5a97d24";
 constexpr const char* kUuidResponse = "6b610005-6169-4f72-8f73-b3e1c5a97d24";
+constexpr const char* kUuidFirmware = "6b610006-6169-4f72-8f73-b3e1c5a97d24";
+
+/// Device Info `caps` bits and `chip` values.
+constexpr uint8_t kCapFirmwareUpdate = 1 << 0;
+constexpr uint8_t kChipEsp32S3 = 1;
+constexpr uint8_t kChipEsp32C3 = 2;
 
 enum class Op : uint8_t {
   Unknown = 0,
@@ -38,9 +45,12 @@ enum class Op : uint8_t {
   TestRun = 0x14,
   LogsGet = 0x20,
   LogsSubscribe = 0x21,
+  FwBegin = 0x30,
+  FwEnd = 0x31,
+  FwAbort = 0x32,
 };
 
-enum class Event : uint8_t { Job = 0x01, Config = 0x02, Test = 0x03, Log = 0x04 };
+enum class Event : uint8_t { Job = 0x01, Config = 0x02, Test = 0x03, Log = 0x04, Fw = 0x05 };
 
 enum class Err : uint8_t {
   BadRequest = 1,
@@ -52,7 +62,15 @@ enum class Err : uint8_t {
   TooLarge = 7,
   PairingClosed = 8,
   Internal = 9,
+  BadImage = 10,
 };
+
+/// bad_image reasons.
+enum class BadImage : uint8_t {
+  None = 0, Size = 1, Header = 2, Chip = 3, Hash = 4, Write = 5, SignatureMissing = 6, SignatureInvalid = 7, Incomplete = 8, Interrupted = 9,
+};
+
+enum class FwState : uint8_t { Receiving = 0, Verifying = 1, Ready = 2, Failed = 3 };
 
 /// invalid_config fields (0 = unspecified).
 enum class Field : uint8_t {

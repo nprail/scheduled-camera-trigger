@@ -151,6 +151,30 @@ Reply Dispatcher::handle(Session& s, const Request& q) {
       }
       return out;
 
+    case Op::FwBegin:
+    case Op::FwEnd:
+    case Op::FwAbort: {
+      if (!fw_) return fail(Err::NotSupported);
+      const uint64_t now = fwClock_ ? fwClock_() : api_.nowMs();
+      FwResult r;
+      if (q.op == Op::FwBegin) {
+        r = fw_->begin(q.fwSize, q.fwSha, q.fwSig, now);
+      } else if (q.op == Op::FwEnd) {
+        r = fw_->end(now);
+      } else {
+        fw_->abort();
+        out.message = encodeEmptyResponse(id);
+        return out;
+      }
+      if (!r.ok) {
+        ErrorDetail d;
+        d.badImage = r.reason;
+        return fail(r.err, d);
+      }
+      out.message = q.op == Op::FwBegin ? encodeFwBeginResponse(id, r.offset, r.value) : encodeFwEndResponse(id, r.value);
+      return out;
+    }
+
     default:
       return fail(Err::NotSupported);
   }

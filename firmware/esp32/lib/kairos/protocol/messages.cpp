@@ -64,6 +64,14 @@ bool decodeRequest(const Bytes& msg, Request& out, uint8_t& id) {
       q.enabled = r.u8() != 0;
       q.after = r.u32();
       break;
+    case 0x30:
+      q.op = Op::FwBegin;
+      q.fwSize = r.u32();
+      r.raw(q.fwSha, 32);
+      r.raw(q.fwSig, 64);
+      break;
+    case 0x31: q.op = Op::FwEnd; break;
+    case 0x32: q.op = Op::FwAbort; break;
     default: break;
   }
   if (!r.ok()) return false;
@@ -129,6 +137,18 @@ Bytes encodeLogsGetResponse(uint8_t id, uint32_t last, bool more, const std::vec
   return w.take();
 }
 
+Bytes encodeFwBeginResponse(uint8_t id, uint32_t offset, uint16_t window) {
+  Writer w = response(id);
+  w.u32(offset).u16(window);
+  return w.take();
+}
+
+Bytes encodeFwEndResponse(uint8_t id, uint16_t rebootInMs) {
+  Writer w = response(id);
+  w.u16(rebootInMs);
+  return w.take();
+}
+
 Bytes encodeError(uint8_t id, Err code, const ErrorDetail& d) {
   Writer w;
   w.u8(kResponse).u8(id).u8(static_cast<uint8_t>(code));
@@ -138,6 +158,8 @@ Bytes encodeError(uint8_t id, Err code, const ErrorDetail& d) {
     w.u8(static_cast<uint8_t>(d.field)).u8(d.index).u8(static_cast<uint8_t>(d.reason));
   } else if (code == Err::Internal && !d.message.empty()) {
     w.str(truncateUtf8(d.message, 120), 120);
+  } else if (code == Err::BadImage) {
+    w.u8(static_cast<uint8_t>(d.badImage));
   }
   return w.take();
 }
@@ -167,6 +189,12 @@ Bytes encodeLogEvent(const LogLine& line) {
   return w.take();
 }
 
+Bytes encodeFwEvent(FwState state, uint32_t offset, BadImage reason) {
+  Writer w;
+  w.u8(kEvent).u8(static_cast<uint8_t>(Event::Fw)).u8(static_cast<uint8_t>(state)).u32(offset).u8(static_cast<uint8_t>(reason));
+  return w.take();
+}
+
 Bytes encodeStatus(const StatusValue& s) {
   Writer w;
   w.u8(s.flags).u8(static_cast<uint8_t>(s.phase)).u32(s.configRev).u32(s.nextEventAt).u8(static_cast<uint8_t>(s.nextEventType));
@@ -177,6 +205,7 @@ Bytes encodeStatus(const StatusValue& s) {
 Bytes encodeDeviceInfo(const DeviceInfo& d) {
   Writer w;
   w.u8(d.v).raw(d.id, 3).u8(static_cast<uint8_t>(d.cam)).u8(d.cams).str(d.fw, 255).str(d.name, kMaxName);
+  if (d.update) w.u8(d.caps).u8(d.chip).u32(d.slot);
   return w.take();
 }
 

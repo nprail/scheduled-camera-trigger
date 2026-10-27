@@ -12,6 +12,8 @@
 #include "protocol/protocol.h"
 #include "protocol/sha256.h"
 
+#include "update/updater.h"
+
 #include "config/config.h"
 
 #include "scheduler/camera.h"

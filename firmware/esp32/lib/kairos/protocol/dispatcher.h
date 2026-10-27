@@ -4,6 +4,7 @@
 
 #include "auth.h"
 #include "device_api.h"
+#include "../update/updater.h"
 #include "messages.h"
 
 namespace kairos {
@@ -33,11 +34,19 @@ class Dispatcher {
   Reply handle(Session& session, const Request& req);
   Lockout& lockout() { return lockout_; }
 
+  /// Enable the fw.* ops. `monotonicMs` is a clock that never steps (the transfer timeouts use it).
+  void setFirmware(Updater* updater, std::function<uint64_t()> monotonicMs) {
+    fw_ = updater;
+    fwClock_ = std::move(monotonicMs);
+  }
+
  private:
   Bytes error(uint8_t id, Err code, ErrorDetail detail = ErrorDetail());
   DeviceApi& api_;
   Random& random_;
   Lockout lockout_;
+  Updater* fw_ = nullptr;
+  std::function<uint64_t()> fwClock_;
 };
 
 }  // namespace kairos
