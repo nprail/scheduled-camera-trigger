@@ -30,7 +30,7 @@ The device is configured and controlled over Bluetooth Low Energy: set the clock
 
 ## Using the apps
 
-Both apps find and connect to devices, pair with the button, show live status with a countdown to the next event, edit the schedule and camera settings, run a test, manually wake, start, stop and sleep the camera, and show the device log live.
+Both apps find and connect to devices, pair with the button, show live status with a countdown to the next event, edit the schedule and camera settings, run a test, manually wake, start, stop and sleep the camera, show the device log live, and [update the device's firmware](updating-firmware.md) over Bluetooth when you choose to.
 
 - **iPhone:** [apps/ios/README.md](https://github.com/nprail/kairos/blob/main/apps/ios/README.md)
 - **Android:** [apps/android/README.md](https://github.com/nprail/kairos/blob/main/apps/android/README.md)

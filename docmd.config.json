@@ -66,6 +66,10 @@
         {
           "title": "Configuration",
           "path": "/configuration/"
+        },
+        {
+          "title": "Updating the firmware",
+          "path": "/updating-firmware/"
         }
       ]
     },
@@ -81,6 +85,10 @@
         {
           "title": "ESP32 firmware",
           "path": "/esp32-port/"
+        },
+        {
+          "title": "Firmware update design",
+          "path": "/ota-plan/"
         },
         {
           "title": "Development",

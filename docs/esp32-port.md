@@ -25,7 +25,7 @@ The boot-time and power wins matter in the field: the device can be cold-powered
 **In:** the ESP32 firmware, the v2 binary protocol, the matching iOS and Android changes, and **updating the Node device code to v2**. Node stays the working device until the ESP32 reaches parity, so the apps can be developed and tested against real hardware. Node is then retired.
 
 **Out:**
-- Wi-Fi, an HTTP server, and OTA in v1. Updates are over USB, but the flash layout reserves two app slots so BLE OTA can be added later without repartitioning (§8, §14).
+- Wi-Fi and an HTTP server. (Updates over Bluetooth were added after v1: see §14 and [Updating the firmware](updating-firmware.md).)
 - Persisting schedule state across resets. After a reboot any attempt whose wake time has passed is `missed`, exactly as on the Pi.
 - A persistent log. The log is a RAM ring, as on the Pi's in-memory buffer.
 
@@ -385,17 +385,19 @@ An ESP32 reboots in ways a Linux box rarely does, so plan for it:
   - Use plain `upload`. It writes the bootloader, partition table and app, and leaves NVS alone.
   - Don't run `erase` (or any "erase all flash" option) unless you mean a factory reset.
   - Don't change the `nvs` partition (§8).
-- **Updates in v1:** reflash over USB.
+- **Updates:** over USB, or over Bluetooth from the app (below). The first firmware with Bluetooth updates has to go on over USB.
 - **CI:** one ESP32 job in the existing workflow: `pio test -e native`, then `pio run -e device` to prove it builds. Separate from the iOS and Android jobs.
 
-### BLE OTA (future, not in v1)
+### BLE OTA (implemented)
 
-Nothing in the port blocks it, and §8 reserves the flash. The transport is the same NimBLE stack. On Arduino the write path is `Update` (a wrapper around `esp_ota_ops`), or `esp_ota_ops` directly where you need rollback.
+Updates over Bluetooth use the two app slots that §8 reserved. The user guide is [Updating the firmware](updating-firmware.md), the design and its reasons are in [the update plan](ota-plan.md), and the wire format is `fw.*` in [the protocol](ble-protocol.md).
 
-- **Protocol:** a firmware image of 1 MB or more doesn't suit a 2 KB message and the one-request-in-flight rule. Add a bulk write-without-response characteristic, or ops such as `fw.begin` / `fw.chunk` / `fw.end` with chunk acknowledgements, resume and a SHA-256 check. Authenticated only, and refused unless the device is idle. This is an additive change to v2.
-- **Apps:** both need a firmware picker and a progress screen.
-- **Device:** write to the inactive slot, verify the hash, switch slots, and **roll back automatically if the new image doesn't confirm itself** (`esp_ota_mark_app_valid_cancel_rollback()`). Rollback depends on the core's bootloader supporting it (§4). Confirm that before promising OTA to anyone, because an unreachable field unit that gets a bad image is the worst case.
-- **Speed:** with a 247–517 byte MTU expect roughly 5–20 KB/s, so a 1.5 MB image takes a few minutes.
+- **Receiving:** a fifth characteristic takes the image as `[offset][bytes]` writes without response. `lib/kairos/update/updater.cpp` (pure C++, tested on the host) keeps the SHA-256, checks the first 64 bytes as they arrive (image magic, chip id, application descriptor), asks the phone to rewind on a gap, and resumes a transfer for 2 minutes. `src/platform/ota_flash.cpp` writes to the idle slot with `esp_ota_ops`.
+- **Safe to start:** only an authenticated phone, only when the device is idle with no event in the next 15 minutes, and a running transfer is dropped if an event gets within 2 minutes.
+- **Signed:** `fw.begin` carries an ECDSA P-256 signature over the image's SHA-256, checked with mbedTLS against the keys in `src/platform/signing_keys.h` before any data is accepted. The `device-dev` environments accept unsigned images (developer builds, flagged in the log at boot).
+- **Rollback:** the prebuilt Arduino core's bootloader supports it (`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` and `CONFIG_APP_ROLLBACK_ENABLE` are set in the S3 and C3 libraries). The firmware overrides `verifyRollbackLater()` so the core leaves a new image pending, and confirms it with `esp_ota_mark_app_valid_cancel_rollback()` once it has run for 30 seconds and a phone has authenticated over Bluetooth with it (so an image whose radio is broken is never kept). A reset before then, a power cycle included, returns to the old image. Tried on an ESP32-C3: an image that aborts 4 s after boot, and an image that never advertises, both went back to the previous firmware.
+- **Version in the file:** every image holds a small `KAIROSFW` tag with its version and chip (`src/platform/fw_tag.cpp`), so the apps can show it before installing.
+- **Speed:** with a 247-byte MTU and a short connection interval expect roughly 10 to 30 KB/s: a minute or two for the 1.1 to 1.2 MB image. Measure it on hardware.
 - A slot swap leaves NVS alone, so pairing, bonds and the schedule survive an update.
 
 ## 15. Testing

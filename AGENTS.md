@@ -19,7 +19,7 @@ The iOS app is a standard Xcode project (`apps/ios/Kairos.xcodeproj`), with no p
 
 The Android app is a Gradle project (`apps/android/`, wrapper included, JDK 17+). Run its unit tests with `cd apps/android && ./gradlew :app:testDebugUnitTest`, and build the debug APK with `./gradlew :app:assembleDebug`.
 
-The ESP32 firmware is a PlatformIO project (`firmware/esp32/`). Run its host tests with `cd firmware/esp32 && pio test -e native`, and build it with `pio run -e device` (ESP32-S3) or `pio run -e device-c3` (ESP32-C3). The tests for the legacy Node device are `cd firmware/legacy-pi && npm test`.
+The ESP32 firmware is a PlatformIO project (`firmware/esp32/`). Run its host tests with `cd firmware/esp32 && pio test -e native`, and build it with `pio run -e device` (ESP32-S3) or `pio run -e device-c3` (ESP32-C3). Firmware updates over Bluetooth are signed: the signing tool's tests are `python3 -m unittest discover -s firmware/esp32/tools` (needs `pip install cryptography`), and `pio run -e device-dev` builds the developer firmware that accepts unsigned updates. The tests for the legacy Node device are `cd firmware/legacy-pi && npm test`.
 
 ## Keep iOS and Android in sync
 
@@ -49,6 +49,7 @@ Main jobs:
 5. Edit the schedule, timing and camera settings.
 6. Manually test, wake, start, stop and sleep the camera.
 7. Show the device log live.
+8. Update the device's firmware over Bluetooth, when the user chooses to (section 6.8).
 
 ## 2. Architecture (mirror this split)
 
@@ -70,13 +71,14 @@ On Android, use the same split: a protocol module, a `ViewModel` (or equivalent)
 
 Read `docs/ble-protocol.md` for the full detail. What the app depends on:
 
-- One GATT service (`6b610001-6169-4f72-8f73-b3e1c5a97d24`) with four characteristics: Device Info (read, binary), Status (read and notify, a fixed 13-byte value), Command (write), Response (notify).
+- One GATT service (`6b610001-6169-4f72-8f73-b3e1c5a97d24`) with four characteristics: Device Info (read, binary), Status (read and notify, a fixed 13-byte value), Command (write), Response (notify). A device that can be updated has a fifth, Firmware (`6b610006-…`, write without response), for the image bytes.
 - Messages are a compact **binary** format (little-endian): a request is `[op][id][body]`, a response `[0x80][id][status][body]`, an event `[0x81][event][body]`. Each message is split into fragments to fit the ATT write size. Responses and unsolicited events arrive on Response and are reassembled. **One request is in flight at a time; extra callers wait their turn.** Each request has a timeout (10 s by default, 20 s for camera actions); a timeout fails the request.
 - The Status value is parsed directly from bytes: flags (recording, camera ready, pairing open, clock valid), phase (idle, awake, recording, test, error), config revision, next event time (Unix seconds, 0 for none), next event type (none, wake, start, stop), attempts remaining, and the index of the attempt that owns the next event. It carries everything the screens show, so there is no separate status request.
 - Attempt times are Unix **seconds**; the clock operations use Unix **milliseconds**. Strings are length-prefixed, with names limited to 32 **bytes** of UTF-8. The config is one fixed binary layout (at most about 1.2 KB), the same bytes the device stores.
-- Events pushed by the device: `job`, `config`, `test`, `log`.
-- Operations used: `hello`, `auth`, `auth.pair`, `config.get`, `config.set`, `jobs.get` (the state of each attempt, in config order; the app computes the times itself), `camera.wake|start|stop|sleep`, `test.run`, `logs.get` (paged), `logs.subscribe`, `time.get`, `time.set`.
+- Events pushed by the device: `job`, `config`, `test`, `log`, and `fw` (firmware transfer progress; the client keeps it on its own channel, because the uploader waits for it).
+- Operations used: `hello`, `auth`, `auth.pair`, `config.get`, `config.set`, `jobs.get` (the state of each attempt, in config order; the app computes the times itself), `camera.wake|start|stop|sleep`, `test.run`, `logs.get` (paged), `logs.subscribe`, `time.get`, `time.set`, and for firmware updates `fw.begin`, `fw.end`, `fw.abort`.
 - Errors are codes with structured detail (`invalid_config` carries a field, an attempt index and a reason). The device sends no message text, so the app builds it (section 9).
+- Device Info has three optional trailing fields: `caps` (bit0 = can be updated over Bluetooth), `chip` (1 ESP32-S3, 2 ESP32-C3) and `slot` (the largest image, in bytes). A device without them (the legacy Pi, older firmware) is simply not updatable: the Firmware row is hidden.
 - Only protocol version **2** is supported. A different version in Device Info or `hello` is an error ("unsupported"), with a message telling the user to update the app.
 
 **Test vectors:** `protocol/test-vectors.json` covers framing, HMAC proofs, Status, Device Info, the config layout, every message and every error. The Android protocol module must pass the same vectors (see `apps/ios/KairosKit/Tests/` for how the iOS tests use them).
@@ -176,6 +178,7 @@ Title: the device name (or "Kairos" if empty). Toolbar: **Disconnect**. Sections
 
 **Device**
 - **Logs** link.
+- **Firmware** link, only when the device can be updated (Device Info `canUpdate`: `caps` bit0, a known `chip` and a `slot`). When the last check found a newer release, a small outlined tag "Update X" sits on the row. That is all an update ever does unasked (section 6.8).
 - **Clock**: shows "Not checked", "Set from this phone (was N ms off)" or "In sync (N ms)", with a **Sync now** button (disabled unless idle). Sync now forces a set (threshold 0).
 - Read-only rows: ID, Camera (type), Software (firmware version).
 - **Forget pairing** (destructive), which asks for confirmation: "Forget this device?" with "To pair again, press the button on the device."
@@ -216,6 +219,31 @@ Log loading: after becoming ready, page through `logs.get` (100 per page, up to 
 
 A dismissible banner at the top of every screen, with a warning icon and the message, in `ink` with `ground` text (an inverse surface, with no shadow). Used for connection failures, a lost connection, camera-action errors and test failures. Cleared when a new connection starts.
 
+### 6.8 Firmware screen
+
+Opened from the **Firmware** link. **An update is always the user's choice**: the app never installs on its own, never blocks a device for being out of date, and shows no dialog, notification or banner about a new release.
+
+**This device:** version (Device Info `fw`) and chip.
+
+**Updates** (while idle):
+- If the last check found a release that is newer and installable: "Version X is available" with its notes. A **Download** button fetches the image (or takes it from the cache); the downloaded image is then shown with its file name, size, "signed" or "unsigned" and the start of its SHA-256, and **Install…** and **Remove**.
+- **Check for updates** always asks GitHub (ignoring the 10-minute window below) and shows the result as text: "Version X is available.", "Up to date (X).", "This device runs a newer version (X) than the latest release (Y).", "This device runs a development build (X), so it can't be compared with the latest release (Y).", "Version Y needs a newer version of this app. Update the app first.", "Version Y can't be installed over Bluetooth on this device. It needs a USB flash.", "The latest release has no firmware for this device (ESP32-S3).", "The release information from GitHub could not be read.", or the network error ("Could not reach GitHub to look for updates. Check the phone's internet connection.").
+- Footer: "Updates are always your choice. The device keeps its pairing and schedule."
+
+**From a file:** **Choose a file…** opens the system picker, which takes the firmware and optionally its signature (multi-select; a file ending in `.sig`, or of at most 200 bytes, is the signature). It is checked on the phone before anything is sent: an ESP image for this chip with an application descriptor (`FirmwareImage.check`; the factory image is refused with "That's a factory image. Use the file ending in -app.bin to update a device."), at most `slot` bytes. A file with no signature shows "No signature. A normal device refuses unsigned firmware; developer builds accept it." and an **Add signature file…** action.
+
+**Advanced** (collapsed): **Check for updates when connecting** (on by default), **Include pre-releases**, and **Choose a version…**, a list of GitHub releases; picking one checks it against the device as above and downloads it.
+
+**Install…** asks for confirmation: "Install {title}?" and "The device will restart. Keep the app open until it finishes." An older version adds "This is older than the version on the device." first; a file adds "This file didn't come from a Kairos release download." first. It is disabled, with the reason, unless the phase is idle and the next event is at least 15 minutes away ("The device must be idle to take an update.", "An event is scheduled within 15 minutes. Try again after it.").
+
+**Progress:** Downloading…, Sending… (a bar and a percentage, with **Cancel**), Restarting the device…, Reconnecting… ("Keep this screen open. The device restarts when it's done."). Back is unavailable while busy, and the screen stays on during a transfer. Results: "Updated to X." ("Pairing and the schedule are unchanged."), "The update was rolled back." ("The device restarted on its previous firmware (X). Its log may say why."), or "The update didn't finish." with the error text. Each has **Done**.
+
+**Flow** (`FirmwareUploader`): `fw.begin` (with the 64-byte signature, or zeros), the bytes as `[offset u32][bytes]` writes on the Firmware characteristic within the device's `window`, then `fw.end`. The device's `fw` events say how far it has got; an event that does not move while writes are outstanding means a write was lost, and the uploader sends again from the device's offset. With no event for 3 s it sends the unconfirmed part again, and after 4 such stalls fails with the timeout error. Cancelling sends `fw.abort`. A drop mid-transfer leaves the partial image on the device for 2 minutes: the banner says "The connection was lost during the update. The device keeps what it received for 2 minutes: connect again and install the same firmware to continue."
+
+**After `fw.end`** the device restarts and the link drops. That is expected, not "connection lost": the app stays on the screen showing Reconnecting…, scans for the same device ID (up to 60 s; otherwise it goes back to the scan screen with "The device didn't come back after the update. Check it, then connect again."), connects, authenticates, reads Device Info and runs the normal ready sequence. If the version now equals the expected one (the image's tag; for a file with no tag, any change from the old one) it is "Updated"; otherwise "rolled back".
+
+**Looking for a release** (`UpdateService`): the newest stable release's `manifest.json` from `https://github.com/nprail/kairos/releases/latest/download/manifest.json` (no API, no identifying data sent), kept with its ETag. **When the device becomes ready**, the app checks in the background if Check on connect is on, at most once every 10 minutes (only a successful check starts the window; inside it, the saved copy answers with no network), with no error shown and no wait. A newer, installable release only sets the "Update X" tag. A downloaded image is verified against the manifest's size and SHA-256, kept in the phone's cache (not backed up; the newest two are kept), and nothing is sent to a device that does not match.
+
 ## 7. Live updates
 
 - **Status notifications** (up to once a second while recording) update the live Status values immediately (phase, flags, next event, next attempt, countdown). The only thing to fetch is the config, when the Status config revision differs from the one held locally; then also refresh jobs.
@@ -223,6 +251,7 @@ A dismissible banner at the top of every screen, with a warning icon and the mes
 - **`config` events:** re-fetch config and jobs.
 - **`test` events:** drive the Run test progress (section 6.4). A step named `done` ends the run.
 - **`log` events:** append to the log (section 6.6).
+- **`fw` events:** only the firmware uploader reads them (section 6.8).
 
 ## 8. Clock sync
 
@@ -251,13 +280,15 @@ Show `DeviceError` messages to the user as friendly text. Mappings in the iOS ap
 | `timeout` | "The device did not respond in time." |
 | `not_found` | "The device is no longer in range." |
 | `unsupported` | "This device uses protocol vN. Update the app." |
+| `bad_image` | By reason: "The firmware file is too small to be a Kairos update.", "That isn't a Kairos application update. Use the file ending in -app.bin, not -factory.bin.", "That firmware is for a different chip.", "The firmware didn't arrive intact. Try again.", "The device could not write the update. Try again.", "That firmware isn't signed, and this device only accepts firmware signed by Kairos.", "The firmware's signature isn't valid for this device.", "The device did not receive the whole update. Try again.", "The update stopped because the transfer stalled or a scheduled event came close." |
+| `update_blocked` (a `busy` from `fw.begin`) | "The device can't take an update now. It must be idle, with no scheduled event in the next 15 minutes." |
 | `internal` | The device's detail text, or "The device had an internal error." |
 
 The `invalid_config` field names are `name`, `cameraType`, `wakeUpTimeout`, `startBefore`, `endAfter`, `zcam.cameraIp`, `attempts`, `attempts[i].name` and `attempts[i].time`. The reasons read: "is required", "is out of range", "is not valid", "must be in the future", "duplicates another attempt", "is too soon: the camera wake-up time has already passed", and "has too many attempts (at most 30)".
 
 ## 10. Details worth matching exactly
 
-- **Busy gating differs by feature.** The iOS app treats the device as busy for *saving config* whenever the live phase is not idle (awake, recording, test and error all count). Manual camera buttons are enabled only when idle **or** recording. Run test and Sync now are enabled only when idle. Keep each rule as is.
+- **Busy gating differs by feature.** The iOS app treats the device as busy for *saving config* whenever the live phase is not idle (awake, recording, test and error all count). Manual camera buttons are enabled only when idle **or** recording. Run test and Sync now are enabled only when idle. Keep each rule as is. An update needs idle **and** no event within 15 minutes (section 6.8).
 - The countdown ticks locally every second from the next-event time; it does not wait for the device.
 - Devices are identified by the device ID in Device Info, not by the Bluetooth address (platforms differ: iOS gives a stable per-phone UUID, Android gives a MAC address).
 - One central, one device at a time. Don't keep the old device's data after disconnecting.
@@ -274,19 +305,19 @@ The `invalid_config` field names are `name`, `cameraType`, `wakeUpTimeout`, `sta
 
 ## 12. Debug demo mode
 
-Both apps have a debug-only demo mode that fills the app with fixture data and skips Bluetooth, so every screen can be checked without a device, in a simulator or emulator or on a phone. Both support the same scenes, which must be kept in step: `scan`, `scanning`, `off`, `unauthorized`, `unsupported`, `connecting`, `pairing`, `pairing-error`, `ready`, `generic`, `recording`, `banner`. The fixtures should match what a real device sends (for example job states `pending`, `active`, `complete`, `missed`).
+Both apps have a debug-only demo mode that fills the app with fixture data and skips Bluetooth, so every screen can be checked without a device, in a simulator or emulator or on a phone. Both support the same scenes, which must be kept in step: `scan`, `scanning`, `off`, `unauthorized`, `unsupported`, `connecting`, `pairing`, `pairing-error`, `ready`, `generic`, `recording`, `banner`, `firmware` (an update is available), `firmware-progress` (sending, 42%), `firmware-failed`. The fixtures should match what a real device sends (for example job states `pending`, `active`, `complete`, `missed`).
 
 - **In the app (both):** on the scan screen, tap a hidden spot 7 times to open a "Demo mode" menu listing the scenes, plus **Exit demo** while in demo mode. The spot is the Kairos lockup (mark and wordmark) on Android and the "Stay within a few metres…" hint under the device list on iOS (a SwiftUI large navigation title can't take taps). In a demo scene, **Disconnect**, **Cancel** or Back returns to the scan screen.
-- **iOS launch argument:** `-demo <scene>`. Code: `apps/ios/Kairos/DemoMode.swift`.
-- **Android intent extras:** `--es demo <scene>`, optionally `--es screen config` or `--es screen logs`, passed to `adb shell am start -n com.noahprail.kairos/.MainActivity`. Code: `apps/android/app/src/main/java/com/noahprail/kairos/DemoMode.kt`.
+- **iOS launch argument:** `-demo <scene>`, optionally `-screen config`, `-screen logs` or `-screen firmware` to open that screen. Code: `apps/ios/Kairos/DemoMode.swift`.
+- **Android intent extras:** `--es demo <scene>`, optionally `--es screen config`, `--es screen logs` or `--es screen firmware`, passed to `adb shell am start -n com.noahprail.kairos/.MainActivity`. Code: `apps/android/app/src/main/java/com/noahprail/kairos/DemoMode.kt`.
 
 Demo mode compiles into debug builds only.
 
 ## 13. Not in either app (don't assume it)
 
-- No background connection, no notifications, and no widgets.
+- No background connection, no notifications, and no widgets. (The one thing the app does without being asked is the update check when it connects, section 6.8: it runs while connected, makes one small request, and can be turned off.)
 - No multi-device management (one connection at a time, though several pairing keys can be stored).
-- No firmware update, and no editing of the device's Wi-Fi network credentials.
+- No automatic or scheduled firmware update (an update is always started by the user), and no editing of the device's Wi-Fi network credentials.
 - No automated UI tests; only the protocol library has unit tests.
 
 ## 14. Brand and look and feel

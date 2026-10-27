@@ -21,7 +21,8 @@
 | What | Command |
 | --- | --- |
 | ESP32 firmware logic (host tests, no hardware) | `cd firmware/esp32 && pio test -e native` |
-| ESP32 firmware build | `cd firmware/esp32 && pio run -e device` (S3) and `pio run -e device-c3` (C3) |
+| ESP32 firmware build | `cd firmware/esp32 && pio run -e device` (S3) and `pio run -e device-c3` (C3); `-e device-dev` is the developer build that accepts unsigned updates |
+| Firmware signing tool | `pip install cryptography && python3 -m unittest discover -s firmware/esp32/tools` |
 | iPhone app's protocol library | `cd apps/ios/KairosKit && swift test` |
 | Android app | `cd apps/android && ./gradlew :app:testDebugUnitTest` |
 | Legacy Raspberry Pi program (protocol, auth, scheduler, config; no hardware needed) | `cd firmware/legacy-pi && npm test` |
