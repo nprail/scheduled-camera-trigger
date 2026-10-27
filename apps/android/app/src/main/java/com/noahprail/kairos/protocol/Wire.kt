@@ -21,6 +21,9 @@ internal enum class Op(val code: Int) {
     TEST_RUN(0x14),
     LOGS_GET(0x20),
     LOGS_SUBSCRIBE(0x21),
+    FW_BEGIN(0x30),
+    FW_END(0x31),
+    FW_ABORT(0x32),
 }
 
 internal class ByteWriter {
@@ -186,11 +189,26 @@ internal object Wire {
                 }
             7 -> DeviceError("too_large", "The request is too large for the device.")
             8 -> DeviceError("pairing_closed", "Pairing is closed.")
+            10 -> DeviceError("bad_image", badImageText(if (r.remaining >= 1) r.u8() else 0))
             else -> {
                 val detail = if (r.remaining >= 1) r.string() else ""
                 DeviceError("internal", detail.ifEmpty { "The device had an internal error." })
             }
         }
+    }
+
+    /** The `bad_image` reasons (docs/ble-protocol.md, Errors). */
+    fun badImageText(id: Int): String = when (id) {
+        1 -> "The firmware file is too small to be a Kairos update."
+        2 -> "That isn't a Kairos application update. Use the file ending in -app.bin, not -factory.bin."
+        3 -> "That firmware is for a different chip."
+        4 -> "The firmware didn't arrive intact. Try again."
+        5 -> "The device could not write the update. Try again."
+        6 -> "That firmware isn't signed, and this device only accepts firmware signed by Kairos."
+        7 -> "The firmware's signature isn't valid for this device."
+        8 -> "The device did not receive the whole update. Try again."
+        9 -> "The update stopped because the transfer stalled or a scheduled event came close."
+        else -> "The device rejected the firmware."
     }
 
     /** The `invalid_config` field ids, as the names the editor uses. */
@@ -289,6 +307,32 @@ internal object Wire {
             0x04 -> logLine(r).let { if (r.ok) DeviceEvent.Log(it) else null }
             else -> null
         }
+    }
+
+    /** The `fw` event (0x05). It has its own channel: the uploader waits for it. */
+    fun firmwareEvent(body: ByteArray): FirmwareEvent? {
+        val r = ByteReader(body)
+        val state = r.u8()
+        val offset = r.u32().toInt()
+        val reason = if (r.remaining >= 1) r.u8() else 0
+        if (!r.ok) return null
+        val s = FirmwareEvent.State.entries.getOrNull(state) ?: return null
+        return FirmwareEvent(s, offset, reason)
+    }
+
+    fun firmwareBegin(body: ByteArray): Pair<Int, Int> {
+        val r = ByteReader(body)
+        val offset = r.u32().toInt()
+        val window = r.u16()
+        if (!r.ok) throw malformed
+        return offset to window
+    }
+
+    fun firmwareEnd(body: ByteArray): Int {
+        val r = ByteReader(body)
+        val ms = r.u16()
+        if (!r.ok) throw malformed
+        return ms
     }
 
     // endregion

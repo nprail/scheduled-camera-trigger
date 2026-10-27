@@ -54,14 +54,15 @@ class BleDeviceConnection(
     private var statusChar: BluetoothGattCharacteristic? = null
     private var commandChar: BluetoothGattCharacteristic? = null
     private var responseChar: BluetoothGattCharacteristic? = null
+    private var firmwareChar: BluetoothGattCharacteristic? = null // only devices that can be updated have it
 
     private val gate = Mutex()
     private var connectResult: CompletableDeferred<Unit>? = null
     private var step: CompletableDeferred<Int>? = null
     private var read: CompletableDeferred<Pair<Int, ByteArray>>? = null
 
-    /** Largest write that fits a single ATT packet (MTU - 3). */
-    override val maxWriteLength: Int get() = maxOf(mtu - 3, 20)
+    /** Largest write that fits a single ATT packet (MTU - 3), and no more than an attribute value may hold (512). */
+    override val maxWriteLength: Int get() = maxOf(minOf(mtu - 3, 512), 20)
 
     // region Setup
 
@@ -93,13 +94,49 @@ class BleDeviceConnection(
         statusChar = service.getCharacteristic(BleUuid.status)
         commandChar = service.getCharacteristic(BleUuid.command)
         responseChar = service.getCharacteristic(BleUuid.response)
+        firmwareChar = service.getCharacteristic(BleUuid.firmware)
         if (infoChar == null || statusChar == null || commandChar == null || responseChar == null) {
             throw DeviceError("not_found", "The device is missing expected characteristics.")
         }
 
         subscribe(responseChar!!)
         subscribe(statusChar!!)
+        // a firmware image is over a megabyte: ask for a short connection interval
+        if (firmwareChar != null) gatt?.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
         established = true
+    }
+
+    /**
+     * Android keeps the GATT table of a bonded device. A device whose firmware gained the Firmware characteristic
+     * (the first update-capable firmware, flashed over USB) looks like it lacks it. When Device Info says the
+     * device can be updated but the characteristic is missing, drop the cache (a hidden but long-standing call)
+     * and discover again.
+     */
+    suspend fun ensureFirmwareCharacteristic(info: DeviceInfo) {
+        if (!info.canUpdate || firmwareChar != null) return
+        val g = gatt ?: return
+        val refreshed = runCatching { g.javaClass.getMethod("refresh").invoke(g) as? Boolean }.getOrNull() == true
+        if (!refreshed) return
+        kotlinx.coroutines.delay(500) // the stack needs a moment to forget the old table
+        val discovered = runStep { discoverServices() }
+        if (discovered != BluetoothGatt.GATT_SUCCESS) return
+        val service = gatt?.getService(BleUuid.service) ?: return
+        infoChar = service.getCharacteristic(BleUuid.deviceInfo) ?: infoChar
+        statusChar = service.getCharacteristic(BleUuid.status) ?: statusChar
+        commandChar = service.getCharacteristic(BleUuid.command) ?: commandChar
+        responseChar = service.getCharacteristic(BleUuid.response) ?: responseChar
+        firmwareChar = service.getCharacteristic(BleUuid.firmware)
+        // the characteristic objects are new: turn notifications on for them again
+        responseChar?.let { subscribe(it) }
+        statusChar?.let { subscribe(it) }
+        if (firmwareChar != null) gatt?.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+    }
+
+    /** When Bluetooth is switched off, the stack's calls throw instead of calling back: that is a lost link. */
+    private inline fun <T> stackCall(block: () -> T): T = try {
+        block()
+    } catch (_: android.os.DeadObjectException) {
+        throw DeviceError.disconnected
     }
 
     private suspend fun runStep(start: BluetoothGatt.() -> Boolean): Int = gate.withLock {
@@ -107,7 +144,7 @@ class BleDeviceConnection(
         if (closed) throw DeviceError.disconnected
         val deferred = CompletableDeferred<Int>()
         step = deferred
-        if (!g.start()) {
+        if (!stackCall { g.start() }) {
             step = null
             throw DeviceError("gatt", "The Bluetooth stack rejected the request.")
         }
@@ -141,7 +178,7 @@ class BleDeviceConnection(
         if (characteristic == null || g == null || closed) throw DeviceError.disconnected
         val deferred = CompletableDeferred<Pair<Int, ByteArray>>()
         read = deferred
-        if (!g.readCharacteristic(characteristic)) {
+        if (!stackCall { g.readCharacteristic(characteristic) }) {
             read = null
             throw DeviceError("gatt", "The Bluetooth stack rejected the request.")
         }
@@ -183,6 +220,49 @@ class BleDeviceConnection(
             }
         }
         if (status != BluetoothGatt.GATT_SUCCESS) throw friendly(status)
+    }
+
+    override suspend fun writeFirmware(data: ByteArray) {
+        val characteristic = firmwareChar ?: throw DeviceError(
+            "stale_services",
+            "This phone remembers an older version of the device's Bluetooth services. Remove the device in the phone's Bluetooth settings, then connect again.",
+        )
+        // Each write waits for the stack to take it, which is the back-pressure. A write without response can be
+        // refused as "busy" for a moment after the previous callback, so a busy answer is retried shortly.
+        gate.withLock {
+            val g = gatt ?: throw DeviceError.disconnected
+            var busyRetries = 0
+            while (true) {
+                if (closed) throw DeviceError.disconnected
+                val deferred = CompletableDeferred<Int>()
+                step = deferred
+                val code = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    stackCall { g.writeCharacteristic(characteristic, data, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) }
+                } else {
+                    @Suppress("DEPRECATION")
+                    characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                    @Suppress("DEPRECATION")
+                    characteristic.value = data
+                    @Suppress("DEPRECATION")
+                    if (stackCall { g.writeCharacteristic(characteristic) }) BluetoothGatt.GATT_SUCCESS else ERROR_BUSY
+                }
+                if (code == BluetoothGatt.GATT_SUCCESS) {
+                    val status = deferred.await()
+                    if (status != BluetoothGatt.GATT_SUCCESS) throw friendly(status)
+                    return@withLock
+                }
+                step = null
+                if (code != ERROR_BUSY || ++busyRetries > 200) {
+                    throw DeviceError("gatt", "The Bluetooth stack rejected a firmware write (code $code).")
+                }
+                kotlinx.coroutines.delay(5)
+            }
+        }
+    }
+
+    private companion object {
+        /** BluetoothStatusCodes.ERROR_GATT_WRITE_REQUEST_BUSY */
+        const val ERROR_BUSY = 201
     }
 
     // endregion

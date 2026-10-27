@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.noahprail.kairos.AppModel
 import com.noahprail.kairos.Link
+import com.noahprail.kairos.firmwareBusy
 
 /** The root: picks a screen from the connection state and overlays the error banner. */
 @Composable
@@ -44,7 +45,11 @@ fun App(model: AppModel) {
     LaunchedEffect(model.link) {
         if (model.link != Link.Ready) route = "main"
     }
-    BackHandler(enabled = route != "main") { route = "main" }
+    // while an update is running, Back must not leave the screen that shows it
+    BackHandler(enabled = route != "main" && !(route == "firmware" && model.firmwareBusy)) { route = "main" }
+    BackHandler(enabled = route == "firmware" && model.firmwareBusy) { }
+    val view = androidx.compose.ui.platform.LocalView.current
+    LaunchedEffect(model.keepScreenOn) { view.keepScreenOn = model.keepScreenOn }
     // demo scenes have no device to disconnect from, so Back leaves them
     BackHandler(enabled = route == "main" && model.demo && model.link != Link.Disconnected) { model.disconnect() }
 
@@ -71,10 +76,12 @@ fun App(model: AppModel) {
                     Link.Ready -> when (currentRoute) {
                         "config" -> ConfigEditorScreen(model, onBack = { route = "main" })
                         "logs" -> LogsScreen(model, onBack = { route = "main" })
+                        "firmware" -> FirmwareScreen(model, onBack = { route = "main" })
                         else -> DeviceScreen(
                             model,
                             onEditConfig = { route = "config" },
                             onShowLogs = { route = "logs" },
+                            onShowFirmware = { route = "firmware" },
                         )
                     }
                 }

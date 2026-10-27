@@ -28,6 +28,11 @@ interface DeviceTransport {
 
     /** Fragments notified on the Response characteristic. Completes on disconnect. */
     val notifications: Flow<ByteArray>
+
+    /** Write one packet to the Firmware characteristic, without response. Returns when the link took it. */
+    suspend fun writeFirmware(data: ByteArray) {
+        throw DeviceError("not_supported", "The device does not support that.")
+    }
 }
 
 enum class CameraAction {
@@ -59,6 +64,11 @@ class DeviceClient(private val transport: DeviceTransport, scope: CoroutineScope
     private var inFlight: Int? = null
     private val mutex = Mutex()
     private val readJob: kotlinx.coroutines.Job
+    private val firmwareChannel = kotlinx.coroutines.channels.Channel<FirmwareEvent>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+
+    @Volatile
+    internal var isLinkClosed = false
+        private set
 
     var maxMessage = Framing.MAX_MESSAGE
         private set
@@ -95,7 +105,12 @@ class DeviceClient(private val transport: DeviceTransport, scope: CoroutineScope
 
     private fun dispatch(data: ByteArray) {
         when (val message = Wire.parse(data)) {
-            is Wire.Message.Event -> Wire.decodeEvent(message.code, message.body)?.let { eventFlow.tryEmit(it) }
+            is Wire.Message.Event ->
+                if (message.code == 0x05) {
+                    Wire.firmwareEvent(message.body)?.let { firmwareChannel.trySend(it) }
+                } else {
+                    Wire.decodeEvent(message.code, message.body)?.let { eventFlow.tryEmit(it) }
+                }
             is Wire.Message.Response ->
                 if (message.id == 0 && message.status != 0) {
                     // an error the device could not attribute to a request (id 0)
@@ -114,7 +129,20 @@ class DeviceClient(private val transport: DeviceTransport, scope: CoroutineScope
     }
 
     private fun linkClosed() {
+        isLinkClosed = true
         for (id in pending.keys.toList()) resolve(id, Result.failure(DeviceError.disconnected))
+        firmwareChannel.close()
+    }
+
+    /** The next `fw` event already received, if any. */
+    internal fun pollFirmwareEvent(): FirmwareEvent? = firmwareChannel.tryReceive().getOrNull()
+
+    /** Wait for the next `fw` event. Null on timeout or when the link closes. */
+    internal suspend fun awaitFirmwareEvent(timeoutMs: Long): FirmwareEvent? =
+        kotlinx.coroutines.withTimeoutOrNull(timeoutMs) { firmwareChannel.receiveCatching().getOrNull() }
+
+    internal fun dropFirmwareEvents() {
+        while (firmwareChannel.tryReceive().isSuccess) Unit
     }
 
     // endregion
@@ -221,6 +249,36 @@ class DeviceClient(private val transport: DeviceTransport, scope: CoroutineScope
     suspend fun subscribeLogs(enabled: Boolean, after: Int = 0) {
         call(Op.LOGS_SUBSCRIBE, ByteWriter().u8(if (enabled) 1 else 0).u32(maxOf(0, after).toLong()).toByteArray())
     }
+
+    // region Firmware update
+
+    /** Declare an image. Returns where to start sending (a resumed transfer starts past 0) and the window. */
+    internal suspend fun firmwareBegin(size: Int, sha256: ByteArray, signature: ByteArray): Pair<Int, Int> {
+        val body = ByteWriter().u32(size.toLong()).bytes(sha256)
+            .bytes(if (signature.size == 64) signature else ByteArray(64)) // all zeros means unsigned
+            .toByteArray()
+        try {
+            return Wire.firmwareBegin(call(Op.FW_BEGIN, body))
+        } catch (e: DeviceError) {
+            when (e.code) {
+                "busy" -> throw DeviceError(
+                    "update_blocked",
+                    "The device can't take an update now. It must be idle, with no scheduled event in the next 15 minutes.",
+                )
+                "too_large" -> throw DeviceError("too_large", "That firmware is too large for this device.")
+                else -> throw e
+            }
+        }
+    }
+
+    /** Finish the transfer. The device checks the image and restarts after the returned delay (milliseconds). */
+    internal suspend fun firmwareEnd(): Int = Wire.firmwareEnd(call(Op.FW_END, timeoutMs = 20_000))
+
+    internal suspend fun firmwareAbort() {
+        runCatching { call(Op.FW_ABORT) }
+    }
+
+    // endregion
 
     suspend fun deviceTime(): Instant = Instant.ofEpochMilli(Wire.timeGet(call(Op.TIME_GET)))
 

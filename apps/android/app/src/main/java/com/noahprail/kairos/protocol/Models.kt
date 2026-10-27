@@ -15,7 +15,16 @@ data class DeviceInfo(
     val fw: String,
     /** The camera types this device can drive. A device without the Ethernet module cannot drive a Z CAM. */
     val cams: List<String> = CameraConfig.cameraTypes,
+    /** Capability bits; bit0 is firmware update over Bluetooth. 0 when the device does not send them. */
+    val caps: Int = 0,
+    /** The chip, when the device says (an update needs it to pick the right image). */
+    val chip: Chip? = null,
+    /** The largest firmware image the device accepts, in bytes. 0 when not updatable. */
+    val slot: Int = 0,
 ) {
+    /** The device can be updated over Bluetooth and the app knows which image fits it. */
+    val canUpdate: Boolean get() = caps and 1 != 0 && chip != null && slot > 0
+
     companion object {
         fun parse(data: ByteArray): DeviceInfo? {
             val r = ByteReader(data)
@@ -26,8 +35,12 @@ data class DeviceInfo(
             val fw = r.string()
             val name = r.string()
             if (!r.ok) return null
+            // optional trailing fields, missing on devices that cannot be updated
+            val caps = if (r.remaining >= 1) r.u8() else 0
+            val chip = if (r.remaining >= 1) Chip.fromDeviceValue(r.u8()) else null
+            val slot = if (r.remaining >= 4) r.u32().toInt() else 0
             val cams = CameraConfig.cameraTypes.filterIndexed { i, _ -> mask and (1 shl i) != 0 }
-            return DeviceInfo(v, id, name, CameraConfig.cameraTypes.getOrElse(cam) { "generic" }, fw, cams)
+            return DeviceInfo(v, id, name, CameraConfig.cameraTypes.getOrElse(cam) { "generic" }, fw, cams, caps, chip, slot)
         }
     }
 }
@@ -174,6 +187,11 @@ data class JobEvent(
 )
 
 data class TestEvent(val step: String, val ok: Boolean, val error: String? = null)
+
+/** Progress of a firmware transfer, from the device (docs/ble-protocol.md, fw.*). */
+data class FirmwareEvent(val state: State, val offset: Int, val reason: Int = 0) {
+    enum class State { RECEIVING, VERIFYING, READY, FAILED }
+}
 
 sealed interface DeviceEvent {
     data class Job(val event: JobEvent) : DeviceEvent

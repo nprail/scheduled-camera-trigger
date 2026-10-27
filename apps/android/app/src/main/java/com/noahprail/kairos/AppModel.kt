@@ -1,6 +1,8 @@
 package com.noahprail.kairos
 
 import android.app.Application
+import com.noahprail.kairos.protocol.UpdateService
+import com.noahprail.kairos.protocol.FirmwareCache
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -55,6 +57,14 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     /** The Status revision of the config this model last fetched. */
     private var configRev: Long? = null
 
+    var firmware by mutableStateOf(FirmwareState())
+
+    /** Keep the screen on (set during a firmware transfer). */
+    var keepScreenOn by mutableStateOf(false)
+
+    /** Bumped when an update setting changes, so the screen reads the new value. */
+    internal var settingsVersion by mutableStateOf(0)
+
     var testSteps by mutableStateOf<List<String>>(emptyList())
     var testRunning by mutableStateOf(false)
     var working by mutableStateOf(false)
@@ -74,11 +84,20 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     // region Plumbing
 
     private val secrets = SecretStore(application)
-    private val central = BleCentral(application, viewModelScope)
-    private var connection: BleDeviceConnection? = null
-    private var client: DeviceClient? = null
-    private var currentId: String? = null
+    internal val central = BleCentral(application, viewModelScope)
+    internal var connection: BleDeviceConnection? = null
+    internal var client: DeviceClient? = null
+    internal var currentId: String? = null
     private val listeners = mutableListOf<kotlinx.coroutines.Job>()
+
+    // Firmware updates (AppModelFirmware.kt)
+    internal val updateStore = PrefsUpdateStore(application)
+    internal val updateService = UpdateService(store = updateStore)
+    internal val firmwareCache = FirmwareCache(java.io.File(application.cacheDir, "Firmware"))
+    internal var installJob: kotlinx.coroutines.Job? = null
+    internal var reconnectJob: kotlinx.coroutines.Job? = null
+    internal var installPhase = InstallPhase.NONE
+    internal var oldVersion: String? = null
 
     init {
         bluetooth = central.state.value
@@ -86,6 +105,8 @@ class AppModel(application: Application) : AndroidViewModel(application) {
             if (demo) return@onEach
             bluetooth = state
             if (state == BluetoothState.POWERED_ON && link == Link.Disconnected) central.startScan()
+            // switching Bluetooth off does not always call back for an open connection: treat it as a lost link
+            if (state != BluetoothState.POWERED_ON && link != Link.Disconnected) connectionLost()
         }.launchIn(viewModelScope)
         central.devices.onEach { if (!demo) devices = it }.launchIn(viewModelScope)
     }
@@ -149,6 +170,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
                     throw DeviceError("unsupported", "This device uses protocol v${info.v}. Update the app.")
                 }
                 this@AppModel.info = info
+                connection.ensureFirmwareCharacteristic(info)
 
                 val client = DeviceClient(connection, viewModelScope)
                 this@AppModel.client = client
@@ -212,7 +234,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         disconnect()
     }
 
-    private suspend fun becomeReady() {
+    internal suspend fun becomeReady() {
         val client = client ?: return
         val connection = connection ?: return
 
@@ -224,6 +246,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         jobs = client.jobs(fetched)
         link = Link.Ready
 
+        checkForUpdatesQuietly()
         loadLogs()
     }
 
@@ -245,7 +268,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
 
     // region Live updates
 
-    private fun listen(client: DeviceClient, connection: BleDeviceConnection) {
+    internal fun listen(client: DeviceClient, connection: BleDeviceConnection) {
         listeners.forEach { it.cancel() }
         listeners.clear()
         listeners += client.events.onEach { handle(it) }.launchIn(viewModelScope)
@@ -359,7 +382,12 @@ class AppModel(application: Application) : AndroidViewModel(application) {
 
     // region Errors and teardown
 
-    private fun fail(error: Throwable) {
+    internal fun stopListening() {
+        listeners.forEach { it.cancel() }
+        listeners.clear()
+    }
+
+    internal fun fail(error: Throwable) {
         val message = describe(error)
         connection?.close()
         teardown()
@@ -367,13 +395,29 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         central.startScan()
     }
 
-    private fun connectionLost() {
+    internal fun connectionLost() {
+        if (installPhase == InstallPhase.RESTARTING) {
+            reconnectAfterUpdate() // expected: the device restarts to run the new firmware
+            return
+        }
+        val duringUpdate = installPhase == InstallPhase.TRANSFERRING
         teardown()
-        banner = "The connection to the device was lost."
+        banner = if (duringUpdate) {
+            "The connection was lost during the update. The device keeps what it received for 2 minutes: connect again and install the same firmware to continue."
+        } else {
+            "The connection to the device was lost."
+        }
         central.startScan()
     }
 
     internal fun teardown() {
+        installJob?.cancel()
+        installJob = null
+        reconnectJob?.cancel()
+        reconnectJob = null
+        installPhase = InstallPhase.NONE
+        keepScreenOn = false
+        firmware = FirmwareState()
         listeners.forEach { it.cancel() }
         listeners.clear()
         client?.close()

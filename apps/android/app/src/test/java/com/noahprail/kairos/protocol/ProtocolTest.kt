@@ -137,7 +137,14 @@ class StatusTest {
         for (v in Vectors.load().list("deviceInfo")) {
             val e = v.obj("expected")
             val info = DeviceInfo.parse(v.hex("hex"))
-            assertEquals(DeviceInfo(e.int("v"), e.str("id"), e.str("name"), e.str("cam"), e.str("fw"), e["cams"]!!.jsonArray.map { it.jsonPrimitive.content }), info)
+            assertEquals(
+                DeviceInfo(
+                    e.int("v"), e.str("id"), e.str("name"), e.str("cam"), e.str("fw"), e["cams"]!!.jsonArray.map { it.jsonPrimitive.content },
+                    caps = e.int("caps"), chip = Chip.fromId(e.str("chip")), slot = e.int("slot"),
+                ),
+                info,
+            )
+            assertEquals(e.int("caps") and 1 != 0 && e.str("chip") != "none" && e.int("slot") > 0, info!!.canUpdate)
         }
         assertNull(DeviceInfo.parse(byteArrayOf(2, 1, 2)))
     }
@@ -187,6 +194,7 @@ class WireTest {
         Op.CONFIG_SET -> Wire.encodeConfig(configFrom(f.obj("config")))
         Op.LOGS_GET -> ByteWriter().u32(f.long("after")).u8(f.int("limit")).toByteArray()
         Op.LOGS_SUBSCRIBE -> ByteWriter().u8(if (f.bool("enabled")) 1 else 0).u32(f.long("after")).toByteArray()
+        Op.FW_BEGIN -> ByteWriter().u32(f.long("size")).bytes(f.hex("sha256Hex")).bytes(f.hex("sigHex")).toByteArray()
         else -> ByteArray(0)
     }
 
@@ -195,6 +203,7 @@ class WireTest {
         "time.set" to Op.TIME_SET, "config.get" to Op.CONFIG_GET, "config.set" to Op.CONFIG_SET, "jobs.get" to Op.JOBS_GET,
         "camera.wake" to Op.CAMERA_WAKE, "camera.start" to Op.CAMERA_START, "camera.stop" to Op.CAMERA_STOP,
         "camera.sleep" to Op.CAMERA_SLEEP, "test.run" to Op.TEST_RUN, "logs.get" to Op.LOGS_GET, "logs.subscribe" to Op.LOGS_SUBSCRIBE,
+        "fw.begin" to Op.FW_BEGIN, "fw.end" to Op.FW_END, "fw.abort" to Op.FW_ABORT,
     )
 
     @Test
@@ -237,6 +246,11 @@ class WireTest {
                     assertEquals(f.arr("lines").map { (it as kotlinx.serialization.json.JsonObject).str("msg") }, page.entries.map { it.msg })
                 }
                 "auth" -> assertEquals(f.str("proofHex"), m.body.hex())
+                "fw.begin" -> Wire.firmwareBegin(m.body).let {
+                    assertEquals(f.int("offset"), it.first)
+                    assertEquals(f.int("window"), it.second)
+                }
+                "fw.end" -> assertEquals(f.int("rebootInMs"), Wire.firmwareEnd(m.body))
                 else -> assertEquals(v.str("name"), 0, m.body.size)
             }
         }
@@ -247,6 +261,15 @@ class WireTest {
         for (v in Vectors.load().list("messages").filter { it.str("kind") == "event" }) {
             val f = v.obj("fields")
             val m = Wire.parse(v.hex("hex")) as Wire.Message.Event
+            if (v.str("ev") == "fw") {
+                assertEquals(0x05, m.code)
+                val e = Wire.firmwareEvent(m.body)!!
+                assertEquals(listOf("receiving", "verifying", "ready", "failed").indexOf(f.str("state")), e.state.ordinal)
+                assertEquals(f.int("offset"), e.offset)
+                assertEquals(f.int("reason"), e.reason)
+                assertNull(Wire.decodeEvent(m.code, m.body)) // it has its own channel
+                continue
+            }
             val event = Wire.decodeEvent(m.code, m.body)
             assertNotNull(v.str("name"), event)
             when (v.str("ev")) {
@@ -285,6 +308,7 @@ class WireTest {
                 assertEquals(Wire.reasonText(d.int("reason")), error.rawMessage)
             }
             if (v.str("code") == "internal") d.optStr("message")?.let { assertEquals(it, error.rawMessage) }
+            if (v.str("code") == "bad_image") assertEquals(v.str("name"), Wire.badImageText(d.int("reason")), error.rawMessage)
         }
     }
 

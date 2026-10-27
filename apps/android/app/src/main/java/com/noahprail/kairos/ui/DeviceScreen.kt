@@ -63,6 +63,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.noahprail.kairos.AppModel
+import com.noahprail.kairos.canUpdate
 import com.noahprail.kairos.protocol.CameraAction
 import com.noahprail.kairos.protocol.StatusValue
 import kotlinx.coroutines.delay
@@ -73,7 +74,7 @@ import kotlin.math.roundToInt
 private fun transparent() = ListItemDefaults.colors(containerColor = Color.Transparent)
 
 @Composable
-fun DeviceScreen(model: AppModel, onEditConfig: () -> Unit, onShowLogs: () -> Unit) {
+fun DeviceScreen(model: AppModel, onEditConfig: () -> Unit, onShowLogs: () -> Unit, onShowFirmware: () -> Unit) {
     var confirmForget by remember { mutableStateOf(false) }
     var confirmCamera by remember { mutableStateOf<CameraAction?>(null) }
 
@@ -115,6 +116,7 @@ fun DeviceScreen(model: AppModel, onEditConfig: () -> Unit, onShowLogs: () -> Un
                     model = model,
                     phase = phase,
                     onShowLogs = onShowLogs,
+                    onShowFirmware = onShowFirmware,
                     onForget = { confirmForget = true },
                 )
             }
@@ -315,7 +317,7 @@ private fun ScheduleSection(model: AppModel, onEdit: () -> Unit) {
 
 /** A small outlined tag. The state is always in the text; a filled dot marks an active attempt. */
 @Composable
-private fun StatePill(state: String) {
+internal fun StatePill(state: String) {
     Surface(
         color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -340,6 +342,7 @@ private fun DeviceSection(
     model: AppModel,
     phase: StatusValue.Phase,
     onShowLogs: () -> Unit,
+    onShowFirmware: () -> Unit,
     onForget: () -> Unit,
 ) {
     Section(title = "Device") {
@@ -349,6 +352,20 @@ private fun DeviceSection(
             trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null) },
             colors = transparent(),
         )
+        if (model.canUpdate) {
+            ListItem(
+                modifier = Modifier.clickable(onClick = onShowFirmware),
+                headlineContent = { Text("Firmware") },
+                trailingContent = {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // a quiet badge: an update is the user's choice, never a prompt
+                        model.firmware.offer?.let { StatePill("Update ${it.version}") }
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
+                    }
+                },
+                colors = transparent(),
+            )
+        }
         ListItem(
             headlineContent = { Text("Clock") },
             supportingContent = { Text(clockText(model)) },
@@ -373,7 +390,7 @@ private fun DeviceSection(
 }
 
 @Composable
-private fun InfoRow(label: String, value: String) {
+internal fun InfoRow(label: String, value: String) {
     ListItem(
         headlineContent = { Text(label) },
         trailingContent = { Text(value, style = BrandText.timecode.copy(fontSize = 13.sp), color = MaterialTheme.colorScheme.onSurfaceVariant) },

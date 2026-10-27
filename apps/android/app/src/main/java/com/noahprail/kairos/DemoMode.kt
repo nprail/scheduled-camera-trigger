@@ -3,6 +3,8 @@ package com.noahprail.kairos
 import com.noahprail.kairos.ble.BluetoothState
 import com.noahprail.kairos.ble.DiscoveredDevice
 import com.noahprail.kairos.protocol.CameraConfig
+import com.noahprail.kairos.protocol.Chip
+import com.noahprail.kairos.protocol.ReleaseManifest
 import com.noahprail.kairos.protocol.ClockSync
 import com.noahprail.kairos.protocol.DeviceInfo
 import com.noahprail.kairos.protocol.Job
@@ -18,6 +20,7 @@ import java.time.Instant
 val demoScenes = listOf(
     "scan", "scanning", "off", "unauthorized", "unsupported", "connecting",
     "pairing", "pairing-error", "ready", "generic", "recording", "banner",
+    "firmware", "firmware-progress", "firmware-failed",
 )
 
 fun AppModel.applyDemo(scene: String, screen: String = "main") {
@@ -29,7 +32,10 @@ fun AppModel.applyDemo(scene: String, screen: String = "main") {
     banner = null
     val now = Instant.now()
 
-    val device = DeviceInfo(v = PROTOCOL_VERSION, id = "A1B2C3", name = "Pad Cam", cam = "zcam", fw = "1.2.0")
+    val device = DeviceInfo(
+        v = PROTOCOL_VERSION, id = "A1B2C3", name = "Pad Cam", cam = "zcam", fw = "1.2.0",
+        caps = 1, chip = Chip.ESP32S3, slot = 0x1F0000,
+    )
 
     when (scene) {
         "off" -> bluetooth = BluetoothState.POWERED_OFF
@@ -44,7 +50,7 @@ fun AppModel.applyDemo(scene: String, screen: String = "main") {
                 else "Press the button on the device, then try again within 2 minutes.",
             )
         }
-        "ready", "generic", "recording", "banner" -> {
+        "ready", "generic", "recording", "banner", "firmware", "firmware-progress", "firmware-failed" -> {
             val recording = scene == "recording"
             val generic = scene == "generic"
             // the generic scene is a unit without the Ethernet module: no Z CAM option
@@ -82,6 +88,21 @@ fun AppModel.applyDemo(scene: String, screen: String = "main") {
             )
             link = Link.Ready
             if (scene == "banner") banner = "The connection to the device was lost."
+            if (scene.startsWith("firmware")) {
+                // idle, with the next event far enough away that an update could start
+                live = live!!.copy(phase = StatusValue.Phase.IDLE, nextEventAt = now.epochSecond + 5400, nextEventType = StatusValue.EventType.WAKE)
+                val image = ReleaseManifest.Image("kairos-esp32s3-1.3.0-app.bin", 1_187_344, "a".repeat(64), "b".repeat(128))
+                var state = FirmwareState(offer = FirmwareOffer("1.3.0", "Fixes the Z CAM retry and adds firmware updates.", image))
+                if (scene == "firmware-progress") {
+                    state = state.copy(
+                        prepared = PreparedFirmware("Version 1.3.0", "1.3.0", image.file, ByteArray(1_187_344), ByteArray(64), "a".repeat(64)),
+                        stage = FirmwareStage.Sending(0.42),
+                    )
+                } else if (scene == "firmware-failed") {
+                    state = state.copy(stage = FirmwareStage.Failed("The firmware's signature isn't valid for this device."))
+                }
+                firmware = state
+            }
         }
         else -> { // "scan"
             val t = android.os.SystemClock.elapsedRealtime()
