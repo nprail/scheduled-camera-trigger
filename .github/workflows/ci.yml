@@ -66,6 +66,16 @@ jobs:
         working-directory: firmware/esp32
         run: pio run -e device-c3
 
+      # the developer builds accept unsigned updates: they must keep compiling, but are never released
+      - name: Build the developer firmware (ESP32-S3)
+        working-directory: firmware/esp32
+        run: pio run -e device-dev
+
+      - name: Signing tool tests
+        run: |
+          pip install cryptography
+          python3 -m unittest discover -s firmware/esp32/tools
+
       # factory.bin is the whole flash image (flash at 0x0), firmware.bin is the app alone (flash at 0x20000)
       - name: Upload the firmware
         uses: actions/upload-artifact@v7

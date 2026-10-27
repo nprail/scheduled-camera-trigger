@@ -20,8 +20,10 @@ jobs:
         include:
           - chip: esp32s3
             env: device
+            slot: 0x1F0000 # the largest image the device accepts (partitions.csv)
           - chip: esp32c3
             env: device-c3
+            slot: 0x1D0000 # partitions_4mb.csv
     env:
       KAIROS_VERSION: ${{ github.ref_name }}
     steps:
@@ -55,8 +57,14 @@ jobs:
           b=firmware/esp32/.pio/build/${{ matrix.env }}
           # factory: bootloader, partitions and app in one image, flashed at 0x0 (erases pairing and schedule)
           cp "$b/firmware.factory.bin" "$out/kairos-${{ matrix.chip }}-$v-factory.bin"
-          # app only: flashed at 0x20000 (keeps pairing and schedule)
+          # app only: flashed at 0x20000 (keeps pairing and schedule); also what a phone sends over Bluetooth
           cp "$b/firmware.bin" "$out/kairos-${{ matrix.chip }}-$v-app.bin"
+          # a release must fit the update slot, or no device could take it over Bluetooth
+          size=$(stat -c%s "$out/kairos-${{ matrix.chip }}-$v-app.bin")
+          if [ "$size" -gt $(( ${{ matrix.slot }} )) ]; then
+            echo "app image is $size bytes, over the ${{ matrix.slot }} slot"
+            exit 1
+          fi
           ls -l "$out"
 
       - uses: actions/upload-artifact@v7
@@ -73,11 +81,37 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+
       - uses: actions/download-artifact@v7
         with:
           path: dist
           pattern: firmware-*
           merge-multiple: true
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - run: pip install cryptography
+
+      # Every app image is signed (ECDSA P-256 over its SHA-256) with the release key, a repository secret. The
+      # devices hold the public key (firmware/esp32/src/platform/signing_keys.h) and refuse anything else.
+      # The factory image is never sent over Bluetooth, so it is not signed.
+      - name: Sign the images and write the manifest
+        env:
+          KAIROS_SIGNING_KEY: ${{ secrets.KAIROS_SIGNING_KEY }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [ -z "$KAIROS_SIGNING_KEY" ]; then
+            echo "The KAIROS_SIGNING_KEY secret is not set: see docs/updating-firmware.md"
+            exit 1
+          fi
+          tool=firmware/esp32/tools/signing.py
+          python3 "$tool" --header firmware/esp32/src/platform/signing_keys.h sign dist/kairos-*-app.bin
+          python3 "$tool" manifest dist "$TAG" \
+            --min-from "$(cat firmware/esp32/MIN_FROM)" \
+            --notes "https://github.com/${{ github.repository }}/releases/tag/$TAG"
 
       - name: Checksums
         working-directory: dist
@@ -96,12 +130,19 @@ jobs:
           | --- | --- | --- |
           | `*-factory.bin` | `0x0` | A new or blank board. **Erases the pairing key and the schedule.** |
           | `*-app.bin` | `0x20000` | Updating a board that is already paired. Keeps the pairing key and the schedule. |
+          | `*-app.bin.sig` | | The signature of the matching `-app.bin`. The apps check it; a device refuses firmware that is not signed by Kairos. |
+          | `manifest.json` | | What the apps read to find this release. |
+
+          **In the Kairos apps:** open a device, then Firmware. The apps download the right file for the chip and send it over Bluetooth. Updates are always optional.
 
           With esptool: `esptool.py write_flash 0x0 kairos-esp32s3-<version>-factory.bin`.
           Verify downloads against `SHA256SUMS`.
           NOTES
+          # a tag with a hyphen (v1.3.0-beta.1) is a pre-release: the apps only offer it from Advanced
+          flags=""
+          case "$TAG" in *-*) flags="--prerelease" ;; esac
           gh release create "$TAG" dist/* \
             --repo "$REPO" \
             --title "Kairos firmware $TAG" \
             --notes-file notes.md \
-            --verify-tag
+            --verify-tag $flags
