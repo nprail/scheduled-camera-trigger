@@ -15,7 +15,7 @@
 <p align="center">
   <a href="https://github.com/nprail/kairos/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/nprail/kairos/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-14130f">
-  <img alt="Device: Raspberry Pi Zero W" src="https://img.shields.io/badge/device-Raspberry%20Pi%20Zero%20W-14130f">
+  <img alt="Device: ESP32" src="https://img.shields.io/badge/device-ESP32-14130f">
   <img alt="Apps: iOS 17+ and Android 8+" src="https://img.shields.io/badge/apps-iOS%2017%2B%20%C2%B7%20Android%208%2B-14130f">
 </p>
 
@@ -36,7 +36,7 @@ Kairos is an open source hardware trigger that starts a camera at a set time. It
 - **Works with your camera.** Trigger any camera with a standard remote trigger port, or a Z CAM over its HTTP API on a wired Ethernet link.
 - **Controlled from your phone.** Native iPhone and Android apps connect over Bluetooth Low Energy. You set the schedule, check the countdown, run a test and watch the log, in the field with no network.
 - **Hard to misuse.** Pair once with a physical button press, so only your phone can control the device.
-- **Small and low power.** It runs on a Raspberry Pi Zero W, with Wi-Fi switched off.
+- **Small and low power.** It runs on an ESP32-S3 or ESP32-C3 with a real-time clock, starts in under two seconds and draws a fraction of a watt, with Wi-Fi switched off. (The original Raspberry Pi Zero W version still works and is now legacy.)
 - **Open.** The device software, both apps and the Bluetooth protocol are MIT licensed and documented in this repository.
 
 ## How it works
@@ -53,24 +53,25 @@ You set the three timings once and list your attempts. The device keeps the sche
 
 ## Quick start
 
-You need a Raspberry Pi Zero W, a camera with a remote trigger port (or a Z CAM), and a button for pairing. Then, on the Pi:
+You need an ESP32-S3 or ESP32-C3 board, a camera with a remote trigger port (or a Z CAM with a W5500 Ethernet module), and ideally a DS3231 real-time clock module. Pairing uses the board's BOOT button, so there is no extra button to wire. Then, with [PlatformIO](https://platformio.org) installed:
 
 ```sh
 git clone git@github.com:nprail/kairos.git
-cd kairos
-npm install
-cp config.example.json config.json   # edit this for your camera and pins
-node trigger/index.js
+cd kairos/firmware/esp32
+pio run -e device -t upload      # ESP32-S3 (use -e device-c3 for an ESP32-C3)
 ```
 
-Install the app on your phone, press the button on the device, then tap **Pair** within two minutes. Full steps, including the Bluetooth and root setup the Pi needs, are in [Setting up a device](docs/SETUP.md).
+Install the app on your phone, press the BOOT button on the board, then tap **Pair** within two minutes. Wiring is in [Hardware](docs/hardware.md), and the full steps are in [Setting up a device](docs/setup.md).
+
+> [!NOTE]
+> The original Raspberry Pi Zero W version is **legacy**. It still works with the same apps and protocol, and its setup is at the end of [Setting up a device](docs/setup.md#legacy-raspberry-pi).
 
 ## The apps
 
 With the apps you can find and connect to devices, pair with the button, see live status with a countdown to the next event, edit the schedule and camera settings, run a test, manually wake, start, stop and sleep the camera, and watch the device log live.
 
-- **iPhone:** [ios/](ios/README.md), a native SwiftUI app for iOS 17 and later.
-- **Android:** [android/](android/README.md), a native Jetpack Compose app for Android 8.0 and later.
+- **iPhone:** [apps/ios/](apps/ios/README.md), a native SwiftUI app for iOS 17 and later.
+- **Android:** [apps/android/](apps/android/README.md), a native Jetpack Compose app for Android 8.0 and later.
 
 ## Documentation
 
@@ -78,13 +79,13 @@ Read it online at [nprail.github.io/kairos/docs](https://nprail.github.io/kairos
 
 | Read | For |
 | --- | --- |
-| [Setting up a device](docs/SETUP.md) | Running Kairos on a Raspberry Pi, Bluetooth setup, pairing |
-| [Hardware](docs/HARDWARE.md) | Parts, GPIO pins, wiring for generic cameras and Z CAMs |
-| [Configuration](docs/CONFIGURATION.md) | Every `config.json` option, and the timeline of an attempt |
+| [Setting up a device](docs/setup.md) | Flashing an ESP32, Bluetooth setup, pairing (and the legacy Raspberry Pi setup) |
+| [Hardware](docs/hardware.md) | ESP32 parts, pins, wiring for generic cameras and Z CAMs (and the legacy Pi) |
+| [Configuration](docs/configuration.md) | Every setting, and the timeline of an attempt (and the legacy `config.json`) |
 | [Bluetooth protocol](docs/ble-protocol.md) | The protocol between the phone and the device |
-| [Development](docs/DEVELOPMENT.md) | Repository layout, running the tests, test vectors |
+| [Development](docs/development.md) | Repository layout, running the tests, test vectors |
 | [App specification](AGENTS.md) | What the apps do, and the rules for working in this repository |
-| [ESP32 port](docs/esp32-port.md) | A proposal for an ESP32 version of the device |
+| [ESP32 firmware](docs/esp32-port.md) | The recommended device: design, status, and what it changes from the legacy Pi version |
 | [Brand assets](brand/README.md) | The Kairos mark, colors and fonts |
 
 ## License

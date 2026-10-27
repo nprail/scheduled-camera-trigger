@@ -1,27 +1,28 @@
 {
-  "name": "kairos",
-  "version": "1.0.0",
-  "description": "",
-  "main": "trigger/index.js",
-  "type": "module",
+  "name": "kairos-docs",
+  "private": true,
+  "description": "Builds the Kairos documentation site (docs/) into website/docs with docmd.",
   "scripts": {
-    "test": "node --test test/*.test.js",
-    "dev": "nodemon trigger/index"
+    "build": "docmd build",
+    "dev": "docmd dev",
+    "validate": "docmd validate",
+    "release:app": "semantic-release --extends ./release/app.config.cjs",
+    "release:firmware": "semantic-release --extends ./release/firmware.config.cjs"
   },
-  "keywords": [],
-  "author": "Noah Prail <noah@prail.net>",
-  "license": "MIT",
   "dependencies": {
-    "axios": "^1.3.4",
-    "ble-host": "^1.0.3",
-    "hci-socket": "^1.0.0",
-    "lodash": "^4.17.21",
-    "nanoid": "^4.0.2",
-    "node-schedule": "^2.1.0",
-    "onoff": "^6.0.3",
-    "uuid": "^9.0.0"
+    "@docmd/core": "0.9.8",
+    "@docmd/plugin-seo": "0.9.8"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "devDependencies": {
-    "nodemon": "^2.0.21"
+    "@semantic-release/changelog": "6.0.3",
+    "@semantic-release/commit-analyzer": "13.0.1",
+    "@semantic-release/exec": "7.1.0",
+    "@semantic-release/git": "10.0.1",
+    "@semantic-release/github": "12.0.10",
+    "@semantic-release/release-notes-generator": "14.1.1",
+    "semantic-release": "25.0.9"
   }
 }

@@ -1,13 +1,15 @@
 name: Deploy site
 
-# Builds the docs with docmd into site/docs, then publishes site/ to GitHub Pages.
+# Builds the docs with docmd into website/docs, then publishes website/ to GitHub Pages.
 on:
   push:
     branches: [main]
     paths:
-      - "site/**"
+      - "website/**"
       - "docs/**"
-      - "docmd/**"
+      - "docmd.config.json"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -31,21 +33,19 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: docmd/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install docmd
-        working-directory: docmd
         run: npm ci
 
-      - name: Build the docs into site/docs
-        working-directory: docmd
+      - name: Build the docs into website/docs
         run: npm run build
 
       - uses: actions/configure-pages@v6
 
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: site
+          path: website
 
   deploy:
     needs: build

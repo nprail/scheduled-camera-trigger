@@ -1,0 +1,199 @@
+name: Release
+
+# Every push to next (or beta) runs semantic-release for two independent version lines, from the commit
+# messages (see "Commit messages" in AGENTS.md):
+#   apps      app-v1.2.3  both phone apps, versioned together; a tag and apps/CHANGELOG.md, no GitHub Release
+#   firmware  v1.2.3      the ESP32 firmware; a draft GitHub Release that the jobs below fill and publish
+# The firmware tag (without the "v") becomes the firmware version the device reports.
+on:
+  push:
+    branches: [next, beta]
+
+permissions:
+  contents: read
+
+# releases must not overlap: each one pushes tags and a commit
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      firmware: ${{ steps.firmware.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # semantic-release reads the whole history and every tag
+          # a token that may push to a protected next; the default token works when next is unprotected
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          cache: npm
+
+      - run: npm ci
+
+      # firmware first: the apps' release pushes a version-bump commit
+      - name: Firmware version
+        id: firmware
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+        run: npm run release:firmware
+
+      - name: Apps version
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+        run: npm run release:app
+
+  build:
+    name: Build ${{ matrix.chip }}
+    needs: version
+    if: needs.version.outputs.firmware != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - chip: esp32s3
+            env: device
+            slot: 0x1F0000 # the largest image the device accepts (partitions.csv)
+          - chip: esp32c3
+            env: device-c3
+            slot: 0x1D0000 # partitions_4mb.csv
+    env:
+      KAIROS_VERSION: v${{ needs.version.outputs.firmware }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: v${{ needs.version.outputs.firmware }}
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('firmware/esp32/platformio.ini') }}
+
+      - run: pip install platformio==6.1.19
+
+      # never ship firmware that fails its own tests
+      - name: Host tests
+        working-directory: firmware/esp32
+        run: pio test -e native
+
+      - name: Build
+        working-directory: firmware/esp32
+        run: pio run -e ${{ matrix.env }}
+
+      - name: Collect binaries
+        run: |
+          v="${KAIROS_VERSION#v}"
+          out=dist
+          mkdir -p "$out"
+          b=firmware/esp32/.pio/build/${{ matrix.env }}
+          # factory: bootloader, partitions and app in one image, flashed at 0x0 (erases pairing and schedule)
+          cp "$b/firmware.factory.bin" "$out/kairos-${{ matrix.chip }}-$v-factory.bin"
+          # app only: flashed at 0x20000 (keeps pairing and schedule); also what a phone sends over Bluetooth
+          cp "$b/firmware.bin" "$out/kairos-${{ matrix.chip }}-$v-app.bin"
+          # a release must fit the update slot, or no device could take it over Bluetooth
+          size=$(stat -c%s "$out/kairos-${{ matrix.chip }}-$v-app.bin")
+          if [ "$size" -gt $(( ${{ matrix.slot }} )) ]; then
+            echo "app image is $size bytes, over the ${{ matrix.slot }} slot"
+            exit 1
+          fi
+          ls -l "$out"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: firmware-${{ matrix.chip }}
+          path: dist/*.bin
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: v${{ needs.version.outputs.firmware }}
+
+      - uses: actions/download-artifact@v7
+        with:
+          path: dist
+          pattern: firmware-*
+          merge-multiple: true
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - run: pip install cryptography
+
+      # Every app image is signed (ECDSA P-256 over its SHA-256) with the release key, a repository secret. The
+      # devices hold the public key (firmware/esp32/src/platform/signing_keys.h) and refuse anything else.
+      # The factory image is never sent over Bluetooth, so it is not signed.
+      - name: Sign the images and write the manifest
+        env:
+          KAIROS_SIGNING_KEY: ${{ secrets.KAIROS_SIGNING_KEY }}
+          TAG: v${{ needs.version.outputs.firmware }}
+        run: |
+          if [ -z "$KAIROS_SIGNING_KEY" ]; then
+            echo "The KAIROS_SIGNING_KEY secret is not set: see docs/updating-firmware.md"
+            exit 1
+          fi
+          tool=firmware/esp32/tools/signing.py
+          python3 "$tool" --header firmware/esp32/src/platform/signing_keys.h sign dist/kairos-*-app.bin
+          python3 "$tool" manifest dist "$TAG" \
+            --min-from "$(cat firmware/esp32/MIN_FROM)" \
+            --notes "https://github.com/${{ github.repository }}/releases/tag/$TAG"
+
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum *.bin > SHA256SUMS
+
+      - name: Attach the images and publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ needs.version.outputs.firmware }}
+          REPO: ${{ github.repository }}
+        run: |
+          cat > notes.md <<'NOTES'
+          ESP32 firmware for Kairos. Pick the files for your chip (`esp32s3` or `esp32c3`).
+
+          | File | Flash at | When to use it |
+          | --- | --- | --- |
+          | `*-factory.bin` | `0x0` | A new or blank board. **Erases the pairing key and the schedule.** |
+          | `*-app.bin` | `0x20000` | Updating a board that is already paired. Keeps the pairing key and the schedule. |
+          | `*-app.bin.sig` | | The signature of the matching `-app.bin`. The apps check it; a device refuses firmware that is not signed by Kairos. |
+          | `manifest.json` | | What the apps read to find this release. |
+
+          **In the Kairos apps:** open a device, then Firmware. The apps download the right file for the chip and send it over Bluetooth. Updates are always optional.
+
+          With esptool: `esptool.py write_flash 0x0 kairos-esp32s3-<version>-factory.bin`.
+          Verify downloads against `SHA256SUMS`.
+          NOTES
+          # semantic-release wrote the changelog into the draft; keep it under the table
+          gh release view "$TAG" --repo "$REPO" --json body --jq .body > changes.md
+          { cat notes.md; printf '\n## Changes\n\n'; cat changes.md; } > body.md
+          gh release upload "$TAG" dist/* --repo "$REPO" --clobber
+          # a tag with a hyphen (v1.3.0-beta.1) is a pre-release: the apps only offer it from Advanced
+          latest="--latest"
+          case "$TAG" in *-*) latest="" ;; esac
+          gh release edit "$TAG" --repo "$REPO" \
+            --title "Kairos firmware $TAG" \
+            --notes-file body.md \
+            --draft=false $latest
