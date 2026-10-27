@@ -34,7 +34,7 @@ The ESP32 firmware is a PlatformIO project (`firmware/esp32/`). Run its host tes
 
 ## Commit messages and releases
 
-Versions are not edited by hand. Every push to `main` runs [semantic-release](https://semantic-release.gitbook.io) (`.github/workflows/release.yml`), which reads the commit messages, picks the next version and publishes it. **Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org):**
+Versions are not edited by hand. Every push to `next` runs [semantic-release](https://semantic-release.gitbook.io) (`.github/workflows/release.yml`), which reads the commit messages, picks the next version and publishes it. **Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org):**
 
 ```
 <type>(<scope>): <summary in the imperative, lower case, no full stop>
@@ -67,9 +67,9 @@ Rules:
 - Never edit a version number, `apps/CHANGELOG.md` or a `chore(release)` commit by hand, and never create a `v*` or `app-v*` tag yourself.
 - A fix that touches both a firmware and an app file releases both, so keep app and firmware changes in separate commits unless they are one change.
 - Mark a breaking protocol change with `!` or a `BREAKING CHANGE:` footer, and describe it in the body. Only protocol changes that need the app and the device updated together are breaking.
-- Merge to `main` with the commit messages intact (a rebase, or a squash with a conventional title). A merge commit message is ignored.
+- Releases come from `next`, not `main`: merge to `next` with the commit messages intact (a rebase, or a squash with a conventional title). A merge commit message is ignored.
 - Releases from the `beta` branch are pre-releases (`1.3.0-beta.1`).
-- Preview a release without publishing: `npm run release:app -- --dry-run --no-ci` or `npm run release:firmware -- --dry-run --no-ci` (set `GITHUB_TOKEN`, and add `--branches <current branch>` off `main`). The plugin that filters commits by path is `release/by-path.cjs`.
+- Preview a release without publishing: `npm run release:app -- --dry-run --no-ci` or `npm run release:firmware -- --dry-run --no-ci` (set `GITHUB_TOKEN`, and add `--branches <current branch>` off `next`). The plugin that filters commits by path is `release/by-path.cjs`.
 - Never include the Claude co-author in commit messages
 
 ---

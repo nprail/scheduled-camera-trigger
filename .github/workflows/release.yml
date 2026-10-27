@@ -1,13 +1,13 @@
 name: Release
 
-# Every push to main (or beta) runs semantic-release for two independent version lines, from the commit
+# Every push to next (or beta) runs semantic-release for two independent version lines, from the commit
 # messages (see "Commit messages" in AGENTS.md):
 #   apps      app-v1.2.3  both phone apps, versioned together; a tag and apps/CHANGELOG.md, no GitHub Release
 #   firmware  v1.2.3      the ESP32 firmware; a draft GitHub Release that the jobs below fill and publish
 # The firmware tag (without the "v") becomes the firmware version the device reports.
 on:
   push:
-    branches: [main, beta]
+    branches: [next, beta]
 
 permissions:
   contents: read
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # semantic-release reads the whole history and every tag
-          # a token that may push to a protected main; the default token works when main is unprotected
+          # a token that may push to a protected next; the default token works when next is unprotected
           token: ${{ secrets.RELEASE_TOKEN || github.token }}
 
       - uses: actions/setup-node@v7
