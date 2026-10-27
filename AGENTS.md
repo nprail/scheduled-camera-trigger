@@ -70,6 +70,7 @@ Rules:
 - Merge to `main` with the commit messages intact (a rebase, or a squash with a conventional title). A merge commit message is ignored.
 - Releases from the `beta` branch are pre-releases (`1.3.0-beta.1`).
 - Preview a release without publishing: `npm run release:app -- --dry-run --no-ci` or `npm run release:firmware -- --dry-run --no-ci` (set `GITHUB_TOKEN`, and add `--branches <current branch>` off `main`). The plugin that filters commits by path is `release/by-path.cjs`.
+- Never include the Claude co-author in commit messages
 
 ---
 
@@ -282,7 +283,7 @@ Opened from the **Firmware** link. **An update is always the user's choice**: th
 
 **After `fw.end`** the device restarts and the link drops. That is expected, not "connection lost": the app stays on the screen showing Reconnecting…, scans for the same device ID (up to 60 s; otherwise it goes back to the scan screen with "The device didn't come back after the update. Check it, then connect again."), connects, authenticates, reads Device Info and runs the normal ready sequence. If the version now equals the expected one (the image's tag; for a file with no tag, any change from the old one) it is "Updated"; otherwise "rolled back".
 
-**Looking for a release** (`UpdateService`): the newest stable release's `manifest.json` from `https://github.com/nprail/kairos/releases/latest/download/manifest.json` (no API, no identifying data sent), kept with its ETag. **When the device becomes ready**, the app checks in the background if Check on connect is on, at most once every 10 minutes (only a successful check starts the window; inside it, the saved copy answers with no network), with no error shown and no wait. A newer, installable release only sets the "Update X" tag. A downloaded image is verified against the manifest's size and SHA-256, kept in the phone's cache (not backed up; the newest two are kept), and nothing is sent to a device that does not match.
+**Looking for a release** (`UpdateService`): the newest stable release's `manifest.json` from `https://github.com/nprail/kairos/releases/latest/download/manifest.json` (no API, no identifying data sent), kept with its ETag. `releases/latest` never returns a pre-release, so with **Include pre-releases** on the check instead takes the newest non-draft release from the releases list (`https://api.github.com/repos/nprail/kairos/releases?per_page=30`, which has a rate limit) and reads that release's `manifest.json` asset; turning the toggle on or off clears the 10-minute window. **When the device becomes ready**, the app checks in the background if Check on connect is on, at most once every 10 minutes (only a successful check starts the window; inside it, the saved copy answers with no network), with no error shown and no wait. A newer, installable release only sets the "Update X" tag. A downloaded image is verified against the manifest's size and SHA-256, kept in the phone's cache (not backed up; the newest two are kept), and nothing is sent to a device that does not match.
 
 ## 7. Live updates
 

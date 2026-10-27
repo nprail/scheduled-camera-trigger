@@ -129,14 +129,29 @@ public final class UpdateService {
     private static let unreachable = DeviceError(
         code: "network", message: "Could not reach GitHub to look for updates. Check the phone's internet connection.")
 
-    /// The newest stable release's manifest. Within the minimum interval of a successful check it answers
-    /// from the saved copy without touching the network; `force` always asks. A "not modified" answer
-    /// from GitHub keeps the saved copy.
-    public func latest(force: Bool = false) async throws -> (manifest: ReleaseManifest, fromCache: Bool) {
+    /// The newest stable release's manifest, or with `includePrereleases` the newest release of any kind
+    /// (`releases/latest` skips pre-releases, so that one is found in the releases list). Within the minimum
+    /// interval of a successful check it answers from the saved copy without touching the network; `force`
+    /// always asks, and changing `includePrereleases` clears the window. A "not modified" answer from GitHub
+    /// keeps the saved copy.
+    public func latest(force: Bool = false, includePrereleases: Bool = false) async throws -> (manifest: ReleaseManifest, fromCache: Bool) {
         if !force, let last = store.lastCheck, now().timeIntervalSince(last) < Self.minimumInterval,
            let saved = store.manifest, let manifest = ReleaseManifest.parse(saved)
         {
             return (manifest, true)
+        }
+        if includePrereleases,
+           let source = try await releases(includePrereleases: true).first(where: { $0.manifestURL != nil })?.manifestURL
+        {
+            let response: HTTPResponse
+            do { response = try await fetcher.fetch(source, etag: nil) } catch { throw Self.unreachable }
+            guard response.status == 200, let manifest = ReleaseManifest.parse(response.data) else {
+                throw DeviceError(code: "network", message: "That release has no usable firmware manifest.")
+            }
+            store.manifest = response.data
+            store.etag = nil
+            store.lastCheck = now()
+            return (manifest, false)
         }
         let response: HTTPResponse
         do {

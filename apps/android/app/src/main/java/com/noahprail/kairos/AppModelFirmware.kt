@@ -132,6 +132,7 @@ var AppModel.includePrereleases: Boolean
     get() = settingsVersion.let { updateStore.includePrereleases }
     set(value) {
         updateStore.includePrereleases = value
+        updateStore.lastCheck = null  // the saved manifest may be the other kind of release
         settingsVersion++
         firmware = firmware.copy(releases = null)
     }
@@ -157,7 +158,7 @@ private suspend fun AppModel.runCheck(force: Boolean, report: Boolean) {
     val fw = info?.fw ?: return
     if (report) firmware = firmware.copy(stage = FirmwareStage.Checking, message = null)
     try {
-        val manifest = updateService.latest(force).manifest
+        val manifest = updateService.latest(force, includePrereleases).manifest
         val result = manifest.assess(chip, fw, PROTOCOL_VERSION)
         if (info?.fw != fw) return // the device changed while we were looking
         val image = result.image

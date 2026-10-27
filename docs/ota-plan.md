@@ -171,7 +171,7 @@ A **Firmware** row in the Device section (visible only when `caps` bit0 is set) 
 
 **Check on connect.** Once the device is ready (§4 of the spec), the app checks GitHub in the background for a newer release than the device's `fw`:
 
-- It uses `releases/latest/download/manifest.json` (stable only; pre-releases never show a badge). The request carries no device ID, version or other identifying data, so GitHub only sees the phone's IP address.
+- It uses `releases/latest/download/manifest.json` (stable only, because GitHub's `latest` skips pre-releases; with Include pre-releases on, the newest release from the releases API is used instead). The request carries no device ID, version or other identifying data, so GitHub only sees the phone's IP address.
 - At most once every 10 minutes per phone, across devices. The manifest is cached with its ETag (a repeat check is a cheap conditional request), and a connect inside the window reuses the cached result (so it works offline). Only a successful check starts the window, so a failure doesn't block the next connect.
 - No internet, a timeout (5 s), a bad manifest or a rate limit: it fails silently and the row shows no badge. The check never delays or blocks the connect sequence.
 - If a newer release exists for this chip and passes the gates in §6.1 (`minFrom`, `protocol`), the Firmware row shows an "Update available (Y)" badge. That is all it does.

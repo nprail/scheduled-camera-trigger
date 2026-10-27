@@ -79,6 +79,7 @@ extension AppModel {
         get { updateStore.includePrereleases }
         set {
             updateStore.includePrereleases = newValue
+            updateStore.lastCheck = nil  // the saved manifest may be the other kind of release
             firmware.releases = nil
         }
     }
@@ -104,7 +105,7 @@ extension AppModel {
             firmware.message = nil
         }
         do {
-            let (manifest, _) = try await updateService.latest(force: force)
+            let (manifest, _) = try await updateService.latest(force: force, includePrereleases: includePrereleases)
             let result = manifest.assess(chip: chip, deviceFw: fw, appProtocol: Int(protocolVersion))
             guard info?.fw == fw else { return }  // the device changed while we were looking
             if result.status == .available, let image = result.image, let version = manifest.version {

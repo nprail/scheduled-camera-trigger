@@ -84,15 +84,29 @@ class UpdateService(
         get() = DeviceError("network", "Could not reach GitHub to look for updates. Check the phone's internet connection.")
 
     /**
-     * The newest stable release's manifest. Within the minimum interval of a successful check it answers
-     * from the saved copy without touching the network; [force] always asks. A "not modified" answer
-     * from GitHub keeps the saved copy.
+     * The newest stable release's manifest, or with [includePrereleases] the newest release of any kind
+     * (`releases/latest` skips pre-releases, so that one is found in the releases list). Within the minimum
+     * interval of a successful check it answers from the saved copy without touching the network; [force]
+     * always asks, and changing [includePrereleases] clears the window. A "not modified" answer from GitHub
+     * keeps the saved copy.
      */
-    suspend fun latest(force: Boolean = false): Latest {
+    suspend fun latest(force: Boolean = false, includePrereleases: Boolean = false): Latest {
         val last = store.lastCheck
         val saved = store.manifest
         if (!force && last != null && now() - last < MINIMUM_INTERVAL_MS && saved != null) {
             ReleaseManifest.parse(saved)?.let { return Latest(it, fromCache = true) }
+        }
+        if (includePrereleases) {
+            val source = releases(includePrereleases = true).firstOrNull { it.manifestUrl != null }?.manifestUrl
+            if (source != null) {
+                val found = fetchOrFail(source)
+                val parsed = (if (found.status == 200) ReleaseManifest.parse(found.data) else null)
+                    ?: throw DeviceError("network", "That release has no usable firmware manifest.")
+                store.manifest = found.data
+                store.etag = null
+                store.lastCheck = now()
+                return Latest(parsed, fromCache = false)
+            }
         }
         val response = fetchOrFail(url("latest/download/manifest.json"), if (saved == null) null else store.etag)
         if (response.status == 304 && saved != null) {

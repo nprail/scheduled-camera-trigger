@@ -414,6 +414,24 @@ class UpdateServiceTest {
     }
 
     @Test
+    fun withPrereleasesTheLatestCheckFindsTheNewestReleaseOfAnyKind() = runTest {
+        val list = """
+        [{"tag_name":"v1.4.0-beta.1","prerelease":true,"draft":false,"assets":[{"name":"manifest.json","browser_download_url":"https://example.test/beta.json"}]},
+         {"tag_name":"v1.3.0","prerelease":false,"draft":false,"assets":[{"name":"manifest.json","browser_download_url":"https://example.test/stable.json"}]}]
+        """.trimIndent()
+        val fetcher = ScriptedFetcher(
+            mapOf(
+                "https://api.github.com/repos/nprail/kairos/releases?per_page=30" to HttpResult(200, list.toByteArray()),
+                "https://example.test/beta.json" to HttpResult(200, manifest("1.4.0-beta.1")),
+                latestUrl to HttpResult(200, manifest("1.3.0")),
+            ),
+        )
+        val service = UpdateService(fetcher, MemoryUpdateStore())
+        assertEquals("1.4.0-beta.1", service.latest(force = true, includePrereleases = true).manifest.version)
+        assertEquals("1.3.0", service.latest(force = true).manifest.version)
+    }
+
+    @Test
     fun aDownloadIsCheckedAgainstTheManifest() = runTest {
         val bytes = ByteArray(500) { (it % 251).toByte() }
         val entry = ReleaseManifest.Image("kairos-esp32s3-1.3.0-app.bin", bytes.size, UpdateService.sha256Hex(bytes), sig)

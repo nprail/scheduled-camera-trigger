@@ -29,6 +29,8 @@ The app checks GitHub for a newer release when it connects, at most once every 1
 
 **Firmware → Advanced** has **Include pre-releases** and **Choose a version…**, which lists earlier releases. Installing an older version asks you to confirm.
 
+With **Include pre-releases** on, **Check for updates** and the check when connecting also look at pre-releases, so a beta can show up as the newest version. Normally they only look at stable releases.
+
 ## Update from a file
 
 Under **Firmware → From a file**, choose the firmware: the file ending in **`-app.bin`**. If it has a matching `.sig` file, choose both together.

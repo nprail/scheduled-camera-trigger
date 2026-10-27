@@ -406,6 +406,24 @@ final class UpdateServiceTests: XCTestCase {
         XCTAssertEqual(all.map(\.tag), ["v1.4.0-beta.1", "v1.3.0"])
     }
 
+    func testWithPrereleasesTheLatestCheckFindsTheNewestReleaseOfAnyKind() async throws {
+        let list = """
+        [{"tag_name":"v1.4.0-beta.1","prerelease":true,"draft":false,"assets":[{"name":"manifest.json","browser_download_url":"https://example.test/beta.json"}]},
+         {"tag_name":"v1.3.0","prerelease":false,"draft":false,"assets":[{"name":"manifest.json","browser_download_url":"https://example.test/stable.json"}]}]
+        """
+        let api = "https://api.github.com/repos/nprail/kairos/releases?per_page=30"
+        let fetcher = ScriptedFetcher(responses: [
+            api: HTTPResponse(status: 200, data: Data(list.utf8)),
+            "https://example.test/beta.json": HTTPResponse(status: 200, data: manifest(version: "1.4.0-beta.1")),
+            Self.latestURL: HTTPResponse(status: 200, data: manifest(version: "1.3.0")),
+        ], calls: .init())
+        let service = UpdateService(fetcher: fetcher, store: MemoryUpdateStore())
+        let withBeta = try await service.latest(force: true, includePrereleases: true)
+        XCTAssertEqual(withBeta.manifest.version, "1.4.0-beta.1")
+        let stable = try await service.latest(force: true)
+        XCTAssertEqual(stable.manifest.version, "1.3.0")
+    }
+
     func testADownloadIsCheckedAgainstTheManifest() async throws {
         let bytes = Data((0 ..< 500).map { UInt8($0 % 251) })
         let entry = ReleaseManifest.Image(file: "kairos-esp32s3-1.3.0-app.bin", size: bytes.count, sha256: UpdateService.sha256Hex(bytes), sig: sig)
