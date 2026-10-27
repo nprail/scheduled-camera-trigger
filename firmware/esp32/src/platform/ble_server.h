@@ -3,6 +3,7 @@
 #pragma once
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
+#include <freertos/message_buffer.h>
 #include <freertos/queue.h>
 
 #include <atomic>
@@ -22,12 +23,16 @@ class BleServer {
   /// Start advertising. `events` receives BleMessage items.
   bool begin(const std::string& advertisedName, const kairos::Bytes& deviceInfo, QueueHandle_t events);
   void setDeviceInfo(const kairos::Bytes& deviceInfo);
+  /// Writes to the Firmware characteristic go to this message buffer, one message per write.
+  void setFirmwareBuffer(MessageBufferHandle_t buffer);
   void setAdvertisedName(const std::string& name);
 
   /// Update the Status characteristic, and notify if the phone subscribed.
   void setStatus(const kairos::Bytes& status);
   /// Notify one Response fragment. Returns false if the phone is not subscribed (or gone).
   bool notify(const kairos::Bytes& fragment);
+  /// Ask for a short connection interval and long packets. Call from the core task, never from a callback.
+  void tuneConnection();
   /// MTU - 3 of the current connection.
   size_t maxFragment() const;
   bool connected() const { return conn_ != kNone; }

@@ -2,7 +2,7 @@
 
 The device side of Kairos on an ESP32-S3 or an ESP32-C3, with an external RTC and a W5500 Ethernet module for a Z CAM. It is the recommended Kairos device. It speaks the same Bluetooth protocol as the legacy Raspberry Pi version in [`firmware/legacy-pi/`](../legacy-pi/) (protocol v2, [docs/ble-protocol.md](../../docs/ble-protocol.md)), so the iPhone and Android apps work with either. The design and the reasons behind it are in [docs/esp32-port.md](../../docs/esp32-port.md). Wiring and parts are in [docs/hardware.md](../../docs/hardware.md).
 
-> **Status:** the firmware builds, and its logic is covered by host tests that run the shared protocol vectors. It has **not been run on hardware yet**. The first bring-up on a real board is where the remaining open items in the design doc (the generic camera's trigger pulse, the Z CAM's DHCP behavior, whether the Arduino core's bootloader supports rollback) get settled.
+> **Status:** the firmware builds, and its logic is covered by host tests that run the shared protocol vectors. It has **not been run on hardware yet**. The first bring-up on a real board is where the remaining open items in the design doc (the generic camera's trigger pulse, the Z CAM's DHCP behavior, and the over-Bluetooth update: its speed, and a rollback from a deliberately crashing image) get settled.
 
 ## Build, test and flash
 
@@ -14,12 +14,13 @@ pio test -e native            # host unit tests: protocol, config, scheduler, ca
 pio run -e device             # build the firmware for an ESP32-S3
 pio run -e device -t upload   # flash over USB
 pio run -e device-c3          # build it for an ESP32-C3 (add -t upload to flash)
+pio run -e device-dev         # a developer build: accepts unsigned updates over Bluetooth (device-c3-dev for the C3)
 pio device monitor            # serial log
 ```
 
 The `device` (ESP32-S3) and `device-c3` (ESP32-C3) environments build the same firmware. They differ only in the pins ([src/platform/board.h](src/platform/board.h), chosen by the chip) and the partition table: the C3 uses [partitions_4mb.csv](partitions_4mb.csv) for the usual 4 MB flash, with the same frozen `nvs` partition. Both use the pioarduino platform (Arduino-ESP32 core 3.3.x) and NimBLE-Arduino, both pinned in [platformio.ini](platformio.ini). The first build downloads the toolchain.
 
-**Flashing keeps the pairing and the schedule.** They live in NVS, which `upload` doesn't touch. Don't run `pio run -t erase` (or any "erase all flash" option) unless you want a factory reset, and never change the `nvs` partition in [partitions.csv](partitions.csv). After a factory reset, a phone that still holds the old bond must forget the device once in its Bluetooth settings.
+**Flashing keeps the pairing and the schedule.** They live in NVS, which `upload` doesn't touch. `upload` also writes a blank `otadata` ([otadata.py](otadata.py)): after an update over Bluetooth the device boots the other app slot, and without this the new USB image would be written but never run. Don't run `pio run -t erase` (or any "erase all flash" option) unless you want a factory reset, and never change the `nvs` partition in [partitions.csv](partitions.csv). After a factory reset, a phone that still holds the old bond must forget the device once in its Bluetooth settings.
 
 ## Versions and releases
 
@@ -32,6 +33,12 @@ Pushing a tag like `v1.2.0` runs [release.yml](../../.github/workflows/release.y
 
 Every CI run also uploads the same binaries as a `firmware` artifact.
 
+## Updates over Bluetooth
+
+The apps can update a device over Bluetooth: see [docs/updating-firmware.md](../../docs/updating-firmware.md). Release images are signed with ECDSA P-256 by the release workflow (the private key is the `KAIROS_SIGNING_KEY` repository secret), and the device holds the public key in [src/platform/signing_keys.h](src/platform/signing_keys.h). [tools/signing.py](tools/signing.py) makes keys, signs images and writes the release `manifest.json`; its tests run with `python3 -m unittest discover -s tools`. [MIN_FROM](MIN_FROM) is the oldest firmware allowed to update directly to a release.
+
+The `-dev` environments build with `KAIROS_ALLOW_UNSIGNED`, which lets a device take an unsigned image: for developers, flagged in the boot log, and never released.
+
 ## Layout
 
 | Path | What |
@@ -39,9 +46,11 @@ Every CI run also uploads the same binaries as a `firmware` artifact.
 | `lib/kairos/` | The firmware logic, in plain C++ with no Arduino or ESP-IDF includes, so it is tested on the host. It is one PlatformIO library. |
 | `lib/kairos/protocol/` | Framing, binary messages, HMAC auth, the dispatcher and the per-connection `Link`. |
 | `lib/kairos/config/` | The `Config` struct, its binary layout (also the form stored in flash) and validation. |
+| `lib/kairos/update/` | The firmware update receiver (`Updater`): offset window, resume, header and size checks, timeouts. It sees the flash and the signature check only through small interfaces. |
 | `lib/kairos/scheduler/` | The scheduler, the `Controller` that implements the protocol's device API, and the log ring. |
 | `lib/kairos/cameras/` | The generic GPIO camera and the Z CAM HTTP camera, behind small `Gpio` and `Http` interfaces. |
-| `src/platform/` | Everything that touches hardware: NimBLE server, W5500 Ethernet, DS3231 RTC, NVS storage, the button, the system clock. |
+| `src/platform/` | Everything that touches hardware: NimBLE server, W5500 Ethernet, DS3231 RTC, NVS storage, the button, the system clock, the OTA slot (`ota_flash`), the signature check (`ecdsa_verifier`) and the version tag (`fw_tag`). |
+| `tools/` | `signing.py`: keys, signatures, the manifest. |
 | `src/main.cpp` | Wires it together. One `core` task owns all device state; BLE callbacks only post to a queue. |
 | `test/test_native/` | Host tests. They load `protocol/test-vectors.json`, the same file the Node reference and both apps pass. |
 

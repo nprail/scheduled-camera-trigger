@@ -9,6 +9,7 @@ BleServer* g_self = nullptr;
 NimBLECharacteristic* g_deviceInfo = nullptr;
 NimBLECharacteristic* g_status = nullptr;
 NimBLECharacteristic* g_response = nullptr;
+MessageBufferHandle_t g_fwBuffer = nullptr;
 
 void post(BleMessage::Type type, const uint8_t* data = nullptr, size_t len = 0) {
   static BleMessage m;  // only the NimBLE task posts
@@ -41,6 +42,14 @@ class CommandCallbacks : public NimBLECharacteristicCallbacks {
   }
 };
 
+class FirmwareCallbacks : public NimBLECharacteristicCallbacks {
+  void onWrite(NimBLECharacteristic* c, NimBLEConnInfo&) override {
+    if (!g_fwBuffer) return;
+    NimBLEAttValue v = c->getValue();
+    xMessageBufferSend(g_fwBuffer, v.data(), v.size(), 0);  // when full, the write is lost and the phone rewinds
+  }
+};
+
 class SubscribeCallbacks : public NimBLECharacteristicCallbacks {
   void onSubscribe(NimBLECharacteristic* c, NimBLEConnInfo&, uint16_t subValue) override {
     g_self->onSubscribe(c == g_status, (subValue & 1) != 0);
@@ -49,6 +58,7 @@ class SubscribeCallbacks : public NimBLECharacteristicCallbacks {
 
 ServerCallbacks serverCallbacks;
 CommandCallbacks commandCallbacks;
+FirmwareCallbacks firmwareCallbacks;
 SubscribeCallbacks subscribeCallbacks;
 }  // namespace
 
@@ -73,6 +83,8 @@ bool BleServer::begin(const std::string& advertisedName, const Bytes& deviceInfo
   NimBLECharacteristic* command = service->createCharacteristic(
       kUuidCommand, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR | NIMBLE_PROPERTY::WRITE_ENC);
   g_response = service->createCharacteristic(kUuidResponse, NIMBLE_PROPERTY::NOTIFY);
+  NimBLECharacteristic* firmware = service->createCharacteristic(kUuidFirmware, NIMBLE_PROPERTY::WRITE_NR | NIMBLE_PROPERTY::WRITE_ENC);
+  firmware->setCallbacks(&firmwareCallbacks);
   command->setCallbacks(&commandCallbacks);
   g_status->setCallbacks(&subscribeCallbacks);
   g_response->setCallbacks(&subscribeCallbacks);
@@ -107,6 +119,18 @@ void BleServer::setAdvertisedName(const std::string& name) {
     NimBLEDevice::getAdvertising()->stop();
     startAdvertising();
   }
+}
+
+void BleServer::setFirmwareBuffer(MessageBufferHandle_t buffer) { g_fwBuffer = buffer; }
+
+void BleServer::tuneConnection() {
+  // A short connection interval: a firmware image is over a megabyte. This waits for the controller, so it
+  // must not run inside a NimBLE callback (the host task would wait on itself): the core task calls it after
+  // the connection has been reported. (Asking for a longer data length with setDataLen() timed out on an
+  // ESP32-C3 and dropped the link, so it is left to the controller, which negotiates it by itself.)
+  const uint16_t handle = conn_;
+  if (handle == kNone) return;
+  NimBLEDevice::getServer()->updateConnParams(handle, 12, 24, 0, 400);
 }
 
 void BleServer::setDeviceInfo(const Bytes& deviceInfo) { g_deviceInfo->setValue(deviceInfo.data(), deviceInfo.size()); }

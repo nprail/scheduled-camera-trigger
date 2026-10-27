@@ -1,4 +1,4 @@
-// Kairos firmware for an ESP32-S3: wires the protocol, scheduler and camera drivers (lib/kairos) to the
+// Kairos firmware for an ESP32-S3 or ESP32-C3: wires the protocol, scheduler and camera drivers (lib/kairos) to the
 // radio, Ethernet, RTC and flash (src/platform). See docs/esp32-port.md.
 //
 // One task ("core") owns all device state: BLE writes, scheduled steps and notifications run in turn on
@@ -6,6 +6,7 @@
 // others for a few seconds at most (the HTTP timeouts), which the schedule's timings leave room for.
 #include <Arduino.h>
 #include <esp_mac.h>
+#include <esp_ota_ops.h>
 #include <esp_rom_sys.h>
 #include <esp_system.h>
 #include <esp_task_wdt.h>
@@ -16,8 +17,11 @@
 #include "platform/ble_server.h"
 #include "platform/board.h"
 #include "platform/button.h"
+#include "platform/ecdsa_verifier.h"
 #include "platform/eth_net.h"
+#include "platform/fw_tag.h"
 #include "platform/nvs_storage.h"
+#include "platform/ota_flash.h"
 #include "platform/rtc_ds3231.h"
 #include "platform/system_clock.h"
 
@@ -66,6 +70,51 @@ Scheduler scheduler(clk, rlog, makeCamera, &hooks);
 Controller controller(clk, storage, rlog, scheduler);
 Dispatcher dispatcher(controller, rng);
 
+// Firmware updates over Bluetooth (docs/ble-protocol.md, fw.*). The phone starts them; the device never does.
+#if CONFIG_IDF_TARGET_ESP32C3
+constexpr uint8_t kChip = kChipEsp32C3;
+constexpr uint16_t kHeaderChipId = 5;  // ESP_CHIP_ID_ESP32C3
+#else
+constexpr uint8_t kChip = kChipEsp32S3;
+constexpr uint16_t kHeaderChipId = 9;  // ESP_CHIP_ID_ESP32S3
+#endif
+#ifdef KAIROS_ALLOW_UNSIGNED
+constexpr bool kAllowUnsigned = true;  // the device-dev environments only: never built by the release workflow
+#else
+constexpr bool kAllowUnsigned = false;
+#endif
+constexpr size_t kFwBufferBytes = kFwWindow + 4096;  // the window plus the per-message overhead
+constexpr uint32_t kConfirmAfterMs = 30000;
+
+OtaFlash otaFlash;
+EcdsaVerifier verifier;
+MessageBufferHandle_t fwBuffer = nullptr;
+bool g_pendingVerify = false;  // this image has not confirmed itself yet: a reset before then goes back to the old one
+bool g_sessionProven = false;  // a phone has connected and authenticated since boot: Bluetooth works
+
+FwGate fwGate() {
+  const StatusValue s = controller.status();
+  FwGate g;
+  g.idle = s.phase == Phase::Idle;
+  if ((s.flags & flag::ClockValid) && s.nextEventType != EventType::None) {
+    const uint32_t now = static_cast<uint32_t>(clk.nowMs() / 1000);
+    g.secondsToNextEvent = s.nextEventAt > now ? s.nextEventAt - now : 0;
+  }
+  return g;
+}
+
+FwConfig makeFwConfig() {
+  FwConfig c;
+  c.headerChipId = kHeaderChipId;
+  c.allowUnsigned = kAllowUnsigned;
+  return c;
+}
+Updater updater(otaFlash, verifier, makeFwConfig(), fwGate);
+
+// A new image must run for a while before it keeps the slot. verifyRollbackLater() makes the Arduino core
+// leave it pending instead of confirming it at once.
+extern "C" bool verifyRollbackLater() { return true; }
+
 const char* resetReason() {
   switch (esp_reset_reason()) {
     case ESP_RST_POWERON: return "power on";
@@ -93,6 +142,10 @@ Bytes deviceInfoBytes() {
   d.cams = eth.present() ? (kCamGeneric | kCamZcam) : kCamGeneric;
   d.fw = FW_VERSION;
   d.name = c.name;
+  d.update = true;
+  d.caps = kCapFirmwareUpdate;
+  d.chip = kChip;
+  d.slot = static_cast<uint32_t>(otaFlash.capacity());
   return encodeDeviceInfo(d);
 }
 
@@ -110,6 +163,7 @@ void handleBle(const BleMessage& m) {
       g_link.reset(new Link(
           dispatcher, [](const Bytes& f) { return ble.notify(f); }, []() { return ble.maxFragment(); }));
       rlog.log("BLE", "Connected");
+      ble.tuneConnection();
       break;
     case BleMessage::Disconnected:
       g_link.reset();
@@ -119,6 +173,28 @@ void handleBle(const BleMessage& m) {
       if (g_link) g_link->onWrite(m.data, m.len, millis());  // the link's timeouts use the monotonic clock
       break;
   }
+}
+
+/// Bytes written to the Firmware characteristic go to the updater, from an authenticated phone only.
+void handleFirmwareData(uint64_t nowMs) {
+  static uint8_t msg[520];
+  for (;;) {
+    const size_t n = xMessageBufferReceive(fwBuffer, msg, sizeof msg, 0);
+    if (n == 0) return;
+    if (g_link && g_link->session().authed) updater.onData(msg, n, nowMs);
+  }
+}
+
+void handleFirmwareProgress() {
+  static bool wasActive = false;
+  FwProgress p;
+  while (updater.takeProgress(p)) {
+    if (g_link) g_link->pushEvent(encodeFwEvent(p.state, p.offset, p.reason));
+    if (p.state == FwState::Failed) rlog.log("FW", "Update failed (reason " + std::to_string(static_cast<int>(p.reason)) + ")");
+    if (p.state == FwState::Ready) rlog.log("FW", "Update verified, restarting");
+  }
+  if (updater.active() && !wasActive) rlog.log("FW", "Receiving an update");
+  wasActive = updater.active();
 }
 
 void coreTask(void*) {
@@ -135,7 +211,7 @@ void coreTask(void*) {
     // sleep until something arrives or the next scheduled step is due (at most 100 ms)
     const uint64_t now = clk.nowMs();
     const uint64_t due = scheduler.nextDueMs();
-    uint32_t waitMs = 100;
+    uint32_t waitMs = updater.active() ? 10 : 100;  // an image arrives in a stream: keep draining it
     if (due != 0 && due > now && due - now < waitMs) waitMs = static_cast<uint32_t>(due - now);
     if (xQueueReceive(bleEvents, &item, pdMS_TO_TICKS(waitMs)) == pdTRUE) {
       handleBle(item);
@@ -143,6 +219,23 @@ void coreTask(void*) {
     }
 
     scheduler.tick();
+
+    handleFirmwareData(millis());
+    updater.tick(millis());
+    handleFirmwareProgress();
+    if (updater.rebootDue(millis())) {
+      vTaskDelay(pdMS_TO_TICKS(100));  // let the last notification and log line out
+      esp_restart();
+    }
+    if (g_link && g_link->session().authed) g_sessionProven = true;
+    // A new image keeps its slot only after it has run for a while AND a phone has authenticated over Bluetooth with
+    // it: an image whose radio is broken could not be updated or fixed again. If that never happens, a reset
+    // (a power cycle) goes back to the previous image.
+    if (g_pendingVerify && g_sessionProven && millis() > kConfirmAfterMs) {
+      g_pendingVerify = false;
+      esp_ota_mark_app_valid_cancel_rollback();
+      rlog.log("FW", std::string("Update confirmed: ") + FW_VERSION);
+    }
 
     if (button.consume()) controller.openPairing();
 
@@ -172,7 +265,7 @@ void coreTask(void*) {
     if (g_link) g_link->tick(millis());
 
     // keep the system clock on the RTC while nothing is running
-    if (ms - lastDiscipline >= kDisciplineEveryMs && scheduler.phase() == Phase::Idle) {
+    if (ms - lastDiscipline >= kDisciplineEveryMs && scheduler.phase() == Phase::Idle && !updater.active()) {
       lastDiscipline = ms;
       if (clk.discipline()) {
         rlog.log("INDEX", "Clock stepped to the RTC");
@@ -204,6 +297,13 @@ void setup() {
   rtc.begin(KAIROS_RTC_SDA, KAIROS_RTC_SCL);
   clk.begin();
   rlog.log("BOOT", std::string("Reset: ") + resetReason());
+  rlog.log("BOOT", std::string("Firmware ") + kairos_fw_tag.version);
+  if (kAllowUnsigned) rlog.log("BOOT", "WARNING: this build accepts unsigned firmware updates (developer build)");
+  {
+    esp_ota_img_states_t state;
+    g_pendingVerify = esp_ota_get_state_partition(esp_ota_get_running_partition(), &state) == ESP_OK && state == ESP_OTA_IMG_PENDING_VERIFY;
+    if (g_pendingVerify) rlog.log("FW", "New firmware is pending verification");
+  }
   if (!rtc.present()) rlog.log("BOOT", "RTC not found");
   if (!clk.valid()) rlog.log("BOOT", "Clock invalid, waiting for a phone");
 
@@ -215,7 +315,10 @@ void setup() {
   rlog.log("BOOT", eth.present() ? "Ethernet module found" : "No Ethernet module: Z CAM unavailable");
 
   bleEvents = xQueueCreate(16, sizeof(BleMessage));
+  fwBuffer = xMessageBufferCreate(kFwBufferBytes);
+  dispatcher.setFirmware(&updater, []() { return static_cast<uint64_t>(millis()); });
   const Config& c = controller.currentConfig();
+  ble.setFirmwareBuffer(fwBuffer);
   ble.begin(advertisedName(c.name, deviceId()), deviceInfoBytes(), bleEvents);
   rlog.log("BLE", "Advertising as " + advertisedName(c.name, deviceId()));
   applyConfig();
