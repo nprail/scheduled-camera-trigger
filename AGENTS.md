@@ -13,6 +13,7 @@ Guidance for agents working in this repository.
 | `apps/ios/` | The native iOS app (SwiftUI) and `KairosKit`, a UI-free Swift package for the protocol. |
 | `brand/` | Kairos brand assets for the apps: the mark (SVG) and the two fonts. The design system itself is the "Kairos" artifact. |
 | `docs/`, `website/` | The user and developer docs (`docs/`, including the protocol spec), and the marketing page (`website/`). The root `docmd.config.json` and `package.json` build `docs/` into `website/docs/` with docmd. |
+| `release/`, `scripts/` | The semantic-release configuration (one for the apps, one for the firmware) and the script that writes the app version into both projects. See "Commit messages and releases". |
 | `apps/android/` | The native Android app (Kotlin, Jetpack Compose, Material 3). The protocol code is in `app/src/main/java/com/noahprail/kairos/protocol/`. |
 
 The iOS app is a standard Xcode project (`apps/ios/Kairos.xcodeproj`), with no project generator. Run the kit's tests with `cd apps/ios/KairosKit && swift test`.
@@ -30,6 +31,45 @@ The ESP32 firmware is a PlatformIO project (`firmware/esp32/`). Run its host tes
 - Protocol changes start in `docs/ble-protocol.md` and the reference test vectors (`protocol/test-vectors.json`). Both apps must pass the same vectors.
 - Run both apps' tests before finishing (`swift test` for iOS, `./gradlew :app:testDebugUnitTest` for Android), make sure both still build, and check any changed screen on both platforms. The debug demo mode on each shows screens without Bluetooth hardware, so it works in a simulator or emulator as well as on a phone.
 - If you can't change both (for example one toolchain isn't available), say so clearly in your final message and list exactly what is left undone on the other platform. Don't silently ship a change on one platform only.
+
+## Commit messages and releases
+
+Versions are not edited by hand. Every push to `main` runs [semantic-release](https://semantic-release.gitbook.io) (`.github/workflows/release.yml`), which reads the commit messages, picks the next version and publishes it. **Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org):**
+
+```
+<type>(<scope>): <summary in the imperative, lower case, no full stop>
+
+<optional body: what and why>
+
+<optional footer: BREAKING CHANGE: what breaks and how to migrate>
+```
+
+| Type | Use for | Release |
+| --- | --- | --- |
+| `feat` | a new capability the user or device gains | minor |
+| `fix` | a bug fix | patch |
+| `perf` | a performance improvement | patch |
+| `feat!`, `fix!`, or a `BREAKING CHANGE:` footer | an incompatible change (for example a protocol version bump) | major |
+| `docs`, `refactor`, `test`, `build`, `ci`, `chore`, `style` | no change in behavior | none |
+
+Scopes: `ios`, `android`, `esp32`, `protocol`, `docs`, `site`, `ci`. A change to both apps uses `apps` (`feat(apps): …`). Use one commit per logical change, and the same type and summary for the matching iOS and Android change.
+
+**Two version lines, decided by the files a commit touches** (not by its scope; the scope is for the reader):
+
+| Line | Tag | Covers | Released as |
+| --- | --- | --- | --- |
+| Apps | `app-v1.2.3` | `apps/`, `brand/` | one number for iOS and Android together; `apps/CHANGELOG.md`; the version and the build number (`versionCode`, `CURRENT_PROJECT_VERSION`) in `build.gradle.kts` and the Xcode project are written by `scripts/set-app-version.mjs` in a `chore(release)` commit; the build number is the release workflow's `GITHUB_RUN_NUMBER`, which only goes up |
+| Firmware | `v1.2.3` | `firmware/esp32/` | a GitHub Release with the signed images and `manifest.json`; the tag is the version the device reports |
+
+`protocol/` and `docs/ble-protocol.md` count for both lines, so a `feat(protocol)` releases the apps and the firmware. The firmware has its own line because the apps offer "Update X" for every new firmware release: an app-only fix must not look like a firmware update, and a firmware-only fix must not force an app release. What ties the two together is the protocol version (`v` in Device Info), not the release numbers. `firmware/legacy-pi/` is not released.
+
+Rules:
+- Never edit a version number, `apps/CHANGELOG.md` or a `chore(release)` commit by hand, and never create a `v*` or `app-v*` tag yourself.
+- A fix that touches both a firmware and an app file releases both, so keep app and firmware changes in separate commits unless they are one change.
+- Mark a breaking protocol change with `!` or a `BREAKING CHANGE:` footer, and describe it in the body. Only protocol changes that need the app and the device updated together are breaking.
+- Merge to `main` with the commit messages intact (a rebase, or a squash with a conventional title). A merge commit message is ignored.
+- Releases from the `beta` branch are pre-releases (`1.3.0-beta.1`).
+- Preview a release without publishing: `npm run release:app -- --dry-run --no-ci` or `npm run release:firmware -- --dry-run --no-ci` (set `GITHUB_TOKEN`, and add `--branches <current branch>` off `main`). The plugin that filters commits by path is `release/by-path.cjs`.
 
 ---
 

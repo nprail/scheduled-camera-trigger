@@ -1,17 +1,61 @@
-name: Release firmware
+name: Release
 
-# Push a tag like v1.2.0 to build the ESP32 firmware and attach it to a GitHub Release.
-# The tag (without the "v") becomes the firmware version the device reports.
+# Every push to main (or beta) runs semantic-release for two independent version lines, from the commit
+# messages (see "Commit messages" in AGENTS.md):
+#   apps      app-v1.2.3  both phone apps, versioned together; a tag and apps/CHANGELOG.md, no GitHub Release
+#   firmware  v1.2.3      the ESP32 firmware; a draft GitHub Release that the jobs below fill and publish
+# The firmware tag (without the "v") becomes the firmware version the device reports.
 on:
   push:
-    tags: ["v*"]
+    branches: [main, beta]
 
 permissions:
   contents: read
 
+# releases must not overlap: each one pushes tags and a commit
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      firmware: ${{ steps.firmware.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # semantic-release reads the whole history and every tag
+          # a token that may push to a protected main; the default token works when main is unprotected
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          cache: npm
+
+      - run: npm ci
+
+      # firmware first: the apps' release pushes a version-bump commit
+      - name: Firmware version
+        id: firmware
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+        run: npm run release:firmware
+
+      - name: Apps version
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+        run: npm run release:app
+
   build:
     name: Build ${{ matrix.chip }}
+    needs: version
+    if: needs.version.outputs.firmware != ''
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -25,9 +69,11 @@ jobs:
             env: device-c3
             slot: 0x1D0000 # partitions_4mb.csv
     env:
-      KAIROS_VERSION: ${{ github.ref_name }}
+      KAIROS_VERSION: v${{ needs.version.outputs.firmware }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: v${{ needs.version.outputs.firmware }}
 
       - uses: actions/setup-python@v7
         with:
@@ -51,7 +97,7 @@ jobs:
 
       - name: Collect binaries
         run: |
-          v="${GITHUB_REF_NAME#v}"
+          v="${KAIROS_VERSION#v}"
           out=dist
           mkdir -p "$out"
           b=firmware/esp32/.pio/build/${{ matrix.env }}
@@ -75,13 +121,15 @@ jobs:
 
   release:
     name: Publish release
-    needs: build
+    needs: [version, build]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: v${{ needs.version.outputs.firmware }}
 
       - uses: actions/download-artifact@v7
         with:
@@ -101,7 +149,7 @@ jobs:
       - name: Sign the images and write the manifest
         env:
           KAIROS_SIGNING_KEY: ${{ secrets.KAIROS_SIGNING_KEY }}
-          TAG: ${{ github.ref_name }}
+          TAG: v${{ needs.version.outputs.firmware }}
         run: |
           if [ -z "$KAIROS_SIGNING_KEY" ]; then
             echo "The KAIROS_SIGNING_KEY secret is not set: see docs/updating-firmware.md"
@@ -117,10 +165,10 @@ jobs:
         working-directory: dist
         run: sha256sum *.bin > SHA256SUMS
 
-      - name: Create the release
+      - name: Attach the images and publish the release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: v${{ needs.version.outputs.firmware }}
           REPO: ${{ github.repository }}
         run: |
           cat > notes.md <<'NOTES'
@@ -138,11 +186,14 @@ jobs:
           With esptool: `esptool.py write_flash 0x0 kairos-esp32s3-<version>-factory.bin`.
           Verify downloads against `SHA256SUMS`.
           NOTES
+          # semantic-release wrote the changelog into the draft; keep it under the table
+          gh release view "$TAG" --repo "$REPO" --json body --jq .body > changes.md
+          { cat notes.md; printf '\n## Changes\n\n'; cat changes.md; } > body.md
+          gh release upload "$TAG" dist/* --repo "$REPO" --clobber
           # a tag with a hyphen (v1.3.0-beta.1) is a pre-release: the apps only offer it from Advanced
-          flags=""
-          case "$TAG" in *-*) flags="--prerelease" ;; esac
-          gh release create "$TAG" dist/* \
-            --repo "$REPO" \
+          latest="--latest"
+          case "$TAG" in *-*) latest="" ;; esac
+          gh release edit "$TAG" --repo "$REPO" \
             --title "Kairos firmware $TAG" \
-            --notes-file notes.md \
-            --verify-tag $flags
+            --notes-file body.md \
+            --draft=false $latest

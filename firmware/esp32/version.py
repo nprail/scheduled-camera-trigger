@@ -1,5 +1,6 @@
 # Sets FW_VERSION, the string the device reports as `fw` in Device Info.
-# KAIROS_VERSION wins (the release workflow sets it from the tag), then `git describe`, then "dev".
+# KAIROS_VERSION wins (the release workflow sets it from the tag), then `git describe` on the
+# firmware tags (v*, not the apps' app-v* tags), then "dev".
 import os
 import subprocess
 
@@ -12,7 +13,7 @@ def version():
         return v
     try:
         out = subprocess.run(
-            ["git", "describe", "--tags", "--always", "--dirty"],
+            ["git", "describe", "--tags", "--match", "v[0-9]*", "--always", "--dirty"],
             cwd=env["PROJECT_DIR"], capture_output=True, text=True, check=True,  # noqa: F821
         ).stdout.strip()
         if out:
