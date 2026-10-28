@@ -1,5 +1,12 @@
 # Kairos apps changelog
 
+# [1.0.0-beta.3](https://github.com/nprail/kairos/compare/app-v1.0.0-beta.2...app-v1.0.0-beta.3) (2026-10-28)
+
+
+### Bug Fixes
+
+* Trigger a release ([54e7326](https://github.com/nprail/kairos/commit/54e7326975a3f6b63817bd669b014575fbd71cfd))
+
 # [1.0.0-beta.2](https://github.com/nprail/kairos/compare/app-v1.0.0-beta.1...app-v1.0.0-beta.2) (2026-10-27)
 
 
