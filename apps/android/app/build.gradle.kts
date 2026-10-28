@@ -15,8 +15,8 @@ android {
         applicationId = "com.noahprail.kairos"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6 // controlled by semantic-release
-        versionName = "1.0.0-beta.3" // controlled by semantic-release
+        versionCode = 7 // controlled by semantic-release
+        versionName = "1.0.0-beta.4" // controlled by semantic-release
     }
 
     // Release signing (the Play upload key). The values come from the environment (CI) or from
