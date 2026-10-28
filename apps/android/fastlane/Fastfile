@@ -102,8 +102,11 @@ platform :android do
   end
 
   desc "Upload the store listing: texts, icon, feature graphic and screenshots"
-  lane :metadata do
+  lane :metadata do |options|
     upload_to_play_store(
+      # supply looks up a release on this track even for a listing-only upload (the default, production, has
+      # none yet), so name a track that has one
+      track: options[:track] || "internal",
       metadata_path: METADATA,
       skip_upload_apk: true,
       skip_upload_aab: true,

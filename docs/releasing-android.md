@@ -21,7 +21,7 @@ The Play API can only update an app that exists, and the **first upload of a new
 
 1. In [Play Console](https://play.google.com/console), create the app. Name: Kairos. Package name: `com.noahprail.kairos`.
 2. Fill in what Play requires that fastlane cannot: the **privacy policy URL** (the app collects nothing, but Play still wants a page), the **Data safety** form, the **content rating**, the **target audience**, and the app category.
-   - Data safety, for reference: no data collected or shared. The app looks for firmware on GitHub when it connects, which sends the phone's IP address to GitHub and nothing else; the pairing key is stored on the device and is not backed up.
+   - Data safety, for reference: no data collected or shared. The app looks for firmware on GitHub when it connects, which sends the phone's IP address to GitHub and nothing else; the pairing key is stored on the device and is not backed up. The answers are in `apps/android/fastlane/data_safety.csv`: in Play Console, Data safety, **Import from CSV** (it is Play's own export with one answer filled in: no data collected or shared).
    - Permissions to explain: Nearby devices (`BLUETOOTH_SCAN` with `neverForLocation`, and `BLUETOOTH_CONNECT`) to find and talk to the device; Internet to look for firmware.
 3. Leave **Play App Signing** on (the default). Google keeps the key that signs what users install. The key below is only the *upload* key.
 4. Build the first release (below), and upload `app-release.aab` by hand to the internal testing track. After that, everything else is automatic.
@@ -73,7 +73,7 @@ Everything is in `apps/android/fastlane/`. Install it once with `cd apps/android
 | `fastlane android test` | the unit tests |
 | `fastlane android build` | a signed release APK and AAB (`app/build/outputs/`). Needs the upload key: `ANDROID_KEYSTORE_FILE` and the other `ANDROID_KEY*` variables, or `apps/android/keystore.properties`, a git-ignored copy of `~/.kairos-signing/android-keystore.properties` |
 | `fastlane android deploy` | builds, writes the "what's new" text from `apps/CHANGELOG.md`, and uploads the AAB. `track:internal` by default |
-| `fastlane android metadata` | uploads the listing: title, descriptions, icon, feature graphic and screenshots |
+| `fastlane android metadata` | uploads the listing (looks for a release on `track:internal`, so upload a build first): title, descriptions, icon, feature graphic and screenshots |
 | `fastlane android screenshots serial:emulator-5554` | takes the phone screenshots (below) |
 | `fastlane android graphics` | draws the icon and the feature graphic from `brand/` (needs `brew install librsvg imagemagick`) |
 | `fastlane android validate` | checks the Play service account key |
