@@ -121,7 +121,9 @@ jobs:
           export ANDROID_KEYSTORE_FILE="$RUNNER_TEMP/upload.jks"
           bundle exec fastlane android build
           # a signed build is useless if the signature is not the upload key's
-          "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk | head -3
+          # the runner has several build-tools versions: use the newest one's apksigner
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk | head -3
 
       - uses: actions/upload-artifact@v7
         if: steps.keys.outputs.signing == 'true'

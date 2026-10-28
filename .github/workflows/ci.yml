@@ -159,7 +159,9 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
           export ANDROID_KEYSTORE_FILE="$RUNNER_TEMP/upload.jks"
           ./gradlew :app:assembleRelease :app:bundleRelease
-          "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk | head -3
+          # the runner has several build-tools versions: use the newest one's apksigner
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk | head -3
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
