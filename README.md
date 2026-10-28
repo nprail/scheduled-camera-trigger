@@ -73,6 +73,16 @@ With the apps you can find and connect to devices, pair with the button, see liv
 - **iPhone:** [apps/ios/](apps/ios/README.md), a native SwiftUI app for iOS 17 and later.
 - **Android:** [apps/android/](apps/android/README.md), a native Jetpack Compose app for Android 8.0 and later.
 
+### Get the apps
+
+- **iPhone:** the app isn't on the App Store, so you build it yourself with Xcode 16 or later and install it on your iPhone (iOS 17 or later):
+  1. `git clone https://github.com/nprail/kairos.git`, then `open kairos/apps/ios/Kairos.xcodeproj`.
+  2. In *Signing & Capabilities*, choose your team (a free Apple ID works) and change the bundle identifier to one that is unique to you.
+  3. Connect your iPhone, turn on Developer Mode (*Settings › Privacy & Security*), choose it in Xcode and press Run.
+
+  Bluetooth doesn't work in the Simulator. An app signed with a free Apple ID stops opening after 7 days: run it from Xcode again to renew it.
+- **Android:** the app is in a closed test on Google Play and is by invitation only. Email [hello@noahprail.com](mailto:hello@noahprail.com) with the email address of your Google account to be added. You can also build it from the source ([apps/android/](apps/android/README.md)).
+
 ## Documentation
 
 Read it online at [nprail.github.io/kairos/docs](https://nprail.github.io/kairos/docs/), or browse the files here.

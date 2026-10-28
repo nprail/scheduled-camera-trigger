@@ -204,7 +204,7 @@
     <section id="apps" class="mx-auto grid max-w-6xl scroll-mt-8 items-center gap-12 px-6 py-16 md:py-24 lg:grid-cols-2">
       <div>
         <p class="label text-muted">Apps</p>
-        <h2 class="mt-3 font-display text-4xl font-semibold leading-[1.1] tracking-[-0.02em]">Available on iPhone and Android.</h2>
+        <h2 class="mt-3 font-display text-4xl font-semibold leading-[1.1] tracking-[-0.02em]">For iPhone and Android.</h2>
         <p class="mt-6 max-w-lg text-lg leading-7 text-muted">Set up and control Kairos from your phone. You can:</p>
         <ul class="mt-6 grid max-w-lg gap-3 text-muted">
           <li class="flex gap-3"><span class="mt-[10px] h-px w-4 shrink-0 bg-ink" aria-hidden="true"></span>Find and connect to devices, and pair with the button</li>
@@ -218,6 +218,42 @@
         <figure class="w-3/4 max-w-[280px]">
           <img src="img/app-ios.png" width="560" height="1218" alt="The Kairos app during a recording: status, a T-minus countdown to the next event, camera controls and the schedule." class="w-full rounded-[28px] border border-hairline" loading="lazy">
         </figure>
+      </div>
+    </section>
+
+    <!-- Download -->
+    <section id="download" class="mx-auto max-w-6xl scroll-mt-8 px-6 pb-16 md:pb-24">
+      <p class="label text-muted">Download</p>
+      <h2 class="mt-3 font-display text-3xl font-semibold leading-[1.1] tracking-[-0.02em]">Get the app.</h2>
+      <div class="mt-8 grid items-start gap-6 lg:grid-cols-2">
+        <article class="rounded-md border border-hairline bg-raised p-6">
+          <p class="label text-muted">iPhone</p>
+          <h3 class="mt-2 font-display text-2xl font-semibold">Build it yourself</h3>
+          <p class="mt-3 leading-7 text-muted">Not on the App Store. You build it with Xcode and install it on your own iPhone.</p>
+          <details class="mt-5">
+            <summary class="inline-block cursor-pointer list-none rounded-md border border-ink px-5 py-3 font-medium hover:bg-ink hover:text-ground [&::-webkit-details-marker]:hidden">Install on iPhone</summary>
+            <ol class="mt-5 grid list-decimal gap-3 pl-5 leading-7 text-muted marker:text-ink">
+              <li>On a Mac, install Xcode 16 or later, and get the source:
+                <pre class="mt-2 overflow-x-auto rounded-sm border border-hairline bg-ground p-3 font-mono text-sm text-ink"><code>git clone https://github.com/nprail/kairos.git
+open kairos/apps/ios/Kairos.xcodeproj</code></pre>
+              </li>
+              <li>In <span class="text-ink">Signing &amp; Capabilities</span>, choose your team (a free Apple ID works) and change the bundle identifier to one that is unique to you.</li>
+              <li>Connect an iPhone running iOS 17 or later, and turn on Developer Mode in <span class="text-ink">Settings, Privacy &amp; Security</span>.</li>
+              <li>Choose your iPhone in Xcode and press Run.</li>
+            </ol>
+            <p class="mt-4 text-sm leading-6 text-muted">Bluetooth doesn't work in the Simulator, so use a real iPhone. An app signed with a free Apple ID stops opening after 7 days. Run it from Xcode again to renew it.</p>
+          </details>
+        </article>
+        <article class="rounded-md border border-hairline bg-raised p-6">
+          <p class="label text-muted">Android</p>
+          <h3 class="mt-2 font-display text-2xl font-semibold">By invitation</h3>
+          <p class="mt-3 leading-7 text-muted">In a closed test on Google Play. You need an invitation to install it.</p>
+          <details class="mt-5">
+            <summary class="inline-block cursor-pointer list-none rounded-md border border-ink px-5 py-3 font-medium hover:bg-ink hover:text-ground [&::-webkit-details-marker]:hidden">Install on Android</summary>
+            <p class="mt-5 leading-7 text-muted">Email <a class="text-ink underline" href="mailto:hello@noahprail.com?subject=Kairos%20Android%20app">hello@noahprail.com</a> with the email address of your Google account, and you'll be added.</p>
+            <p class="mt-4 text-sm leading-6 text-muted">Needs Android 8.0 or later. You can also build the app from the source: see <a class="underline" href="https://github.com/nprail/kairos/tree/main/apps/android">apps/android</a>.</p>
+          </details>
+        </article>
       </div>
     </section>
 
