@@ -26,6 +26,7 @@ jobs:
       contents: write
     outputs:
       firmware: ${{ steps.firmware.outputs.version }}
+      app: ${{ steps.app.outputs.version }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -48,9 +49,101 @@ jobs:
         run: npm run release:firmware
 
       - name: Apps version
+        id: app
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
         run: npm run release:app
+
+  # The Android app, signed with the Play upload key and sent to the internal track. The GitHub Release is
+  # only for the firmware (see release/app.config.cjs), so the build is a workflow artifact and Play.
+  # Needs the secrets in docs/releasing-android.md; without them the job explains and does nothing.
+  android:
+    name: Android app
+    needs: version
+    if: needs.version.outputs.app != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: app-v${{ needs.version.outputs.app }}
+
+      - name: Check the signing secrets
+        id: keys
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PLAY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$KEYSTORE" ]; then
+            echo "::warning::ANDROID_KEYSTORE_BASE64 is not set, so the Android release was not built. See docs/releasing-android.md."
+            echo "signing=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "signing=true" >> "$GITHUB_OUTPUT"
+          if [ -z "$PLAY" ]; then
+            echo "::notice::PLAY_SERVICE_ACCOUNT_JSON is not set: the release is built and kept as an artifact, but not sent to Google Play."
+            echo "play=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "play=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-java@v6
+        if: steps.keys.outputs.signing == 'true'
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v6
+        if: steps.keys.outputs.signing == 'true'
+
+      - uses: ruby/setup-ruby@v1
+        if: steps.keys.outputs.signing == 'true'
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: apps/android
+
+      - name: Unit tests
+        if: steps.keys.outputs.signing == 'true'
+        working-directory: apps/android
+        run: ./gradlew :app:testDebugUnitTest
+
+      - name: Build the signed release
+        if: steps.keys.outputs.signing == 'true'
+        working-directory: apps/android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          export ANDROID_KEYSTORE_FILE="$RUNNER_TEMP/upload.jks"
+          bundle exec fastlane android build
+          # a signed build is useless if the signature is not the upload key's
+          # the runner has several build-tools versions: use the newest one's apksigner
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk | head -3
+
+      - uses: actions/upload-artifact@v7
+        if: steps.keys.outputs.signing == 'true'
+        with:
+          name: android-release
+          path: |
+            apps/android/app/build/outputs/apk/release/app-release.apk
+            apps/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+      # internal track only: moving a build to beta or production is a human choice, made in Play Console
+      - name: Upload to Google Play (internal track)
+        if: steps.keys.outputs.play == 'true'
+        working-directory: apps/android
+        env:
+          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          printf '%s' "$PLAY_JSON" > "$RUNNER_TEMP/play.json"
+          export SUPPLY_JSON_KEY="$RUNNER_TEMP/play.json"
+          bundle exec fastlane android deploy skip_build:true track:internal
 
   build:
     name: Build ${{ matrix.chip }}

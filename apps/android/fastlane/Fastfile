@@ -1,0 +1,168 @@
+# Releasing the Android app to Google Play (docs/releasing-android.md).
+#
+#   bundle exec fastlane test         run the unit tests
+#   bundle exec fastlane build        a signed release APK and AAB (needs the upload key, see the docs)
+#   bundle exec fastlane deploy       build, then upload the AAB to a Play track (default: internal)
+#   bundle exec fastlane metadata     upload the listing: texts, icon, feature graphic and screenshots
+#   bundle exec fastlane screenshots  take the phone screenshots from the app's demo scenes (adb device or emulator)
+#   bundle exec fastlane graphics     draw the icon and feature graphic from the brand files
+#   bundle exec fastlane validate     check that the Play service account key works
+#
+# Versions are never set here: semantic-release writes versionName and versionCode into build.gradle.kts.
+require "fileutils"
+
+# fastlane evaluates this file, so __dir__ is only "." here: make the paths absolute
+FASTLANE_DIR = File.expand_path(__dir__)
+ANDROID_DIR = File.expand_path("..", FASTLANE_DIR)
+REPO_DIR = File.expand_path("../..", ANDROID_DIR)
+METADATA = File.join(FASTLANE_DIR, "metadata", "android")
+LOCALE = "en-US"
+GRADLE_FILE = File.join(ANDROID_DIR, "app", "build.gradle.kts")
+
+# the app's demo scenes (debug builds), as [file name, scene, screen]: see "Debug demo mode" in AGENTS.md
+SCREENSHOTS = [
+  ["01_devices", "scan", "main"],
+  ["02_status", "ready", "main"],
+  ["03_recording", "recording", "main"],
+  ["04_schedule", "ready", "config"],
+  ["05_firmware", "firmware", "firmware"],
+  ["06_logs", "ready", "logs"],
+].freeze
+
+def version_code
+  File.read(GRADLE_FILE)[/versionCode = (\d+)/, 1] or UI.user_error!("no versionCode in #{GRADLE_FILE}")
+end
+
+def version_name
+  File.read(GRADLE_FILE)[/versionName = "([^"]+)"/, 1] or UI.user_error!("no versionName in #{GRADLE_FILE}")
+end
+
+def signing_configured?
+  return true if ENV["ANDROID_KEYSTORE_FILE"] && !ENV["ANDROID_KEYSTORE_FILE"].empty?
+  File.exist?(File.join(ANDROID_DIR, "keystore.properties"))
+end
+
+def adb_path
+  sdk = ENV["ANDROID_HOME"] || ENV["ANDROID_SDK_ROOT"] || File.expand_path("~/Library/Android/sdk")
+  File.join(sdk, "platform-tools", "adb")
+end
+
+def adb(*args, serial: nil)
+  device = serial ? ["-s", serial] : []
+  sh(adb_path, *device, *args, log: false)
+end
+
+platform :android do
+  desc "Run the unit tests"
+  lane :test do
+    gradle(task: "testDebugUnitTest", project_dir: ANDROID_DIR)
+  end
+
+  desc "Build the signed release APK and AAB"
+  lane :build do
+    UI.user_error!("No upload key: set ANDROID_KEYSTORE_FILE (and the other ANDROID_KEY* variables) or create apps/android/keystore.properties. See docs/releasing-android.md.") unless signing_configured?
+    gradle(tasks: ["assembleRelease", "bundleRelease"], project_dir: ANDROID_DIR)
+    UI.success("Built #{version_name} (#{version_code})")
+  end
+
+  desc "Write the Play 'what's new' text for this build from apps/CHANGELOG.md"
+  lane :changelog do
+    text = File.read(File.join(REPO_DIR, "apps", "CHANGELOG.md"))
+    # the newest release is the first section: from its heading to the next one
+    section = text.split(/^# \[?\d/).find { |part| part.include?("\n* ") }.to_s
+    lines = section.lines.map(&:strip).reject { |l| l.empty? || l.start_with?("[") }
+    items = lines.select { |l| l.start_with?("* ") }.map do |l|
+      l.sub(/^\* /, "").sub(/\s*\(\[[0-9a-f]+\]\(.*\)\)\s*$/, "").sub(/^\*\*[^*]+:\*\* /, "")
+    end
+    body = items.empty? ? "Improvements and fixes." : items.map { |i| "- #{i}" }.join("\n")
+    body = body[0, 497] + "..." if body.length > 500 # Play allows 500 characters
+    path = File.join(METADATA, LOCALE, "changelogs", "#{version_code}.txt")
+    FileUtils.mkdir_p(File.dirname(path))
+    File.write(path, body + "\n")
+    UI.message("Wrote #{path}:\n#{body}")
+  end
+
+  desc "Build and upload the AAB to a Play track (internal unless track: is given)"
+  lane :deploy do |options|
+    track = options[:track] || "internal"
+    build unless options[:skip_build]
+    changelog
+    aab = File.join(ANDROID_DIR, "app", "build", "outputs", "bundle", "release", "app-release.aab")
+    upload_to_play_store(
+      track: track,
+      aab: aab,
+      # a draft can be reviewed and rolled out in the console; the internal track needs no review
+      release_status: track == "internal" ? "completed" : "draft",
+      metadata_path: METADATA,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      skip_upload_apk: true,
+    )
+  end
+
+  desc "Upload the store listing: texts, icon, feature graphic and screenshots"
+  lane :metadata do
+    upload_to_play_store(
+      metadata_path: METADATA,
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      skip_upload_changelogs: true,
+    )
+  end
+
+  desc "Check that the Play service account key can reach the app"
+  lane :validate do
+    validate_play_store_json_key
+  end
+
+  desc "Draw the 512 px icon and the feature graphic from the brand files"
+  lane :graphics do
+    sh(File.join(FASTLANE_DIR, "graphics.sh"), File.join(METADATA, LOCALE, "images"))
+  end
+
+  desc "Take the Play phone screenshots from the demo scenes (serial: picks the device; it must be running)"
+  lane :screenshots do |options|
+    serial = options[:serial] || ENV["ANDROID_SERIAL"]
+    out = File.join(METADATA, LOCALE, "images", "phoneScreenshots")
+    FileUtils.mkdir_p(out)
+    Dir.glob(File.join(out, "*.png")).each { |f| File.delete(f) }
+
+    gradle(task: "assembleDebug", project_dir: ANDROID_DIR)
+    apk = File.join(ANDROID_DIR, "app", "build", "outputs", "apk", "debug", "app-debug.apk")
+    adb("install", "-r", apk, serial: serial)
+
+    # Play wants no side longer than twice the other, and a plain light phone: fix the size and the theme
+    adb("shell", "wm", "size", "1080x2160", serial: serial)
+    adb("shell", "wm", "density", "420", serial: serial)
+    adb("shell", "cmd", "uimode", "night", "no", serial: serial)
+    # a clean status bar: fixed clock, full battery, no notification icons
+    adb("shell", "settings", "put", "global", "sysui_demo_allowed", "1", serial: serial)
+    demo = lambda do |*extra|
+      adb("shell", "am", "broadcast", "-a", "com.android.systemui.demo", *extra, serial: serial)
+    end
+    demo.call("-e", "command", "enter")
+    demo.call("-e", "command", "clock", "-e", "hhmm", "0941")
+    demo.call("-e", "command", "battery", "-e", "level", "100", "-e", "plugged", "false")
+    demo.call("-e", "command", "network", "-e", "wifi", "show", "-e", "level", "4")
+    demo.call("-e", "command", "network", "-e", "mobile", "show", "-e", "datatype", "none", "-e", "level", "4")
+    demo.call("-e", "command", "notifications", "-e", "visible", "false")
+
+    begin
+      SCREENSHOTS.each do |name, scene, screen|
+        adb("shell", "am", "force-stop", "com.noahprail.kairos", serial: serial)
+        adb("shell", "am", "start", "-n", "com.noahprail.kairos/.MainActivity", "--es", "demo", scene, "--es", "screen", screen, serial: serial)
+        sleep(4)
+        file = File.join(out, "#{name}.png")
+        sh("#{adb_path} #{serial ? "-s #{serial}" : ""} exec-out screencap -p > '#{file}'", log: false)
+        UI.user_error!("no screenshot for #{name}") unless File.size?(file)
+        UI.success("#{name}: #{scene}/#{screen}")
+      end
+    ensure
+      demo.call("-e", "command", "exit")
+      adb("shell", "wm", "size", "reset", serial: serial)
+      adb("shell", "wm", "density", "reset", serial: serial)
+      adb("shell", "cmd", "uimode", "night", "auto", serial: serial)
+    end
+  end
+end

@@ -14,4 +14,5 @@ Kairos is an open source hardware, time-based camera trigger. It wakes a camera 
 - [Bluetooth protocol](ble-protocol.md): how the phone and the device talk to each other.
 - [ESP32 firmware](esp32-port.md): the design of the ESP32 firmware, its status, and what it changes from the legacy Raspberry Pi version.
 - [Firmware update design](ota-plan.md): how updates over Bluetooth work and why.
+- [Releasing the Android app](releasing-android.md): signing, Google Play, fastlane, and the screenshots.
 - [Development](development.md): repository layout, running the tests, and the test vectors.

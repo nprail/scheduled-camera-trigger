@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy policy | kairos</title>
+  <meta name="description" content="The Kairos app talks only to your Kairos device over Bluetooth. It has no accounts, ads or analytics.">
+  <meta name="theme-color" content="#f2f0ea" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#14130f" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&family=Space+Grotesk:wght@600&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script>
+    // Kairos brand tokens (see brand/README.md). Light and dark are both first-class.
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ground: 'rgb(var(--ground) / <alpha-value>)',
+            raised: 'rgb(var(--raised) / <alpha-value>)',
+            ink: 'rgb(var(--ink) / <alpha-value>)',
+            muted: 'rgb(var(--muted) / <alpha-value>)',
+            hairline: 'rgb(var(--hairline) / <alpha-value>)',
+            signal: 'rgb(var(--signal) / <alpha-value>)',
+          },
+          fontFamily: {
+            display: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
+            sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+          },
+          borderRadius: { sm: '4px', md: '8px' },
+        },
+      },
+    }
+  </script>
+  <style>
+    :root {
+      --ground: 242 240 234; --raised: 250 249 245; --ink: 20 19 15;
+      --muted: 107 103 94; --hairline: 217 214 204; --signal: 242 63 18;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --ground: 20 19 15; --raised: 30 29 25; --ink: 242 240 234;
+        --muted: 168 163 152; --hairline: 46 44 39; --signal: 255 90 46;
+      }
+    }
+    html { scroll-behavior: smooth; }
+    body { background: rgb(var(--ground)); color: rgb(var(--ink)); }
+    /* a solid 2px ink ring, offset by 2px, on every focusable element */
+    :focus-visible { outline: 2px solid rgb(var(--ink)); outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    .mark-ink { stroke: rgb(var(--ink)); }
+    .mark-sig { stroke: rgb(var(--signal)); }
+    .mark-dot { fill: rgb(var(--signal)); }
+    .label { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
+    .wordmark { font-family: 'Space Grotesk', system-ui, sans-serif; font-weight: 600; letter-spacing: -0.03em; }
+  </style>
+</head>
+<body class="font-sans text-base antialiased">
+  <svg width="0" height="0" class="absolute" aria-hidden="true">
+    <defs>
+      <symbol id="mark" viewBox="0 0 120 120">
+        <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path class="mark-ink" stroke-width="7" d="M8 34V10H32M88 10H112V34M112 86V110H88M32 110H8V86"/>
+          <g class="mark-ink" stroke-width="6"><line x1="28" y1="64" x2="28" y2="90"/><line x1="44" y1="64" x2="44" y2="90"/><line x1="76" y1="64" x2="76" y2="90"/><line x1="92" y1="64" x2="92" y2="90"/></g>
+          <line class="mark-sig" stroke-width="6" x1="60" y1="42" x2="60" y2="90"/>
+        </g>
+        <circle class="mark-dot" cx="60" cy="31" r="10"/>
+      </symbol>
+      <symbol id="mark-small" viewBox="0 0 120 120">
+        <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path class="mark-ink" stroke-width="10" d="M8 34V10H32M88 10H112V34M112 86V110H88M32 110H8V86"/>
+          <line class="mark-sig" stroke-width="10" x1="60" y1="42" x2="60" y2="92"/>
+        </g>
+        <circle class="mark-dot" cx="60" cy="31" r="13"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-ink focus:px-4 focus:py-2 focus:text-ground">Skip to content</a>
+
+  <header class="border-b border-hairline">
+    <div class="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4">
+      <a href="../" class="flex items-center gap-[10px]" aria-label="kairos, home">
+        <svg width="32" height="32" aria-hidden="true"><use href="#mark"/></svg>
+        <span class="wordmark text-3xl leading-none">kairos</span>
+      </a>
+      <nav aria-label="Primary" class="flex items-center gap-6 text-sm">
+        <a class="hover:underline" href="../docs/">Docs</a>
+        <a class="rounded-md border border-ink px-4 py-2 font-medium hover:bg-ink hover:text-ground" href="https://github.com/nprail/kairos">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="mx-auto max-w-3xl px-6 py-16 md:py-20">
+    <p class="label text-muted">Legal</p>
+    <h1 class="mt-4 font-display text-5xl font-semibold leading-[1.05] tracking-[-0.02em]">Privacy policy</h1>
+    <p class="mt-4 text-muted">Last updated 28 October 2026</p>
+
+    <div class="mt-10 space-y-10 leading-7">
+      <section>
+        <p class="text-lg">The Kairos app (iOS and Android) configures and controls a Kairos device over Bluetooth. It collects no personal information: no accounts, ads, analytics or crash reporting, and no server of ours that it talks to.</p>
+      </section>
+
+      <section>
+        <h2 class="font-display text-2xl font-semibold">On your phone</h2>
+        <p class="mt-3">The pairing key for your device is stored in the iOS Keychain or Android Keystore. It stays on the phone, is not backed up, and is deleted when you forget the device. The app also keeps your settings and downloaded firmware files in its private storage. Uninstalling the app removes them.</p>
+      </section>
+
+      <section>
+        <h2 class="font-display text-2xl font-semibold">Internet use</h2>
+        <p class="mt-3">When you connect to a device, the app checks GitHub for a newer firmware release (at most every 10 minutes) and downloads firmware only if you ask. No information about you or your device is sent. GitHub can see the phone's IP address, as any website can, under <a class="underline" href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">its own privacy statement</a>. You can turn the check off under Firmware, Advanced.</p>
+      </section>
+
+      <section>
+        <h2 class="font-display text-2xl font-semibold">Permissions</h2>
+        <p class="mt-3">Bluetooth (iOS) or Nearby devices (Android), to find your Kairos device. The app does not use it for location.</p>
+      </section>
+
+      <section>
+        <h2 class="font-display text-2xl font-semibold">Changes and contact</h2>
+        <p class="mt-3">If this changes, this page and its date will be updated. Questions: <a class="underline" href="https://github.com/nprail/kairos/issues">open an issue on GitHub</a>.</p>
+      </section>
+    </div>
+  </main>
+
+  <footer class="border-t border-hairline">
+    <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-8 text-sm text-muted">
+      <div class="flex items-center gap-[8px] text-ink">
+        <svg width="24" height="24" aria-hidden="true"><use href="#mark-small"/></svg>
+        <span class="wordmark text-2xl leading-none">kairos</span>
+      </div>
+      <p>A camera trigger for the exact moment. Open source.</p>
+      <nav aria-label="Footer" class="flex gap-6">
+        <a class="hover:underline" href="https://github.com/nprail/kairos">GitHub</a>
+        <a class="hover:underline" href="../docs/">Docs</a>
+        <a class="hover:underline" href="../privacy/" aria-current="page">Privacy</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>

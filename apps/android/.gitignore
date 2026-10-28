@@ -6,3 +6,14 @@ local.properties
 captures/
 .cxx/
 Kairos-debug.apk
+
+# release signing and fastlane (docs/releasing-android.md)
+*.jks
+*.keystore
+keystore.properties
+play-service-account*.json
+fastlane/report.xml
+fastlane/README.md
+fastlane/metadata/android/*/changelogs/[0-9]*.txt
+.bundle/
+vendor/bundle/

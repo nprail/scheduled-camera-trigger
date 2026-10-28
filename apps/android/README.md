@@ -32,6 +32,8 @@ cd apps/android
 
 The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. Install it with `adb install -r` or by copying it to your phone.
 
+Release builds are signed with the Play upload key and sent to Google Play with fastlane: see [docs/releasing-android.md](../../docs/releasing-android.md). Without the key, `./gradlew :app:assembleRelease` builds an unsigned APK.
+
 The first time you open the app it asks for the Nearby devices permission (`BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT`, or location on Android 11 and earlier), which it needs to find the device.
 
 ## Test

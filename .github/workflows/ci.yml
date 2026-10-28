@@ -134,9 +134,48 @@ jobs:
         working-directory: apps/android
         run: ./gradlew :app:assembleDebug
 
+      # the release configuration must keep building. With the upload key (the repository's secrets, so not
+      # on forks) the build is signed; without it, only an unsigned bundle is built, to check that it compiles
+      - name: Check the signing secrets
+        id: keys
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: echo "signing=$([ -n "$KEYSTORE" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Build release bundle (unsigned)
+        if: steps.keys.outputs.signing != 'true'
+        working-directory: apps/android
+        run: ./gradlew :app:bundleRelease
+
+      - name: Build signed release APK and bundle
+        if: steps.keys.outputs.signing == 'true'
+        working-directory: apps/android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          export ANDROID_KEYSTORE_FILE="$RUNNER_TEMP/upload.jks"
+          ./gradlew :app:assembleRelease :app:bundleRelease
+          # the runner has several build-tools versions: use the newest one's apksigner
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk | head -3
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
         with:
           name: app-debug
           path: apps/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Upload signed release APK and bundle
+        if: steps.keys.outputs.signing == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: app-release
+          path: |
+            apps/android/app/build/outputs/apk/release/app-release.apk
+            apps/android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
