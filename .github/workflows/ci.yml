@@ -134,6 +134,11 @@ jobs:
         working-directory: apps/android
         run: ./gradlew :app:assembleDebug
 
+      # the release configuration must keep building (unsigned here: the upload key is only in the release workflow)
+      - name: Build release bundle
+        working-directory: apps/android
+        run: ./gradlew :app:bundleRelease
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
         with:

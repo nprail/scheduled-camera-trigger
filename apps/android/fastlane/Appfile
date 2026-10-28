@@ -1,0 +1,4 @@
+# The Play service account is a JSON key from Google Play Console > Setup > API access. CI writes it from the
+# PLAY_SERVICE_ACCOUNT_JSON secret; locally, point SUPPLY_JSON_KEY at the file (it stays out of the repository).
+json_key_file(ENV["SUPPLY_JSON_KEY"]) if ENV["SUPPLY_JSON_KEY"]
+package_name("com.noahprail.kairos")

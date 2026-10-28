@@ -91,6 +91,10 @@
           "path": "/ota-plan/"
         },
         {
+          "title": "Releasing the Android app",
+          "path": "/releasing-android/"
+        },
+        {
           "title": "Development",
           "path": "/development/"
         }

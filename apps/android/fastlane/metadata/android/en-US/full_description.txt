@@ -1,0 +1,17 @@
+Kairos is an open source camera trigger that wakes a camera and starts and stops recording at the exact moment you choose. This app sets it up and controls it from your phone, over Bluetooth, with no Wi-Fi or internet needed in the field.
+
+You need a Kairos device (an ESP32 board with the Kairos firmware) to use it. Build instructions and the firmware are at github.com/nprail/kairos.
+
+WHAT YOU CAN DO
+• Find nearby Kairos devices and pair once with a press of the button on the device, so only your phone controls it.
+• Set the device clock from your phone every time you connect, so a launch never starts at the wrong time.
+• See live status with a countdown to the next wake, start or stop.
+• Edit launch attempts, timing and camera settings. Changes are saved to the device in one step.
+• Run a test, or wake, start, stop and sleep the camera by hand.
+• Follow the device log live.
+• Update the device firmware over Bluetooth, when you choose to. Nothing is ever installed without your tap.
+
+PRIVACY
+The app talks only to your Kairos device over Bluetooth. It has no accounts, no ads and no analytics. The one thing it does over the internet is look for a newer firmware release on GitHub when you connect, which you can turn off under Firmware, Advanced. The pairing key for your device is stored encrypted on your phone and is not included in backups.
+
+Kairos is free software (MIT licensed).

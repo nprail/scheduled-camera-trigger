@@ -18,7 +18,7 @@ Guidance for agents working in this repository.
 
 The iOS app is a standard Xcode project (`apps/ios/Kairos.xcodeproj`), with no project generator. Run the kit's tests with `cd apps/ios/KairosKit && swift test`.
 
-The Android app is a Gradle project (`apps/android/`, wrapper included, JDK 17+). Run its unit tests with `cd apps/android && ./gradlew :app:testDebugUnitTest`, and build the debug APK with `./gradlew :app:assembleDebug`.
+The Android app is a Gradle project (`apps/android/`, wrapper included, JDK 17+). Run its unit tests with `cd apps/android && ./gradlew :app:testDebugUnitTest`, and build the debug APK with `./gradlew :app:assembleDebug`. Release signing, the Google Play listing and uploads are fastlane (`apps/android/fastlane/`, `bundle exec fastlane android <lane>`); the upload key and Play credentials are never in the repository. See `docs/releasing-android.md`. After a screen changes, retake the Play screenshots with `bundle exec fastlane android screenshots serial:<device>` and commit them.
 
 The ESP32 firmware is a PlatformIO project (`firmware/esp32/`). Run its host tests with `cd firmware/esp32 && pio test -e native`, and build it with `pio run -e device` (ESP32-S3) or `pio run -e device-c3` (ESP32-C3). Firmware updates over Bluetooth are signed: the signing tool's tests are `python3 -m unittest discover -s firmware/esp32/tools` (needs `pip install cryptography`), and `pio run -e device-dev` builds the developer firmware that accepts unsigned updates. The tests for the legacy Node device are `cd firmware/legacy-pi && npm test`.
 

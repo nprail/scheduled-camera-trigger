@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -17,9 +19,33 @@ android {
         versionName = "1.0.0-beta.2"
     }
 
+    // Release signing (the Play upload key). The values come from the environment (CI) or from
+    // apps/android/keystore.properties (a local file, never committed); with neither, the release build is
+    // left unsigned, so `assembleDebug`, the tests and forks that do not publish keep working.
+    // See docs/releasing-android.md.
+    val keystoreProperties = Properties().apply {
+        val file = rootProject.file("keystore.properties")
+        if (file.exists()) file.inputStream().use { load(it) }
+    }
+    fun signingValue(env: String, key: String): String? =
+        System.getenv(env)?.takeIf { it.isNotBlank() } ?: keystoreProperties.getProperty(key)?.takeIf { it.isNotBlank() }
+
+    val keystorePath = signingValue("ANDROID_KEYSTORE_FILE", "storeFile")
+    signingConfigs {
+        if (keystorePath != null) {
+            create("release") {
+                storeFile = rootProject.file(keystorePath).takeIf { it.exists() } ?: file(keystorePath)
+                storePassword = signingValue("ANDROID_KEYSTORE_PASSWORD", "storePassword")
+                keyAlias = signingValue("ANDROID_KEY_ALIAS", "keyAlias")
+                keyPassword = signingValue("ANDROID_KEY_PASSWORD", "keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
     }
 

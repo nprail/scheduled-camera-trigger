@@ -1,0 +1,4 @@
+source "https://rubygems.org"
+
+# Play Store metadata, screenshots and uploads (docs/releasing-android.md)
+gem "fastlane", "~> 2.241"

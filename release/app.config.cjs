@@ -15,7 +15,14 @@ module.exports = {
       },
     ],
     ["@semantic-release/changelog", { changelogFile: "apps/CHANGELOG.md", changelogTitle: "# Kairos apps changelog" }],
-    ["@semantic-release/exec", { prepareCmd: "node scripts/set-app-version.mjs ${nextRelease.version}" }],
+    [
+      "@semantic-release/exec",
+      {
+        prepareCmd: "node scripts/set-app-version.mjs ${nextRelease.version}",
+        // tell the workflow which version to build and send to the stores
+        publishCmd: 'echo "version=${nextRelease.version}" >> "$GITHUB_OUTPUT"',
+      },
+    ],
     [
       "@semantic-release/git",
       {
